@@ -33,10 +33,12 @@ def get_embedding_model():
         return None
     if model is None:
         try:
-            print("Loading sentence transformer model...")
+            if DEBUG:
+                print("Loading sentence transformer model...")
             model = SentenceTransformer('all-mpnet-base-v2')
         except Exception as e:
-            print(f"Warning: Could not load sentence transformer: {e}")
+            if DEBUG:
+                print(f"Warning: Could not load sentence transformer: {e}")
             return None
     return model
 
@@ -227,8 +229,9 @@ CRITICAL REQUIREMENTS:
             scoring_result["criterion_scores"] = validated_criterion_scores
             
         except json.JSONDecodeError as e:
-            print(f"JSON decode error: {e}")
-            print(f"Content received (first 1000 chars): {content[:1000]}")
+            if DEBUG:
+                print(f"JSON decode error: {e}")
+                print(f"Content received (first 1000 chars): {content[:1000]}")
             # Try to extract score using regex as fallback
             score_match = re.search(r'"overall_score"\s*:\s*(\d+\.?\d*)', content)
             if score_match:
@@ -240,7 +243,8 @@ CRITICAL REQUIREMENTS:
                     llm_score = float(score_match.group(1))
                 else:
                     llm_score = semantic_score  # Use semantic score as fallback
-                    print(f"WARNING: Could not extract overall_score, using semantic_score: {semantic_score}")
+                    if DEBUG:
+                        print(f"WARNING: Could not extract overall_score, using semantic_score: {semantic_score}")
             
             # Try to extract criterion scores using regex
             criterion_scores = []
@@ -310,9 +314,11 @@ CRITICAL REQUIREMENTS:
         }
         
     except Exception as e:
-        print(f"ERROR in LLM scoring: {e}")
-        import traceback
-        traceback.print_exc()
+        import logging
+        logging.error(f"ERROR in LLM scoring: {e}")
+        if DEBUG:
+            import traceback
+            traceback.print_exc()
         
         # Provide more detailed error information
         error_msg = str(e)
