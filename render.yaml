@@ -5,6 +5,7 @@ services:
     rootDir: backend
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    pythonVersion: 3.11
     envVars:
       - key: MONGODB_URI
         sync: false
@@ -15,7 +16,5 @@ services:
       - key: CORS_ORIGINS
         sync: false
       - key: DEBUG
-        value: false
-      - key: PYTHON_VERSION
-        value: 3.11
+        value: "false"
 
