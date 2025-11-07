@@ -1,10 +1,7 @@
 import axios from 'axios'
 
-// In development, use proxy (no CORS needed). In production, MUST set VITE_API_URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : (() => {
-  console.error('⚠️ VITE_API_URL not set in production! Please set it in Vercel environment variables.')
-  return '/api' // Fallback to relative path (won't work without backend deployed)
-})())
+// In development, use proxy (no CORS needed). In production, use Render backend
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'https://greenstoneresume.onrender.com/api')
 
 const authApi = axios.create({
   baseURL: API_BASE_URL,
