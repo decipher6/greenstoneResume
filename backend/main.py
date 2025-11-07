@@ -22,8 +22,10 @@ app = FastAPI(
 )
 
 # CORS configuration - use environment variable in production
-allowed_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
-allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
+# Default includes localhost for development and Vercel frontend for production
+default_origins = "http://localhost:5173,http://localhost:3000,https://greenstone-resume.vercel.app,https://greenstone-resume-git-main.vercel.app"
+allowed_origins_str = os.getenv("CORS_ORIGINS", default_origins)
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
