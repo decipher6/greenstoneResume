@@ -48,7 +48,7 @@ Go to **Settings → Environment** and add:
 | `MONGODB_URI` | `mongodb+srv://...` | Your MongoDB connection string |
 | `GROQ_API_KEY` | `gsk_...` | Your Groq API key |
 | `DATABASE_NAME` | `greenstone_talent` | Database name |
-| `CORS_ORIGINS` | `https://your-frontend.vercel.app` | Your Vercel frontend URL |
+| `CORS_ORIGINS` | `https://greenstone-resume.vercel.app,https://greenstone-resume-git-main.vercel.app` | Your Vercel frontend URLs |
 | `DEBUG` | `false` | Production mode |
 
 **Important**: 

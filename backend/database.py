@@ -8,7 +8,13 @@ load_dotenv()
 
 def get_mongodb_uri():
     """Get MongoDB URI with properly encoded credentials"""
-    raw_uri = os.getenv("MONGODB_URI", "mongodb+srv://yg2810:M@l()n3*D1es@cluster0.uxqqqdj.mongodb.net/")
+    raw_uri = os.getenv("MONGODB_URI")
+    
+    if not raw_uri:
+        raise ValueError(
+            "MONGODB_URI environment variable is required. "
+            "Please set it in your .env file or environment variables."
+        )
     
     try:
         # If URI already contains @, parse it and encode credentials
