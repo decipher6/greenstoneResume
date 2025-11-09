@@ -27,4 +27,4 @@ Intelligent candidate screening platform with AI-powered resume analysis.
 ## Hosting is done on free tiers of Render so it might take some time for the service to wake up while trying to access the website. The free instance will spin down with inactivity, which can delay requests by 50 seconds or more. So please give the MVP some time after the login fails for the Backend service to be active.
 
 # Demo
-- https://www.loom.com/share/16d965ba3547498b861e62122543d394
+- https://www.loom.com/share/edc046f3d28f421da8a3badb12be05c7
