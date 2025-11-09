@@ -8,8 +8,8 @@ motor>=3.7.0
 pymongo>=4.15.0,<5.0.0
 pyOpenSSL>=25.0.0
 cryptography>=46.0.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
+pydantic>=2.5.0,<3.0.0
+pydantic-settings>=2.1.0
 python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
 python-dotenv==1.0.0
