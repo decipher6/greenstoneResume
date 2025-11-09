@@ -25,6 +25,20 @@ const JobDetail = () => {
     min_overall_score: '',
     sort_by: 'overall_score'
   })
+  const [autoAnalyze, setAutoAnalyze] = useState(true)
+
+  // Load autoAnalyze setting from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('appSettings')
+    if (saved) {
+      try {
+        const settings = JSON.parse(saved)
+        setAutoAnalyze(settings.autoAnalyze ?? true)
+      } catch (e) {
+        console.error('Error loading settings:', e)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     fetchData()
@@ -84,6 +98,24 @@ const JobDetail = () => {
       await uploadCandidatesBulk(jobId, files)
       alert(`Successfully uploaded ${files.length} file(s)!`)
       fetchData()
+      
+      // Auto-analyze if setting is enabled
+      if (autoAnalyze) {
+        // Wait a moment for candidates to be saved, then trigger analysis
+        setTimeout(async () => {
+          try {
+            await runAnalysis(jobId, false) // false = only analyze new candidates
+            alert('Auto-analysis started! Results will appear shortly.')
+            // Poll for updates
+            const refreshInterval = setInterval(() => {
+              fetchData()
+            }, 3000)
+            setTimeout(() => clearInterval(refreshInterval), 60000)
+          } catch (error) {
+            console.error('Error starting auto-analysis:', error)
+          }
+        }, 1000)
+      }
     } catch (error) {
       console.error('Error uploading files:', error)
       alert('Error uploading files. Please try again.')

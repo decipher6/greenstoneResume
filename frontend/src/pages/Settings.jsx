@@ -1,15 +1,24 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const Settings = () => {
-  const [settings, setSettings] = useState({
-    companyName: 'Greenstone Talent AI',
-    email: 'admin@greenstone.ai',
-    timezone: 'UTC-8 (Pacific Time)',
-    autoAnalyze: true,
-    emailNotifications: false,
-    advancedScoring: false,
-    linkedinEvaluation: false
+  // Load settings from localStorage on mount
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem('appSettings')
+    return saved ? JSON.parse(saved) : {
+      companyName: 'Greenstone Talent AI',
+      email: 'admin@greenstone.ai',
+      timezone: 'UTC-8 (Pacific Time)',
+      autoAnalyze: true,
+      emailNotifications: false,
+      advancedScoring: false,
+      linkedinEvaluation: false
+    }
   })
+
+  // Save settings to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('appSettings', JSON.stringify(settings))
+  }, [settings])
 
   const handleToggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }))
