@@ -24,5 +24,7 @@ Intelligent candidate screening platform with AI-powered resume analysis.
 - **AI**: Groq API (LLaMA 3.3)
 - **Hosting**: Vercel (Frontend) + Render (Backend)
 
-# Hosting is done on free tiers of Render so it might take some time for the service to wake up while trying to access the website.
-# The free instance will spin down with inactivity, which can delay requests by 50 seconds or more. So please give the MVP some time after the login fails for the Backend service to be active.
+## Hosting is done on free tiers of Render so it might take some time for the service to wake up while trying to access the website. The free instance will spin down with inactivity, which can delay requests by 50 seconds or more. So please give the MVP some time after the login fails for the Backend service to be active.
+
+# Demo
+- https://www.loom.com/share/16d965ba3547498b861e62122543d394
