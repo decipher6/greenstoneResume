@@ -42,26 +42,15 @@ def decode_token(token: str) -> dict:
 
 @router.post("/signup")
 async def signup(user_data: UserSignup):
-    """Create a new user account (simplified - always succeeds)"""
+    """Create a new user account"""
     db = get_db()
     
     # Check if user already exists
     existing_user = await db.users.find_one({"email": user_data.email})
     if existing_user:
-        # If user exists, just return success with existing user
-        user_id = str(existing_user["_id"])
-        token = create_token(user_id, user_data.email)
-        return {
-            "message": "Login successful",
-            "token": token,
-            "user": {
-                "id": user_id,
-                "email": existing_user["email"],
-                "name": existing_user.get("name", user_data.name)
-            }
-        }
+        raise HTTPException(status_code=400, detail="User with this email already exists. Please sign in instead.")
     
-    # Hash password
+    # Store password as-is (no hashing as requested)
     password_hash = hash_password(user_data.password)
     
     # Create user
@@ -90,35 +79,21 @@ async def signup(user_data: UserSignup):
 
 @router.post("/login")
 async def login(user_data: UserLogin):
-    """Login user (simplified - creates user if doesn't exist)"""
+    """Login user - verify email and password"""
     db = get_db()
     
     # Find user
     user = await db.users.find_one({"email": user_data.email})
     
     if not user:
-        # Auto-create user if doesn't exist (simplified auth)
-        user_dict = {
-            "email": user_data.email,
-            "name": user_data.email.split("@")[0],  # Use email prefix as name
-            "password_hash": hash_password(user_data.password),
-            "created_at": datetime.now()
-        }
-        result = await db.users.insert_one(user_dict)
-        user_id = str(result.inserted_id)
-        token = create_token(user_id, user_data.email)
-        return {
-            "message": "Login successful",
-            "token": token,
-            "user": {
-                "id": user_id,
-                "email": user_data.email,
-                "name": user_dict["name"]
-            }
-        }
+        raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    # Verify password (but don't fail - simplified)
-    # Always allow login for existing users
+    # Verify password (plain text comparison, no hashing)
+    stored_password = user.get("password_hash", "")
+    if not verify_password(user_data.password, stored_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    # Create token
     token = create_token(str(user["_id"]), user["email"])
     
     return {
