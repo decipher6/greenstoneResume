@@ -5,8 +5,8 @@ Intelligent candidate screening platform with AI-powered resume analysis.
 ## Quick Links
 
 - **Frontend**: https://greenstone-resume.vercel.app
+- **Backend**: https://greenstoneresume.onrender.com
 - **Deployment Guide**: See `DEPLOYMENT_FINAL.md`
-- **Render Quick Reference**: See `RENDER_QUICK_REFERENCE.md`
 
 ## Features
 
@@ -24,8 +24,4 @@ Intelligent candidate screening platform with AI-powered resume analysis.
 - **Database**: MongoDB Atlas
 - **AI**: Groq API (LLaMA 3.3)
 - **Hosting**: Vercel (Frontend) + Render (Backend)
-
-## Documentation
-
-- `DEPLOYMENT_FINAL.md` - Complete deployment guide
-- `RENDER_QUICK_REFERENCE.md` - Quick reference for Render configuration
+- Hosting is done on free tiers of Render so it might take some time for the service to wake up while trying to access the website. 
