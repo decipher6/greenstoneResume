@@ -51,8 +51,9 @@ async def send_emails(email_data: EmailSend):
         sent_count += 1
     
     return {
-        "message": f"Emails sent to {sent_count} candidates",
+        "message": f"[DEMO] Email functionality is for demonstration purposes only. {sent_count} emails would be sent.",
         "sent_count": sent_count,
-        "candidates": candidates_emailed
+        "candidates": candidates_emailed,
+        "demo": True
     }
 

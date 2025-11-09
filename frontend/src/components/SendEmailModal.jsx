@@ -19,7 +19,8 @@ Greenstone Talent Team`,
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await sendEmails({ job_id: jobId, candidate_ids: candidateIds, template })
+      const response = await sendEmails({ job_id: jobId, candidate_ids: candidateIds, template })
+      alert(response.data.message || `Demo: Emails would be sent to ${candidateIds.length} candidates`)
       onClose()
     } catch (error) {
       console.error('Error sending emails:', error)
@@ -40,9 +41,13 @@ Greenstone Talent Team`,
           </button>
         </div>
 
-        <div className="mb-6 p-4 glass-card bg-glass-100">
+        <div className="mb-6 p-4 glass-card bg-glass-100 border border-yellow-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-yellow-400 text-sm font-semibold">⚠️ DEMO MODE</span>
+          </div>
           <p className="text-sm text-gray-400 mb-2">{candidateIds.length} candidates selected</p>
-          <p className="text-xs text-gray-500">Use [Candidate Name] and [Job Title] as placeholders - they will be automatically replaced.</p>
+          <p className="text-xs text-yellow-300">This is a demonstration. No actual emails will be sent.</p>
+          <p className="text-xs text-gray-500 mt-1">Use [Candidate Name] and [Job Title] as placeholders - they will be automatically replaced.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -73,7 +78,7 @@ Greenstone Talent Team`,
               Cancel
             </button>
             <button type="submit" className="glass-button bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700">
-              Send {candidateIds.length} Emails
+              Demo: Send {candidateIds.length} Emails
             </button>
           </div>
         </form>
