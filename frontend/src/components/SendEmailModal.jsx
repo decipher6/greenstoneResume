@@ -47,7 +47,6 @@ Greenstone Talent Team`,
           </div>
           <p className="text-sm text-gray-400 mb-2">{candidateIds.length} candidates selected</p>
           <p className="text-xs text-yellow-300">This is a demonstration. No actual emails will be sent.</p>
-          <p className="text-xs text-gray-500 mt-1">Use [Candidate Name] and [Job Title] as placeholders - they will be automatically replaced.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
