@@ -100,7 +100,7 @@ const JobDetail = () => {
       fetchData()
     } catch (error) {
       console.error('Error adding LinkedIn candidate:', error)
-      alert('Error adding LinkedIn candidate. Please try again.')
+      alert('LinkedIn candidate retrival not active. LinkedIn\'s robots.txt disllows scraping')
     }
   }
 
