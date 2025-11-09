@@ -59,25 +59,6 @@ async def create_job(job: JobCreate):
     job_dict["id"] = str(result.inserted_id)
     return Job(**job_dict)
 
-@router.put("/{job_id}", response_model=Job)
-async def update_job(job_id: str, job: JobCreate):
-    """Update a job post"""
-    db = get_db()
-    job_dict = job.dict()
-    job_dict["updated_at"] = datetime.now()
-    
-    result = await db.jobs.update_one(
-        {"_id": ObjectId(job_id)},
-        {"$set": job_dict}
-    )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    updated_job = await db.jobs.find_one({"_id": ObjectId(job_id)})
-    updated_job["id"] = str(updated_job["_id"])
-    return Job(**updated_job)
-
 @router.delete("/{job_id}")
 async def delete_job(job_id: str):
     """Delete a job post"""

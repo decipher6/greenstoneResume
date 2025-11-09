@@ -19,56 +19,6 @@ router = APIRouter()
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.post("/upload")
-async def upload_candidate(
-    job_id: str = Form(...),
-    file: UploadFile = File(...)
-):
-    """Upload a single candidate CV"""
-    db = get_db()
-    
-    # Verify job exists
-    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    # Read file content
-    file_content = await file.read()
-    
-    # Parse resume
-    resume_text = await parse_resume(file_content, file.filename)
-    
-    # Extract entities
-    contact_info_dict = await extract_contact_info(resume_text)
-    name = await extract_name(resume_text)
-    
-    # Save file
-    file_path = os.path.join(UPLOAD_DIR, f"{job_id}_{datetime.now().timestamp()}_{file.filename}")
-    async with aiofiles.open(file_path, 'wb') as f:
-        await f.write(file_content)
-    
-    # Create candidate record
-    candidate_dict = {
-        "job_id": job_id,
-        "name": name,
-        "contact_info": contact_info_dict,
-        "resume_text": resume_text,
-        "resume_file_path": file_path,
-        "status": CandidateStatus.uploaded.value,
-        "created_at": datetime.now()
-    }
-    
-    result = await db.candidates.insert_one(candidate_dict)
-    
-    # Update job candidate count
-    await db.jobs.update_one(
-        {"_id": ObjectId(job_id)},
-        {"$inc": {"candidate_count": 1}}
-    )
-    
-    candidate_dict["id"] = str(result.inserted_id)
-    return Candidate(**candidate_dict)
-
 @router.post("/upload-bulk")
 async def upload_candidates_bulk(
     job_id: str = Form(...),

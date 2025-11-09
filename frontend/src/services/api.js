@@ -29,7 +29,6 @@ api.interceptors.request.use(
 export const getJobs = () => api.get('/jobs')
 export const getJob = (jobId) => api.get(`/jobs/${jobId}`)
 export const createJob = (data) => api.post('/jobs', data)
-export const updateJob = (jobId, data) => api.put(`/jobs/${jobId}`, data)
 export const deleteJob = (jobId) => api.delete(`/jobs/${jobId}`)
 export const runAnalysis = (jobId, force = false) => api.post(`/jobs/${jobId}/run-analysis?force=${force}`)
 export const reAnalyzeCandidate = (candidateId) => api.post(`/candidates/${candidateId}/re-analyze`)
@@ -37,14 +36,6 @@ export const reAnalyzeCandidate = (candidateId) => api.post(`/candidates/${candi
 // Candidates
 export const getCandidates = (jobId) => api.get(`/candidates/job/${jobId}`)
 export const getCandidate = (candidateId) => api.get(`/candidates/${candidateId}`)
-export const uploadCandidate = (jobId, file) => {
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('job_id', jobId)
-  return api.post('/candidates/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-}
 export const uploadCandidatesBulk = (jobId, files) => {
   const formData = new FormData()
   files.forEach(file => formData.append('files', file))
