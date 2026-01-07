@@ -83,6 +83,13 @@ export const getActivityLogs = (params = {}) => {
   const queryString = queryParams.toString()
   return api.get(`/activity-logs${queryString ? `?${queryString}` : ''}`)
 }
+export const getActivityLogsCount = (params = {}) => {
+  const queryParams = new URLSearchParams()
+  if (params.activity_type) queryParams.append('activity_type', params.activity_type)
+  if (params.job_id) queryParams.append('job_id', params.job_id)
+  const queryString = queryParams.toString()
+  return api.get(`/activity-logs/count${queryString ? `?${queryString}` : ''}`)
+}
 
 export default api
 

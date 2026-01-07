@@ -81,6 +81,29 @@ async def get_activity_logs(
         traceback.print_exc()
         return []
 
+@router.get("/count")
+async def get_activity_logs_count(
+    activity_type: Optional[str] = None,
+    job_id: Optional[str] = None
+):
+    """Get total count of activity logs with optional filtering"""
+    try:
+        db = get_db()
+        if not db:
+            return {"count": 0}
+        
+        query = {}
+        if activity_type:
+            query["activity_type"] = activity_type
+        if job_id:
+            query["job_id"] = job_id
+        
+        count = await db.activity_logs.count_documents(query)
+        return {"count": count}
+    except Exception as e:
+        print(f"❌ Error counting activity logs: {e}")
+        return {"count": 0}
+
 @router.get("/test")
 async def test_activity_log():
     """Test endpoint to create a sample activity log"""

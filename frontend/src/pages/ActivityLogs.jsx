@@ -10,14 +10,16 @@ import {
   Filter,
   RefreshCw
 } from 'lucide-react'
-import { getActivityLogs } from '../services/api'
+import { getActivityLogs, getActivityLogsCount } from '../services/api'
 
 const ActivityLogs = () => {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(0)
-  const limit = 50
+  const [totalCount, setTotalCount] = useState(0)
+  const [error, setError] = useState(null)
+  const limit = 30
 
   useEffect(() => {
     let isMounted = true
@@ -25,24 +27,37 @@ const ActivityLogs = () => {
     const fetchLogs = async () => {
       try {
         setLoading(true)
+        setError(null)
         const params = {
           limit,
           skip: page * limit
         }
+        const filterParams = {}
         if (filter !== 'all') {
           params.activity_type = filter
+          filterParams.activity_type = filter
         }
-        const response = await getActivityLogs(params)
+        
+        // Fetch logs and count in parallel
+        const [logsResponse, countResponse] = await Promise.all([
+          getActivityLogs(params),
+          getActivityLogsCount(filterParams)
+        ])
+        
         if (isMounted) {
-          console.log('Activity logs response:', response?.data)
+          console.log('Activity logs response:', logsResponse?.data)
+          console.log('Activity logs count:', countResponse?.data)
           // Ensure we have an array and filter out any invalid entries
-          const logsData = Array.isArray(response?.data) ? response.data : []
-          setLogs(logsData.filter(log => log && log.id))
+          const logsData = Array.isArray(logsResponse?.data) ? logsResponse.data : []
+          const validLogs = logsData.filter(log => log && log.id)
+          setLogs(validLogs)
+          setTotalCount(countResponse?.data?.count || 0)
         }
       } catch (error) {
         console.error('Error fetching activity logs:', error)
         if (isMounted) {
           setLogs([])
+          setError(error.response?.data?.detail || error.message || 'Failed to load activity logs')
         }
       } finally {
         if (isMounted) {
@@ -185,20 +200,30 @@ const ActivityLogs = () => {
             onClick={async () => {
               try {
                 setLoading(true)
+                setError(null)
                 const params = {
                   limit,
                   skip: page * limit
                 }
+                const filterParams = {}
                 if (filter !== 'all') {
                   params.activity_type = filter
+                  filterParams.activity_type = filter
                 }
-                const response = await getActivityLogs(params)
-                console.log('Activity logs response:', response?.data)
-                const logsData = Array.isArray(response?.data) ? response.data : []
-                setLogs(logsData.filter(log => log && log.id))
+                const [logsResponse, countResponse] = await Promise.all([
+                  getActivityLogs(params),
+                  getActivityLogsCount(filterParams)
+                ])
+                console.log('Activity logs response:', logsResponse?.data)
+                console.log('Activity logs count:', countResponse?.data)
+                const logsData = Array.isArray(logsResponse?.data) ? logsResponse.data : []
+                const validLogs = logsData.filter(log => log && log.id)
+                setLogs(validLogs)
+                setTotalCount(countResponse?.data?.count || 0)
               } catch (error) {
                 console.error('Error fetching activity logs:', error)
                 setLogs([])
+                setError(error.response?.data?.detail || error.message || 'Failed to load activity logs')
               } finally {
                 setLoading(false)
               }
@@ -212,6 +237,31 @@ const ActivityLogs = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="glass-card p-4 bg-red-500/10 border border-red-500/30">
+          <p className="text-red-400 text-sm font-medium mb-1">Error loading activity logs:</p>
+          <p className="text-red-300 text-sm">{error}</p>
+          <p className="text-xs text-gray-400 mt-2">Check the browser console for more details.</p>
+        </div>
+      )}
+
+      {!loading && !error && totalCount === 0 && logs.length === 0 && (
+        <div className="glass-card p-6 bg-yellow-500/10 border border-yellow-500/30">
+          <p className="text-yellow-400 text-sm font-medium mb-2">No activity logs found</p>
+          <p className="text-xs text-gray-400 mb-3">
+            This could mean:
+          </p>
+          <ul className="text-xs text-gray-400 list-disc list-inside space-y-1 mb-3">
+            <li>No activities have been logged yet</li>
+            <li>The activity logging system may need to be initialized</li>
+            <li>Activities created before the logging system was added won't appear</li>
+          </ul>
+          <p className="text-xs text-gray-400">
+            Try creating a new job or uploading a resume to generate activity logs.
+          </p>
+        </div>
+      )}
+
       {loading && logs.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-400 mx-auto mb-4"></div>
@@ -223,6 +273,9 @@ const ActivityLogs = () => {
           <p className="text-gray-400 mb-2">No activity logs found</p>
           <p className="text-sm text-gray-500">
             Activity logs will appear here when you create jobs, upload resumes, delete candidates, or run analyses.
+          </p>
+          <p className="text-xs text-gray-500 mt-2">
+            If you just created activities, try refreshing the page.
           </p>
         </div>
       ) : (
@@ -281,19 +334,21 @@ const ActivityLogs = () => {
         </div>
       )}
 
-      {logs.length >= limit && (
+      {(logs.length > 0 || page > 0) && (
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
-            disabled={page === 0}
+            disabled={page === 0 || loading}
             className="glass-button disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Previous
           </button>
-          <span className="text-sm text-gray-400">Page {page + 1}</span>
+          <span className="text-sm text-gray-400">
+            Page {page + 1} {totalCount > 0 && `(${Math.min((page + 1) * limit, totalCount)} of ${totalCount})`}
+          </span>
           <button
             onClick={() => setPage(p => p + 1)}
-            disabled={logs.length < limit}
+            disabled={logs.length < limit || loading}
             className="glass-button disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Next

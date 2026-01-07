@@ -23,7 +23,7 @@ const CreateJobModal = ({ onClose }) => {
     if (Math.abs(totalWeight - 100) > 5) {
       await showAlert(
         'Invalid Criteria Weights',
-        `The evaluation criteria weights must sum to approximately 100%.\n\nCurrent total: ${totalWeight.toFixed(1)}%\nRequired: ~100%`,
+        `The evaluation criteria weights must sum to 100%.\n\nCurrent total: ${totalWeight.toFixed(1)}%\nRequired: 100%`,
         'error'
       )
       return
