@@ -64,9 +64,6 @@ async def init_db():
             await db.jobs.create_index("title")
             await db.candidates.create_index("job_id")
             await db.candidates.create_index([("name", 1), ("phone", 1)])
-            await db.activity_logs.create_index("created_at")
-            await db.activity_logs.create_index("activity_type")
-            await db.activity_logs.create_index("job_id")
             # Note: assessments collections will be created when needed
             print("✅ Database indexes created")
         except Exception as idx_error:

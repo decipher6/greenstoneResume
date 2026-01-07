@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 
 from database import init_db
-from routes import jobs, candidates, assessments, analytics, email, auth, activity_logs
+from routes import jobs, candidates, assessments, analytics, email, auth
 
 load_dotenv()
 
@@ -41,7 +41,6 @@ app.include_router(candidates.router, prefix="/api/candidates", tags=["candidate
 app.include_router(assessments.router, prefix="/api/assessments", tags=["assessments"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(email.router, prefix="/api/email", tags=["email"])
-app.include_router(activity_logs.router, prefix="/api/activity-logs", tags=["activity-logs"])
 
 @app.get("/")
 async def root():
@@ -50,7 +49,7 @@ async def root():
 @app.get("/api/health")
 async def health():
     """Health check endpoint"""
-    return {"status": "ok", "routes": ["/api/auth", "/api/jobs", "/api/candidates", "/api/assessments", "/api/analytics", "/api/email", "/api/activity-logs"]}
+    return {"status": "ok", "routes": ["/api/auth", "/api/jobs", "/api/candidates", "/api/assessments", "/api/analytics", "/api/email"]}
 
 if __name__ == "__main__":
     import uvicorn

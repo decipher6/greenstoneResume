@@ -73,23 +73,5 @@ export const getTopCandidates = (jobId, limit = 5) => api.get(`/analytics/top-ca
 // Email
 export const sendEmails = (data) => api.post('/email/send', data)
 
-// Activity Logs
-export const getActivityLogs = (params = {}) => {
-  const queryParams = new URLSearchParams()
-  if (params.limit) queryParams.append('limit', params.limit)
-  if (params.skip) queryParams.append('skip', params.skip)
-  if (params.activity_type) queryParams.append('activity_type', params.activity_type)
-  if (params.job_id) queryParams.append('job_id', params.job_id)
-  const queryString = queryParams.toString()
-  return api.get(`/activity-logs${queryString ? `?${queryString}` : ''}`)
-}
-export const getActivityLogsCount = (params = {}) => {
-  const queryParams = new URLSearchParams()
-  if (params.activity_type) queryParams.append('activity_type', params.activity_type)
-  if (params.job_id) queryParams.append('job_id', params.job_id)
-  const queryString = queryParams.toString()
-  return api.get(`/activity-logs/count${queryString ? `?${queryString}` : ''}`)
-}
-
 export default api
 
