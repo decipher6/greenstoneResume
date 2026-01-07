@@ -92,16 +92,19 @@ async def upload_candidates_bulk(
         {"$inc": {"candidate_count": len(uploaded_candidates)}}
     )
     
-    # Log activity
+    # Log activity (don't fail if logging fails)
     if uploaded_candidates:
-        candidate_names = [c.name for c in uploaded_candidates]
-        await create_activity_log(
-            activity_type=ActivityType.candidate_uploaded,
-            description=f"{len(uploaded_candidates)} resume(s) uploaded",
-            job_id=job_id,
-            job_title=job.get("title"),
-            metadata={"count": len(uploaded_candidates), "candidate_names": candidate_names}
-        )
+        try:
+            candidate_names = [c.name for c in uploaded_candidates]
+            await create_activity_log(
+                activity_type=ActivityType.candidate_uploaded,
+                description=f"{len(uploaded_candidates)} resume(s) uploaded",
+                job_id=job_id,
+                job_title=job.get("title"),
+                metadata={"count": len(uploaded_candidates), "candidate_names": candidate_names}
+            )
+        except Exception as e:
+            print(f"Warning: Failed to log activity for candidate upload: {e}")
     
     return {"uploaded": len(uploaded_candidates), "candidates": uploaded_candidates}
 
@@ -205,16 +208,19 @@ async def add_candidate_from_linkedin(
         {"$inc": {"candidate_count": 1}}
     )
     
-    # Log activity
-    await create_activity_log(
-        activity_type=ActivityType.candidate_uploaded,
-        description=f"LinkedIn candidate '{candidate_dict['name']}' added",
-        job_id=job_id,
-        job_title=job.get("title"),
-        candidate_id=candidate_dict["id"],
-        candidate_name=candidate_dict["name"],
-        metadata={"source": "linkedin"}
-    )
+    # Log activity (don't fail if logging fails)
+    try:
+        await create_activity_log(
+            activity_type=ActivityType.candidate_uploaded,
+            description=f"LinkedIn candidate '{candidate_dict['name']}' added",
+            job_id=job_id,
+            job_title=job.get("title"),
+            candidate_id=candidate_dict["id"],
+            candidate_name=candidate_dict["name"],
+            metadata={"source": "linkedin"}
+        )
+    except Exception as e:
+        print(f"Warning: Failed to log activity for LinkedIn candidate: {e}")
     
     return Candidate(**candidate_dict)
 
@@ -267,15 +273,18 @@ async def delete_candidate(candidate_id: str):
         {"$inc": {"candidate_count": -1}}
     )
     
-    # Log activity
-    await create_activity_log(
-        activity_type=ActivityType.candidate_deleted,
-        description=f"Candidate '{candidate_name}' deleted",
-        job_id=job_id,
-        job_title=job_title,
-        candidate_id=candidate_id,
-        candidate_name=candidate_name
-    )
+    # Log activity (don't fail if logging fails)
+    try:
+        await create_activity_log(
+            activity_type=ActivityType.candidate_deleted,
+            description=f"Candidate '{candidate_name}' deleted",
+            job_id=job_id,
+            job_title=job_title,
+            candidate_id=candidate_id,
+            candidate_name=candidate_name
+        )
+    except Exception as e:
+        print(f"Warning: Failed to log activity for candidate deletion: {e}")
     
     return {"message": "Candidate deleted successfully"}
 
@@ -446,17 +455,20 @@ async def process_candidate_analysis(job_id: str, candidate_id: str):
             }
         )
         
-        # Log activity
-        candidate_name = candidate.get("name", "Unknown")
-        await create_activity_log(
-            activity_type=ActivityType.candidate_analyzed,
-            description=f"Candidate '{candidate_name}' analyzed with score {score_breakdown['overall_score']:.1f}/10",
-            job_id=job_id,
-            job_title=job.get("title"),
-            candidate_id=candidate_id,
-            candidate_name=candidate_name,
-            metadata={"overall_score": score_breakdown["overall_score"]}
-        )
+        # Log activity (don't fail if logging fails)
+        try:
+            candidate_name = candidate.get("name", "Unknown")
+            await create_activity_log(
+                activity_type=ActivityType.candidate_analyzed,
+                description=f"Candidate '{candidate_name}' analyzed with score {score_breakdown['overall_score']:.1f}/10",
+                job_id=job_id,
+                job_title=job.get("title"),
+                candidate_id=candidate_id,
+                candidate_name=candidate_name,
+                metadata={"overall_score": score_breakdown["overall_score"]}
+            )
+        except Exception as e:
+            print(f"Warning: Failed to log activity for candidate analysis: {e}")
         
     except Exception as e:
         print(f"Error analyzing candidate {candidate_id}: {e}")

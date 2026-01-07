@@ -34,9 +34,11 @@ const ActivityLogs = () => {
         params.activity_type = filter
       }
       const response = await getActivityLogs(params)
-      setLogs(response.data)
+      console.log('Activity logs response:', response.data)
+      setLogs(response.data || [])
     } catch (error) {
       console.error('Error fetching activity logs:', error)
+      setLogs([])
     } finally {
       setLoading(false)
     }
@@ -175,7 +177,11 @@ const ActivityLogs = () => {
         </div>
       ) : logs.length === 0 ? (
         <div className="glass-card p-12 text-center">
-          <p className="text-gray-400">No activity logs found</p>
+          <FileText size={48} className="mx-auto mb-4 text-gray-500" />
+          <p className="text-gray-400 mb-2">No activity logs found</p>
+          <p className="text-sm text-gray-500">
+            Activity logs will appear here when you create jobs, upload resumes, delete candidates, or run analyses.
+          </p>
         </div>
       ) : (
         <div className="glass-card overflow-hidden">
