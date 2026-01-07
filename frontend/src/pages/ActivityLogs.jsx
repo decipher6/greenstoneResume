@@ -240,8 +240,16 @@ const ActivityLogs = () => {
       {error && (
         <div className="glass-card p-4 bg-red-500/10 border border-red-500/30">
           <p className="text-red-400 text-sm font-medium mb-1">Error loading activity logs:</p>
-          <p className="text-red-300 text-sm">{error}</p>
-          <p className="text-xs text-gray-400 mt-2">Check the browser console for more details.</p>
+          <p className="text-red-300 text-sm mb-2">{error}</p>
+          {error.includes('404') || error.includes('Not Found') ? (
+            <div className="text-xs text-gray-400 space-y-1">
+              <p className="font-medium text-yellow-400">⚠️ Backend not deployed yet</p>
+              <p>The activity logs feature requires the backend to be updated on Render.</p>
+              <p>Please deploy the latest backend code to see activity logs.</p>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 mt-2">Check the browser console for more details.</p>
+          )}
         </div>
       )}
 

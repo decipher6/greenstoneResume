@@ -50,7 +50,7 @@ async def root():
 @app.get("/api/health")
 async def health():
     """Health check endpoint"""
-    return {"status": "ok", "routes": ["/api/auth", "/api/jobs", "/api/candidates", "/api/assessments", "/api/analytics", "/api/email"]}
+    return {"status": "ok", "routes": ["/api/auth", "/api/jobs", "/api/candidates", "/api/assessments", "/api/analytics", "/api/email", "/api/activity-logs"]}
 
 if __name__ == "__main__":
     import uvicorn
