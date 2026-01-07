@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ModalProvider } from './context/ModalContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
@@ -128,7 +129,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <ModalProvider>
+          <AppRoutes />
+        </ModalProvider>
       </AuthProvider>
     </Router>
   )

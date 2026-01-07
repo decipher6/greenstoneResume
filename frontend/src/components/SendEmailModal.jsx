@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { X, Mail } from 'lucide-react'
 import { sendEmails } from '../services/api'
+import { useModal } from '../context/ModalContext'
 
 const SendEmailModal = ({ jobId, candidateIds, onClose }) => {
+  const { showAlert } = useModal()
   const [template, setTemplate] = useState({
     subject: 'Update on your application',
     body: `Dear [Candidate Name],
@@ -20,11 +22,15 @@ Greenstone Talent Team`,
     e.preventDefault()
     try {
       const response = await sendEmails({ job_id: jobId, candidate_ids: candidateIds, template })
-      alert(response.data.message || `Demo: Emails would be sent to ${candidateIds.length} candidates`)
+      await showAlert(
+        'Emails Sent',
+        response.data.message || `Demo: Emails would be sent to ${candidateIds.length} candidates`,
+        'success'
+      )
       onClose()
     } catch (error) {
       console.error('Error sending emails:', error)
-      alert('Error sending emails. Please try again.')
+      await showAlert('Error', 'Error sending emails. Please try again.', 'error')
     }
   }
 

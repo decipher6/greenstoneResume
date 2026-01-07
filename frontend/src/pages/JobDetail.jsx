@@ -7,10 +7,12 @@ import {
 } from '../services/api'
 import api from '../services/api'
 import SendEmailModal from '../components/SendEmailModal'
+import { useModal } from '../context/ModalContext'
 
 const JobDetail = () => {
   const { jobId } = useParams()
   const navigate = useNavigate()
+  const { showConfirm, showAlert } = useModal()
   const [job, setJob] = useState(null)
   const [candidates, setCandidates] = useState([])
   const [topCandidates, setTopCandidates] = useState([])
@@ -76,7 +78,11 @@ const JobDetail = () => {
 
     // Validate file limit (50 CVs max)
     if (files.length > 50) {
-      alert(`Maximum 50 files allowed. You selected ${files.length} files. Please select fewer files.`)
+      await showAlert(
+        'File Limit Exceeded',
+        `Maximum 50 files allowed. You selected ${files.length} files. Please select fewer files.`,
+        'error'
+      )
       e.target.value = '' // Reset input
       return
     }
@@ -89,14 +95,18 @@ const JobDetail = () => {
     })
 
     if (invalidFiles.length > 0) {
-      alert(`Invalid file format(s): ${invalidFiles.map(f => f.name).join(', ')}\n\nSupported formats: .pdf, .docx, .doc`)
+      await showAlert(
+        'Invalid File Format',
+        `Invalid file format(s): ${invalidFiles.map(f => f.name).join(', ')}\n\nSupported formats: .pdf, .docx, .doc`,
+        'error'
+      )
       e.target.value = '' // Reset input
       return
     }
 
     try {
       await uploadCandidatesBulk(jobId, files)
-      alert(`Successfully uploaded ${files.length} file(s)!`)
+      await showAlert('Success', `Successfully uploaded ${files.length} file(s)!`, 'success')
       fetchData()
       
       // Auto-analyze if setting is enabled
@@ -105,7 +115,7 @@ const JobDetail = () => {
         setTimeout(async () => {
           try {
             await runAnalysis(jobId, false) // false = only analyze new candidates
-            alert('Auto-analysis started! Results will appear shortly.')
+            await showAlert('Analysis Started', 'Auto-analysis started! Results will appear shortly.', 'info')
             // Poll for updates
             const refreshInterval = setInterval(() => {
               fetchData()
@@ -118,7 +128,7 @@ const JobDetail = () => {
       }
     } catch (error) {
       console.error('Error uploading files:', error)
-      alert('Error uploading files. Please try again.')
+      await showAlert('Error', 'Error uploading files. Please try again.', 'error')
     }
     e.target.value = '' // Reset input after upload
   }
@@ -130,17 +140,33 @@ const JobDetail = () => {
       await addLinkedInCandidate(jobId, linkedinUrl)
       setLinkedinUrl('')
       fetchData()
+      await showAlert('Success', 'LinkedIn candidate added successfully.', 'success')
     } catch (error) {
       console.error('Error adding LinkedIn candidate:', error)
-      alert('LinkedIn candidate retrival not active. LinkedIn\'s robots.txt disllows scraping')
+      await showAlert(
+        'LinkedIn Not Available',
+        'LinkedIn candidate retrieval is not active. LinkedIn\'s robots.txt disallows scraping.',
+        'info'
+      )
     }
   }
 
   const handleRunAnalysis = async () => {
-    const force = window.confirm('Re-analyze all candidates (including already analyzed ones)?\n\nClick OK to re-analyze all, or Cancel to only analyze new candidates.')
+    const force = await showConfirm({
+      title: 'Run Analysis',
+      message: 'Re-analyze all candidates (including already analyzed ones)?\n\nClick "Re-analyze All" to re-analyze all candidates, or "Analyze New Only" to only analyze new candidates.',
+      type: 'info',
+      confirmText: 'Re-analyze All',
+      cancelText: 'Analyze New Only'
+    })
+    
     try {
       await runAnalysis(jobId, force)
-      alert(`Analysis started! ${force ? 'Re-analyzing all candidates' : 'Analyzing new candidates only'}. Results will appear shortly.`)
+      await showAlert(
+        'Analysis Started',
+        `${force ? 'Re-analyzing all candidates' : 'Analyzing new candidates only'}. Results will appear shortly.`,
+        'success'
+      )
       // Poll for updates
       const refreshInterval = setInterval(() => {
         fetchData()
@@ -148,17 +174,27 @@ const JobDetail = () => {
       setTimeout(() => clearInterval(refreshInterval), 60000) // Stop after 60 seconds
     } catch (error) {
       console.error('Error running analysis:', error)
-      alert('Error running analysis. Please try again.')
+      await showAlert('Error', 'Error running analysis. Please try again.', 'error')
     }
   }
 
   const handleDelete = async (candidateId) => {
-    if (window.confirm('Are you sure you want to delete this candidate?')) {
+    const confirmed = await showConfirm({
+      title: 'Delete Candidate',
+      message: 'Are you sure you want to delete this candidate? This action cannot be undone.',
+      type: 'confirm',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    })
+    
+    if (confirmed) {
       try {
         await deleteCandidate(candidateId)
         fetchData()
+        await showAlert('Success', 'Candidate deleted successfully.', 'success')
       } catch (error) {
         console.error('Error deleting candidate:', error)
+        await showAlert('Error', 'Failed to delete candidate. Please try again.', 'error')
       }
     }
   }

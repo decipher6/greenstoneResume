@@ -3,10 +3,12 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Brain, Mail, FileText, Upload, RefreshCw } from 'lucide-react'
 import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+import { useModal } from '../context/ModalContext'
 
 const CandidateProfile = () => {
   const { candidateId } = useParams()
   const navigate = useNavigate()
+  const { showConfirm, showAlert } = useModal()
   const [candidate, setCandidate] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -46,11 +48,15 @@ const CandidateProfile = () => {
       if (personality_uploaded) parts.push('Personality')
       message += parts.join(' and ')
       
-      alert(message)
+      await showAlert('Success', message, 'success')
       fetchCandidate() // Refresh candidate data
     } catch (error) {
       console.error('Error uploading assessments:', error)
-      alert('Error uploading assessment results. Please check the file format.\n\nCSV format: percentile, raw_score, openness, conscientiousness, extraversion, agreeableness, neuroticism\nPDF: Should contain CCAT percentile and personality scores.')
+      await showAlert(
+        'Upload Error',
+        'Error uploading assessment results. Please check the file format.\n\nCSV format: percentile, raw_score, openness, conscientiousness, extraversion, agreeableness, neuroticism\nPDF: Should contain CCAT percentile and personality scores.',
+        'error'
+      )
     } finally {
       setUploading(false)
       e.target.value = '' // Reset input
@@ -58,14 +64,22 @@ const CandidateProfile = () => {
   }
 
   const handleReAnalyze = async () => {
-    if (!window.confirm('Re-analyze this candidate with updated AI scoring? This will update all scores and justifications.')) {
+    const confirmed = await showConfirm({
+      title: 'Re-analyze Candidate',
+      message: 'Re-analyze this candidate with updated AI scoring? This will update all scores and justifications.',
+      type: 'info',
+      confirmText: 'Re-analyze',
+      cancelText: 'Cancel'
+    })
+    
+    if (!confirmed) {
       return
     }
 
     setReAnalyzing(true)
     try {
       await reAnalyzeCandidate(candidateId)
-      alert('Re-analysis started! The page will auto-refresh to show updated scores.')
+      await showAlert('Re-analysis Started', 'Re-analysis started! The page will auto-refresh to show updated scores.', 'success')
       
       // Poll for updates every 2 seconds
       const refreshInterval = setInterval(async () => {
@@ -92,7 +106,7 @@ const CandidateProfile = () => {
       }, 120000)
     } catch (error) {
       console.error('Error re-analyzing candidate:', error)
-      alert('Error starting re-analysis. Please try again.')
+      await showAlert('Error', 'Error starting re-analysis. Please try again.', 'error')
       setReAnalyzing(false)
     }
   }

@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { createJob } from '../services/api'
+import { useModal } from '../context/ModalContext'
 
 const CreateJobModal = ({ onClose }) => {
+  const { showAlert } = useModal()
   const [formData, setFormData] = useState({
     title: '',
     department: '',
@@ -12,14 +14,28 @@ const CreateJobModal = ({ onClose }) => {
     ]
   })
 
+  const totalWeight = formData.evaluation_criteria.reduce((sum, c) => sum + (parseFloat(c.weight) || 0), 0)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Validate weights
+    if (Math.abs(totalWeight - 100) > 5) {
+      await showAlert(
+        'Invalid Criteria Weights',
+        `The evaluation criteria weights must sum to approximately 100%.\n\nCurrent total: ${totalWeight.toFixed(1)}%\nRequired: ~100%`,
+        'error'
+      )
+      return
+    }
+
     try {
       await createJob(formData)
       onClose()
     } catch (error) {
       console.error('Error creating job:', error)
-      alert('Error creating job. Please try again.')
+      const errorMessage = error.response?.data?.detail || 'Error creating job. Please try again.'
+      await showAlert('Error', errorMessage, 'error')
     }
   }
 
@@ -91,7 +107,12 @@ const CreateJobModal = ({ onClose }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-3">Evaluation Criteria</label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium">Evaluation Criteria</label>
+              <div className={`text-sm font-medium ${Math.abs(totalWeight - 100) <= 5 ? 'text-green-400' : 'text-red-400'}`}>
+                Total: {totalWeight.toFixed(1)}% {Math.abs(totalWeight - 100) <= 5 ? '✓' : '(Must be ~100%)'}
+              </div>
+            </div>
             <div className="space-y-3">
               {formData.evaluation_criteria.map((criterion, index) => (
                 <div key={index} className="flex items-center gap-3">
@@ -106,6 +127,7 @@ const CreateJobModal = ({ onClose }) => {
                     type="number"
                     min="0"
                     max="100"
+                    step="0.1"
                     placeholder="Weight"
                     className="glass-input w-24"
                     value={criterion.weight}
@@ -116,6 +138,7 @@ const CreateJobModal = ({ onClose }) => {
                     type="button"
                     onClick={() => removeCriterion(index)}
                     className="p-2 rounded-lg hover:bg-red-500/20 transition-colors"
+                    disabled={formData.evaluation_criteria.length === 1}
                   >
                     <X size={18} className="text-red-400" />
                   </button>

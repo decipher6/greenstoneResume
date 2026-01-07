@@ -3,11 +3,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Eye, MoreVertical, Calendar, Users, Trash2, LucideTrash } from 'lucide-react'
 import { getJobs, deleteJob } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
+import { useModal } from '../context/ModalContext'
 
 const JobPosts = () => {
   const [jobs, setJobs] = useState([])
   const [showModal, setShowModal] = useState(false)
   const navigate = useNavigate()
+  const { showConfirm, showAlert } = useModal()
 
   useEffect(() => {
     fetchJobs()
@@ -23,12 +25,22 @@ const JobPosts = () => {
   }
 
   const handleDelete = async (jobId) => {
-    if (window.confirm('Are you sure you want to delete this job?')) {
+    const confirmed = await showConfirm({
+      title: 'Delete Job Post',
+      message: 'Are you sure you want to delete this job? This action cannot be undone and will also delete all associated candidates.',
+      type: 'confirm',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    })
+    
+    if (confirmed) {
       try {
         await deleteJob(jobId)
         fetchJobs()
+        await showAlert('Success', 'Job post deleted successfully.', 'success')
       } catch (error) {
         console.error('Error deleting job:', error)
+        await showAlert('Error', 'Failed to delete job post. Please try again.', 'error')
       }
     }
   }
