@@ -9,7 +9,8 @@ from database import get_db
 
 # Debug mode - set DEBUG=true in environment to enable debug prints
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
-from models import Candidate, CandidateStatus, ContactInfo, ScoreBreakdown, CriterionScore
+from models import Candidate, CandidateStatus, ContactInfo, ScoreBreakdown, CriterionScore, ActivityType
+from routes.activity_logs import create_activity_log
 from utils.cv_parser import parse_resume
 from utils.entity_extraction import extract_contact_info, extract_name
 from utils.ai_scoring import score_resume_with_llm, calculate_composite_score
@@ -90,6 +91,17 @@ async def upload_candidates_bulk(
         {"_id": ObjectId(job_id)},
         {"$inc": {"candidate_count": len(uploaded_candidates)}}
     )
+    
+    # Log activity
+    if uploaded_candidates:
+        candidate_names = [c.name for c in uploaded_candidates]
+        await create_activity_log(
+            activity_type=ActivityType.candidate_uploaded,
+            description=f"{len(uploaded_candidates)} resume(s) uploaded",
+            job_id=job_id,
+            job_title=job.get("title"),
+            metadata={"count": len(uploaded_candidates), "candidate_names": candidate_names}
+        )
     
     return {"uploaded": len(uploaded_candidates), "candidates": uploaded_candidates}
 
@@ -193,6 +205,17 @@ async def add_candidate_from_linkedin(
         {"$inc": {"candidate_count": 1}}
     )
     
+    # Log activity
+    await create_activity_log(
+        activity_type=ActivityType.candidate_uploaded,
+        description=f"LinkedIn candidate '{candidate_dict['name']}' added",
+        job_id=job_id,
+        job_title=job.get("title"),
+        candidate_id=candidate_dict["id"],
+        candidate_name=candidate_dict["name"],
+        metadata={"source": "linkedin"}
+    )
+    
     return Candidate(**candidate_dict)
 
 @router.post("/{candidate_id}/re-analyze")
@@ -225,6 +248,13 @@ async def delete_candidate(candidate_id: str):
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
     
+    candidate_name = candidate.get("name", "Unknown")
+    job_id = candidate.get("job_id")
+    
+    # Get job title for activity log
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)}) if job_id else None
+    job_title = job.get("title") if job else None
+    
     # Delete file if exists
     if candidate.get("resume_file_path") and os.path.exists(candidate["resume_file_path"]):
         os.remove(candidate["resume_file_path"])
@@ -233,8 +263,18 @@ async def delete_candidate(candidate_id: str):
     
     # Update job candidate count
     await db.jobs.update_one(
-        {"_id": ObjectId(candidate["job_id"])},
+        {"_id": ObjectId(job_id)},
         {"$inc": {"candidate_count": -1}}
+    )
+    
+    # Log activity
+    await create_activity_log(
+        activity_type=ActivityType.candidate_deleted,
+        description=f"Candidate '{candidate_name}' deleted",
+        job_id=job_id,
+        job_title=job_title,
+        candidate_id=candidate_id,
+        candidate_name=candidate_name
     )
     
     return {"message": "Candidate deleted successfully"}
@@ -404,6 +444,18 @@ async def process_candidate_analysis(job_id: str, candidate_id: str):
                     "analyzed_at": datetime.now()
                 }
             }
+        )
+        
+        # Log activity
+        candidate_name = candidate.get("name", "Unknown")
+        await create_activity_log(
+            activity_type=ActivityType.candidate_analyzed,
+            description=f"Candidate '{candidate_name}' analyzed with score {score_breakdown['overall_score']:.1f}/10",
+            job_id=job_id,
+            job_title=job.get("title"),
+            candidate_id=candidate_id,
+            candidate_name=candidate_name,
+            metadata={"overall_score": score_breakdown["overall_score"]}
         )
         
     except Exception as e:

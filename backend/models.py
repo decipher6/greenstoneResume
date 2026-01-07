@@ -112,3 +112,40 @@ class EmailSend(BaseModel):
     template: EmailTemplate
     job_id: str
 
+class ActivityType(str, Enum):
+    job_created = "job_created"
+    job_deleted = "job_deleted"
+    candidate_uploaded = "candidate_uploaded"
+    candidate_deleted = "candidate_deleted"
+    candidate_analyzed = "candidate_analyzed"
+    analysis_run = "analysis_run"
+
+class ActivityLog(BaseModel):
+    id: Optional[str] = None
+    activity_type: ActivityType
+    description: str
+    job_id: Optional[str] = None
+    job_title: Optional[str] = None
+    candidate_id: Optional[str] = None
+    candidate_name: Optional[str] = None
+    metadata: Optional[Dict] = None
+    created_at: Optional[datetime] = None
+
+class ActivityType(str, Enum):
+    job_created = "job_created"
+    job_deleted = "job_deleted"
+    candidate_uploaded = "candidate_uploaded"
+    candidate_deleted = "candidate_deleted"
+    candidate_analyzed = "candidate_analyzed"
+    analysis_run = "analysis_run"
+
+class ActivityLog(BaseModel):
+    id: Optional[str] = None
+    activity_type: ActivityType
+    description: str
+    job_id: Optional[str] = None
+    job_title: Optional[str] = None
+    candidate_id: Optional[str] = None
+    candidate_name: Optional[str] = None
+    metadata: Optional[Dict] = None
+    created_at: Optional[datetime] = None
