@@ -79,3 +79,5 @@ async def init_db():
 def get_db():
     return db
 
+def get_client():
+    return client

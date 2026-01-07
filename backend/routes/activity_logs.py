@@ -1,118 +1,128 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
 
-from database import get_db
-from models import ActivityLog, ActivityType
+from database import get_db, get_client
 
 router = APIRouter()
 
-async def create_activity_log(
-    activity_type: ActivityType,
-    description: str,
-    job_id: Optional[str] = None,
-    job_title: Optional[str] = None,
-    candidate_id: Optional[str] = None,
-    candidate_name: Optional[str] = None,
-    metadata: Optional[dict] = None
-):
-    """Helper function to create an activity log entry"""
-    try:
-        db = get_db()
-        if not db:
-            print("ERROR: Database not initialized")
-            return None
-        
-        log_dict = {
-            "activity_type": activity_type.value,
-            "description": description,
-            "job_id": job_id,
-            "job_title": job_title,
-            "candidate_id": candidate_id,
-            "candidate_name": candidate_name,
-            "metadata": metadata or {},
-            "created_at": datetime.now()
-        }
-        result = await db.activity_logs.insert_one(log_dict)
-        log_dict["id"] = str(result.inserted_id)
-        print(f"✅ Activity log created: {activity_type.value} - {description}")
-        return log_dict
-    except Exception as e:
-        print(f"❌ Error creating activity log: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
+def parse_oplog_entry(oplog_entry):
+    """Parse oplog entry into a simple activity log format"""
+    op = oplog_entry.get('op', '')  # i=insert, u=update, d=delete
+    ns = oplog_entry.get('ns', '')  # namespace (database.collection)
+    ts = oplog_entry.get('ts', None)
+    o = oplog_entry.get('o', {})  # document
+    
+    # Determine activity type
+    activity_type = 'unknown'
+    description = ''
+    
+    if 'jobs' in ns:
+        if op == 'i':
+            activity_type = 'job_created'
+            description = f"Job created: {o.get('title', 'Unknown')}"
+        elif op == 'd':
+            activity_type = 'job_deleted'
+            description = f"Job deleted"
+    elif 'candidates' in ns:
+        if op == 'i':
+            activity_type = 'candidate_uploaded'
+            description = f"Resume uploaded: {o.get('name', 'Unknown')}"
+        elif op == 'd':
+            activity_type = 'candidate_deleted'
+            description = f"Candidate deleted"
+        elif op == 'u':
+            activity_type = 'candidate_analyzed'
+            description = f"Candidate updated: {o.get('name', 'Unknown')}"
+    
+    # Convert timestamp
+    created_at = None
+    if ts:
+        try:
+            # MongoDB timestamp can be Timestamp object or tuple
+            if hasattr(ts, 'time'):
+                # Timestamp object
+                created_at = datetime.fromtimestamp(ts.time)
+            elif isinstance(ts, tuple) and len(ts) >= 1:
+                # Tuple format (seconds, increment)
+                created_at = datetime.fromtimestamp(ts[0])
+            elif isinstance(ts, (int, float)):
+                # Unix timestamp
+                created_at = datetime.fromtimestamp(ts)
+            else:
+                created_at = datetime.now()
+        except:
+            created_at = datetime.now()
+    else:
+        created_at = datetime.now()
+    
+    return {
+        "id": str(oplog_entry.get('_id', ObjectId())),
+        "activity_type": activity_type,
+        "description": description,
+        "job_id": o.get('job_id'),
+        "job_title": o.get('title'),
+        "candidate_id": str(o.get('_id', '')) if 'candidates' in ns else None,
+        "candidate_name": o.get('name'),
+        "metadata": {"operation": op, "namespace": ns},
+        "created_at": created_at.isoformat() if created_at else datetime.now().isoformat()
+    }
 
-@router.get("/", response_model=List[ActivityLog])
+@router.get("/")
 async def get_activity_logs(
-    limit: int = Query(100, ge=1, le=500),
-    skip: int = Query(0, ge=0),
-    activity_type: Optional[str] = None,
-    job_id: Optional[str] = None
+    limit: int = Query(30, ge=1, le=500),
+    skip: int = Query(0, ge=0)
 ):
-    """Get activity logs with optional filtering"""
+    """Get activity logs from MongoDB oplog - basic version"""
     try:
-        db = get_db()
-        if not db:
-            print("ERROR: Database not initialized in get_activity_logs")
+        client = get_client()
+        if not client:
             return []
         
-        query = {}
-        if activity_type:
-            query["activity_type"] = activity_type
-        if job_id:
-            query["job_id"] = job_id
+        # Access oplog from local database
+        local_db = client.local
+        oplog = local_db.oplog.rs
         
         logs = []
-        async for log in db.activity_logs.find(query).sort("created_at", -1).skip(skip).limit(limit):
-            try:
-                log["id"] = str(log["_id"])
-                logs.append(ActivityLog(**log))
-            except Exception as e:
-                print(f"Error processing log {log.get('_id')}: {e}")
-                continue
+        count = 0
         
-        print(f"✅ Retrieved {len(logs)} activity logs (query: {query})")
+        # Read from oplog in reverse order (newest first)
+        async for entry in oplog.find().sort("ts", -1).skip(skip).limit(limit):
+            # Only include operations on our collections
+            ns = entry.get('ns', '')
+            if 'greenstone_talent' in ns or 'jobs' in ns or 'candidates' in ns:
+                parsed = parse_oplog_entry(entry)
+                logs.append(parsed)
+                count += 1
+                if count >= limit:
+                    break
+        
         return logs
     except Exception as e:
-        print(f"❌ Error fetching activity logs: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Error reading oplog: {e}")
+        # Fallback: return empty list
         return []
 
 @router.get("/count")
-async def get_activity_logs_count(
-    activity_type: Optional[str] = None,
-    job_id: Optional[str] = None
-):
-    """Get total count of activity logs with optional filtering"""
+async def get_activity_logs_count():
+    """Get total count from oplog"""
     try:
-        db = get_db()
-        if not db:
+        client = get_client()
+        if not client:
             return {"count": 0}
         
-        query = {}
-        if activity_type:
-            query["activity_type"] = activity_type
-        if job_id:
-            query["job_id"] = job_id
+        local_db = client.local
+        oplog = local_db.oplog.rs
         
-        count = await db.activity_logs.count_documents(query)
+        # Count operations on our collections
+        count = 0
+        async for entry in oplog.find().sort("ts", -1).limit(1000):
+            ns = entry.get('ns', '')
+            if 'greenstone_talent' in ns or 'jobs' in ns or 'candidates' in ns:
+                count += 1
+        
         return {"count": count}
     except Exception as e:
-        print(f"❌ Error counting activity logs: {e}")
+        print(f"❌ Error counting oplog: {e}")
         return {"count": 0}
-
-@router.get("/test")
-async def test_activity_log():
-    """Test endpoint to create a sample activity log"""
-    try:
-        test_log = await create_activity_log(
-            activity_type=ActivityType.job_created,
-            description="Test activity log - system is working",
-            metadata={"test": True}
-        )
-        return {"message": "Test log created successfully", "log": test_log}
-    except Exception as e:
-        return {"error": str(e), "message": "Failed to create test log"}
