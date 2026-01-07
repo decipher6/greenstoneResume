@@ -12,6 +12,16 @@ export default defineConfig({
         changeOrigin: true
       }
     } : undefined
+  },
+  preview: {
+    port: 5173,
+    // Handle SPA routing in preview mode
+    strictPort: true
+  },
+  build: {
+    // Ensure proper build output
+    outDir: 'dist',
+    assetsDir: 'assets'
   }
 })
 
