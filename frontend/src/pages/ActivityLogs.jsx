@@ -20,51 +20,73 @@ const ActivityLogs = () => {
   const limit = 50
 
   useEffect(() => {
+    let isMounted = true
+    
+    const fetchLogs = async () => {
+      try {
+        setLoading(true)
+        const params = {
+          limit,
+          skip: page * limit
+        }
+        if (filter !== 'all') {
+          params.activity_type = filter
+        }
+        const response = await getActivityLogs(params)
+        if (isMounted) {
+          console.log('Activity logs response:', response?.data)
+          // Ensure we have an array and filter out any invalid entries
+          const logsData = Array.isArray(response?.data) ? response.data : []
+          setLogs(logsData.filter(log => log && log.id))
+        }
+      } catch (error) {
+        console.error('Error fetching activity logs:', error)
+        if (isMounted) {
+          setLogs([])
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+    
     fetchLogs()
+    
+    return () => {
+      isMounted = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, page])
 
-  const fetchLogs = async () => {
-    try {
-      setLoading(true)
-      const params = {
-        limit,
-        skip: page * limit
-      }
-      if (filter !== 'all') {
-        params.activity_type = filter
-      }
-      const response = await getActivityLogs(params)
-      console.log('Activity logs response:', response.data)
-      setLogs(response.data || [])
-    } catch (error) {
-      console.error('Error fetching activity logs:', error)
-      setLogs([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown'
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now - date
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
+    try {
+      if (!dateString) return 'Unknown'
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return 'Invalid date'
+      
+      const now = new Date()
+      const diffMs = now - date
+      const diffMins = Math.floor(diffMs / 60000)
+      const diffHours = Math.floor(diffMs / 3600000)
+      const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
-    
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+      if (diffMins < 1) return 'Just now'
+      if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
+      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+      if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+      
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch (error) {
+      console.error('Error formatting date:', error)
+      return 'Unknown'
+    }
   }
 
   const getActivityIcon = (type) => {
@@ -160,7 +182,27 @@ const ActivityLogs = () => {
             </select>
           </div>
           <button
-            onClick={fetchLogs}
+            onClick={async () => {
+              try {
+                setLoading(true)
+                const params = {
+                  limit,
+                  skip: page * limit
+                }
+                if (filter !== 'all') {
+                  params.activity_type = filter
+                }
+                const response = await getActivityLogs(params)
+                console.log('Activity logs response:', response?.data)
+                const logsData = Array.isArray(response?.data) ? response.data : []
+                setLogs(logsData.filter(log => log && log.id))
+              } catch (error) {
+                console.error('Error fetching activity logs:', error)
+                setLogs([])
+              } finally {
+                setLoading(false)
+              }
+            }}
             className="glass-button flex items-center gap-2"
             disabled={loading}
           >
@@ -187,8 +229,10 @@ const ActivityLogs = () => {
         <div className="glass-card overflow-hidden">
           <div className="divide-y divide-glass-200">
             {logs.map((log) => {
-              const Icon = getActivityIcon(log.activity_type)
-              const colorClass = getActivityColor(log.activity_type)
+              if (!log || !log.id) return null
+              
+              const Icon = getActivityIcon(log.activity_type || '')
+              const colorClass = getActivityColor(log.activity_type || '')
               
               return (
                 <div
@@ -202,7 +246,7 @@ const ActivityLogs = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4 mb-2">
                         <div className="flex-1">
-                          <p className="font-medium mb-1">{log.description}</p>
+                          <p className="font-medium mb-1">{log.description || 'No description'}</p>
                           <div className="flex items-center gap-4 text-sm text-gray-400">
                             {log.job_title && (
                               <Link
@@ -220,7 +264,7 @@ const ActivityLogs = () => {
                               </span>
                             )}
                             <span className="px-2 py-1 rounded text-xs border border-glass-200">
-                              {getActivityLabel(log.activity_type)}
+                              {getActivityLabel(log.activity_type || '')}
                             </span>
                           </div>
                         </div>
