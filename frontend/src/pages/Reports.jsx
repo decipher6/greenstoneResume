@@ -45,12 +45,6 @@ const Reports = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end mb-6">
-        <button className="glass-button flex items-center gap-2">
-          <Download size={18} />
-          Export CSV
-        </button>
-      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
