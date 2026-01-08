@@ -130,21 +130,10 @@ const JobPosts = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">Job Posts</h2>
-          <p className="text-sm text-gray-400">Manage your open positions and track candidates</p>
-        </div>
-        <button onClick={() => setShowModal(true)} className="glass-button flex items-center gap-2">
-          <Plus size={20} />
-          Add Job
-        </button>
-      </div>
-
       {/* Search and Filters */}
       <div className="glass-card p-4">
         <div className="flex items-center gap-4 mb-4">
-          <div className="glass-input flex items-center gap-2 flex-1">
+          <div className="glass-input flex items-center gap-2 flex-1 max-w-2xl">
             <Search size={18} className="text-gray-400" />
             <input
               type="text"
@@ -162,6 +151,13 @@ const JobPosts = () => {
               </button>
             )}
           </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="glass-button flex items-center gap-2 whitespace-nowrap"
+          >
+            <Plus size={20} />
+            Add Job
+          </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`glass-button-secondary flex items-center gap-2 ${showFilters ? 'bg-glass-200' : ''}`}
