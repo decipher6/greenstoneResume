@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Link as LinkIcon, Eye, Trash2, CheckCircle, Send, Filter } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar } from 'lucide-react'
 import { 
-  getJob, getCandidates, uploadCandidatesBulk, addLinkedInCandidate, 
+  getJob, getCandidates, uploadCandidatesBulk, 
   runAnalysis, deleteCandidate, getTopCandidates
 } from '../services/api'
 import api from '../services/api'
 import SendEmailModal from '../components/SendEmailModal'
+import SendInterviewModal from '../components/SendInterviewModal'
 import { useModal } from '../context/ModalContext'
 
 const JobDetail = () => {
@@ -19,7 +20,7 @@ const JobDetail = () => {
   const [topCandidatesLimit, setTopCandidatesLimit] = useState(5)
   const [selectedCandidates, setSelectedCandidates] = useState([])
   const [showEmailModal, setShowEmailModal] = useState(false)
-  const [linkedinUrl, setLinkedinUrl] = useState('')
+  const [showInterviewModal, setShowInterviewModal] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
     min_resume_score: '',
@@ -133,23 +134,6 @@ const JobDetail = () => {
     e.target.value = '' // Reset input after upload
   }
 
-  const handleLinkedInAdd = async () => {
-    if (!linkedinUrl.trim()) return
-
-    try {
-      await addLinkedInCandidate(jobId, linkedinUrl)
-      setLinkedinUrl('')
-      fetchData()
-      await showAlert('Success', 'LinkedIn candidate added successfully.', 'success')
-    } catch (error) {
-      console.error('Error adding LinkedIn candidate:', error)
-      await showAlert(
-        'LinkedIn Not Available',
-        'LinkedIn candidate retrieval is not active. LinkedIn\'s robots.txt disallows scraping.',
-        'info'
-      )
-    }
-  }
 
   const handleRunAnalysis = async () => {
     const force = await showConfirm({
@@ -259,51 +243,6 @@ const JobDetail = () => {
         </div>
       </div>
 
-      {/* Bulk Actions */}
-      {selectedCandidates.length > 0 && (
-        <div className="glass-card p-4 flex items-center justify-between">
-          <span className="text-sm text-gray-400">{selectedCandidates.length} candidates selected</span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowEmailModal(true)}
-              className="glass-button-secondary flex items-center gap-2"
-            >
-              <Send size={16} />
-              Send Rejection ({selectedCandidates.length})
-            </button>
-            <button
-              onClick={() => {
-                selectedCandidates.forEach(id => handleDelete(id))
-                setSelectedCandidates([])
-              }}
-              className="glass-button-secondary flex items-center gap-2 text-red-400 hover:bg-red-500/20"
-            >
-              <Trash2 size={16} />
-              Delete ({selectedCandidates.length})
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Add LinkedIn */}
-      <div className="glass-card p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <LinkIcon size={20} className="text-primary-400" />
-          <h3 className="text-lg font-semibold">Add Candidate from LinkedIn</h3>
-        </div>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            placeholder="Paste LinkedIn profile URL..."
-            className="glass-input flex-1"
-            value={linkedinUrl}
-            onChange={(e) => setLinkedinUrl(e.target.value)}
-          />
-          <button onClick={handleLinkedInAdd} className="glass-button">
-            Add LinkedIn Profile
-          </button>
-        </div>
-      </div>
 
       {/* Job Description & Criteria */}
       <div className="grid grid-cols-2 gap-6">
@@ -392,6 +331,39 @@ const JobDetail = () => {
             {showFilters ? 'Hide' : 'Show'} Filters
           </button>
         </div>
+
+        {/* Bulk Actions */}
+        {selectedCandidates.length > 0 && (
+          <div className="p-4 border-b border-glass-200 bg-glass-100 flex items-center justify-between">
+            <span className="text-sm text-gray-400">{selectedCandidates.length} candidates selected</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowInterviewModal(true)}
+                className="glass-button flex items-center gap-2"
+              >
+                <Calendar size={16} />
+                Invite to Interview ({selectedCandidates.length})
+              </button>
+              <button
+                onClick={() => setShowEmailModal(true)}
+                className="glass-button-secondary flex items-center gap-2"
+              >
+                <Send size={16} />
+                Send Rejection ({selectedCandidates.length})
+              </button>
+              <button
+                onClick={() => {
+                  selectedCandidates.forEach(id => handleDelete(id))
+                  setSelectedCandidates([])
+                }}
+                className="glass-button-secondary flex items-center gap-2 text-red-400 hover:bg-red-500/20"
+              >
+                <Trash2 size={16} />
+                Delete ({selectedCandidates.length})
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         {showFilters && (
@@ -563,6 +535,18 @@ const JobDetail = () => {
           candidateIds={selectedCandidates}
           onClose={() => {
             setShowEmailModal(false)
+            setSelectedCandidates([])
+            fetchData()
+          }}
+        />
+      )}
+
+      {showInterviewModal && (
+        <SendInterviewModal
+          jobId={jobId}
+          candidateIds={selectedCandidates}
+          onClose={() => {
+            setShowInterviewModal(false)
             setSelectedCandidates([])
             fetchData()
           }}

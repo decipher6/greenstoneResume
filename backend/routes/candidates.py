@@ -162,39 +162,6 @@ async def get_candidate(candidate_id: str):
                 candidate["score_breakdown"][key] = float(value["$numberDouble"])
     return Candidate(**candidate)
 
-@router.post("/linkedin")
-async def add_candidate_from_linkedin(
-    job_id: str = Form(...),
-    linkedin_url: str = Form(...),
-    name: Optional[str] = Form(None),
-    email: Optional[str] = Form(None)
-):
-    """Add candidate from LinkedIn URL"""
-    db = get_db()
-    
-    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    candidate_dict = {
-        "job_id": job_id,
-        "name": name or "LinkedIn Candidate",
-        "contact_info": {"email": email, "linkedin": linkedin_url},
-        "linkedin_url": linkedin_url,
-        "status": CandidateStatus.uploaded.value,
-        "created_at": datetime.now()
-    }
-    
-    result = await db.candidates.insert_one(candidate_dict)
-    candidate_dict["id"] = str(result.inserted_id)
-    
-    await db.jobs.update_one(
-        {"_id": ObjectId(job_id)},
-        {"$inc": {"candidate_count": 1}}
-    )
-    
-    return Candidate(**candidate_dict)
-
 @router.post("/{candidate_id}/re-analyze")
 async def re_analyze_candidate(candidate_id: str, background_tasks: BackgroundTasks):
     """Re-analyze a specific candidate with updated LLM scoring"""

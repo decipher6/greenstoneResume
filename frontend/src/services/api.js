@@ -44,14 +44,6 @@ export const uploadCandidatesBulk = (jobId, files) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
-export const addLinkedInCandidate = (jobId, linkedinUrl, name, email) => {
-  const formData = new FormData()
-  formData.append('job_id', jobId)
-  formData.append('linkedin_url', linkedinUrl)
-  if (name) formData.append('name', name)
-  if (email) formData.append('email', email)
-  return api.post('/candidates/linkedin', formData)
-}
 export const deleteCandidate = (candidateId) => api.delete(`/candidates/${candidateId}`)
 
 // Assessments
