@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, BarChart3, Settings, Bell, User, LogOut } from 'lucide-react'
+import { LayoutDashboard, Briefcase, BarChart3, Settings, User, LogOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const Layout = ({ children, pageTitle, pageSubtitle }) => {
@@ -90,16 +90,10 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="glass-card m-4 mb-0 rounded-2xl p-6 flex items-center justify-between">
+        <header className="glass-card m-4 mb-0 rounded-2xl p-6">
           <div>
             <h2 className="text-2xl font-bold">{title}</h2>
             <p className="text-sm text-gray-400">{subtitle}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <button className="relative p-2 rounded-lg hover:bg-glass-100 transition-colors">
-              <Bell size={20} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full"></span>
-            </button>
           </div>
         </header>
 
