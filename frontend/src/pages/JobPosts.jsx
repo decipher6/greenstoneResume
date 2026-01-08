@@ -130,19 +130,9 @@ const JobPosts = () => {
 
   return (
     <div className="space-y-6">
-      {/* Add Job Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => setShowModal(true)}
-          className="glass-button flex items-center gap-2"
-        >
-          <Plus size={20} />
-          Add Job
-        </button>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="glass-card p-4">
+      {/* Search and Filters with Add Job Button */}
+      <div className="flex items-center gap-4">
+        <div className="glass-card p-4 flex-1">
         <div className="flex items-center gap-4 mb-4">
           <div className="glass-input flex items-center gap-2 flex-1">
             <Search size={18} className="text-gray-400" />
@@ -220,6 +210,14 @@ const JobPosts = () => {
             </div>
           </div>
         )}
+        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="glass-button flex items-center gap-2 whitespace-nowrap"
+        >
+          <Plus size={20} />
+          Add Job
+        </button>
       </div>
 
       <div className="glass-card overflow-hidden">
