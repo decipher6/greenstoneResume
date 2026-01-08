@@ -14,7 +14,10 @@ const CreateJobModal = ({ onClose }) => {
     ]
   })
 
-  const totalWeight = formData.evaluation_criteria.reduce((sum, c) => sum + (parseFloat(c.weight) || 0), 0)
+  const totalWeight = formData.evaluation_criteria.reduce((sum, c) => {
+    const weight = c.weight === '' ? 0 : (parseFloat(c.weight) || 0)
+    return sum + weight
+  }, 0)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -42,7 +45,7 @@ const CreateJobModal = ({ onClose }) => {
   const addCriterion = () => {
     setFormData({
       ...formData,
-      evaluation_criteria: [...formData.evaluation_criteria, { name: '', weight: 0 }]
+      evaluation_criteria: [...formData.evaluation_criteria, { name: '', weight: '' }]
     })
   }
 
@@ -55,7 +58,12 @@ const CreateJobModal = ({ onClose }) => {
 
   const updateCriterion = (index, field, value) => {
     const updated = [...formData.evaluation_criteria]
-    updated[index][field] = field === 'weight' ? parseFloat(value) || 0 : value
+    if (field === 'weight') {
+      // Keep as empty string if empty, otherwise parse as float
+      updated[index][field] = value === '' ? '' : parseFloat(value) || ''
+    } else {
+      updated[index][field] = value
+    }
     setFormData({ ...formData, evaluation_criteria: updated })
   }
 
@@ -130,7 +138,7 @@ const CreateJobModal = ({ onClose }) => {
                     step="0.1"
                     placeholder="Weight"
                     className="glass-input w-24"
-                    value={criterion.weight}
+                    value={criterion.weight === 0 ? '' : criterion.weight}
                     onChange={(e) => updateCriterion(index, 'weight', e.target.value)}
                   />
                   <span className="text-gray-400">%</span>
