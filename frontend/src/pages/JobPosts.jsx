@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Eye, MoreVertical, Calendar, Users, Trash2, LucideTrash, Search, Filter, X } from 'lucide-react'
-import { getJobs, deleteJob, updateJobStatus } from '../services/api'
+import { Plus, Eye, MoreVertical, Calendar, Users, Trash2, LucideTrash, Search, Filter, X, ArrowUpDown } from 'lucide-react'
+import { getJobs, deleteJob } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
 import { useModal } from '../context/ModalContext'
 
@@ -13,10 +13,10 @@ const JobPosts = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
     department: '',
-    status: '',
     minCandidates: '',
     maxCandidates: ''
   })
+  const [lastRunSort, setLastRunSort] = useState('latest') // 'latest' or 'oldest'
   const navigate = useNavigate()
   const { showConfirm, showAlert } = useModal()
 
@@ -36,18 +36,17 @@ const JobPosts = () => {
 
   useEffect(() => {
     applyFilters()
-  }, [searchQuery, filters, jobs])
+  }, [searchQuery, filters, jobs, lastRunSort])
 
   const applyFilters = () => {
     let filtered = [...jobs]
 
-    // Search filter (searches in title, department, status)
+    // Search filter (searches in title, department)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(job => 
         job.title?.toLowerCase().includes(query) ||
         job.department?.toLowerCase().includes(query) ||
-        job.status?.toLowerCase().includes(query) ||
         String(job.candidate_count || 0).includes(query)
       )
     }
@@ -56,13 +55,6 @@ const JobPosts = () => {
     if (filters.department) {
       filtered = filtered.filter(job => 
         job.department?.toLowerCase() === filters.department.toLowerCase()
-      )
-    }
-
-    // Status filter
-    if (filters.status) {
-      filtered = filtered.filter(job => 
-        job.status?.toLowerCase() === filters.status.toLowerCase()
       )
     }
 
@@ -77,38 +69,33 @@ const JobPosts = () => {
       filtered = filtered.filter(job => (job.candidate_count || 0) <= max)
     }
 
+    // Sort by last_run
+    filtered.sort((a, b) => {
+      const aDate = a.last_run ? new Date(a.last_run).getTime() : 0
+      const bDate = b.last_run ? new Date(b.last_run).getTime() : 0
+      
+      if (lastRunSort === 'latest') {
+        return bDate - aDate // Latest first (descending)
+      } else {
+        return aDate - bDate // Oldest first (ascending)
+      }
+    })
+
     setFilteredJobs(filtered)
+  }
+
+  const toggleLastRunSort = () => {
+    setLastRunSort(prev => prev === 'latest' ? 'oldest' : 'latest')
   }
 
   const clearFilters = () => {
     setSearchQuery('')
     setFilters({
       department: '',
-      status: '',
       minCandidates: '',
       maxCandidates: ''
     })
-  }
-
-  const handleCloseJob = async (jobId) => {
-    const confirmed = await showConfirm({
-      title: 'Close Job Post',
-      message: 'Are you sure you want to close this job post? You can reopen it later if needed.',
-      type: 'info',
-      confirmText: 'Close Job',
-      cancelText: 'Cancel'
-    })
-    
-    if (confirmed) {
-      try {
-        await updateJobStatus(jobId, 'closed')
-        await showAlert('Success', 'Job post closed successfully.', 'success')
-        fetchJobs()
-      } catch (error) {
-        console.error('Error closing job:', error)
-        await showAlert('Error', 'Failed to close job post. Please try again.', 'error')
-      }
-    }
+    setLastRunSort('latest')
   }
 
   const handleDelete = async (jobId) => {
@@ -195,7 +182,7 @@ const JobPosts = () => {
 
         {/* Filter Options */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-glass-200">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-glass-200">
             <div>
               <label className="block text-sm font-medium mb-2">Department</label>
               <select
@@ -207,19 +194,6 @@ const JobPosts = () => {
                 {departments.map(dept => (
                   <option key={dept} value={dept}>{dept}</option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Status</label>
-              <select
-                className="glass-input w-full"
-                value={filters.status}
-                onChange={(e) => setFilters({...filters, status: e.target.value})}
-              >
-                <option value="">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-                <option value="closed">Closed</option>
               </select>
             </div>
             <div>
@@ -260,15 +234,28 @@ const JobPosts = () => {
               <th className="px-6 py-4 text-left text-sm font-semibold">Title</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Department</th>
               <th className="px-6 py-4 text-left text-sm font-semibold"># Candidates</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Last Run</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
+              <th 
+                className="px-6 py-4 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                onClick={toggleLastRunSort}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Last Run</span>
+                  <ArrowUpDown size={14} className="text-gray-400" />
+                  {lastRunSort === 'latest' && (
+                    <span className="text-xs text-gray-400">(Latest first)</span>
+                  )}
+                  {lastRunSort === 'oldest' && (
+                    <span className="text-xs text-gray-400">(Oldest first)</span>
+                  )}
+                </div>
+              </th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredJobs.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
+                <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
                   No jobs found matching your search criteria.
                 </td>
               </tr>
@@ -294,17 +281,6 @@ const JobPosts = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                    job.status === 'active' 
-                      ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                      : job.status === 'closed'
-                      ? 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-                      : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                  }`}>
-                    {job.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <Link
                       to={`/jobs/${job.id}`}
@@ -313,15 +289,6 @@ const JobPosts = () => {
                     >
                       <Eye size={18} className="text-gray-400" />
                     </Link>
-                    {job.status !== 'closed' && (
-                      <button
-                        onClick={() => handleCloseJob(job.id)}
-                        className="p-2 rounded-lg hover:bg-orange-500/20 transition-colors"
-                        title="Close Job"
-                      >
-                        <X size={18} className="text-orange-400" />
-                      </button>
-                    )}
                     <button
                       onClick={() => handleDelete(job.id)}
                       className="p-2 rounded-lg hover:bg-red-500/20 transition-colors"
