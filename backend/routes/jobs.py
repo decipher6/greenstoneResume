@@ -7,6 +7,7 @@ from database import get_db
 from models import Job, JobCreate, JobStatus
 from utils.ai_scoring import score_resume_with_llm
 from routes.candidates import process_candidate_analysis
+from routes.activity_logs import log_activity
 
 router = APIRouter()
 
@@ -57,6 +58,16 @@ async def create_job(job: JobCreate):
     
     result = await db.jobs.insert_one(job_dict)
     job_dict["id"] = str(result.inserted_id)
+    
+    # Log activity
+    await log_activity(
+        action="job_created",
+        entity_type="job",
+        description=f"Created job: {job.title}",
+        entity_id=job_dict["id"],
+        metadata={"department": job.department, "status": "active"}
+    )
+    
     return Job(**job_dict)
 
 @router.delete("/{job_id}")
@@ -76,6 +87,14 @@ async def delete_job(job_id: str):
     
     # Also delete associated candidates
     await db.candidates.delete_many({"job_id": job_id})
+    
+    # Log activity
+    await log_activity(
+        action="job_deleted",
+        entity_type="job",
+        description=f"Deleted job: {job_title}",
+        entity_id=job_id
+    )
     
     return {"message": "Job deleted successfully"}
 
@@ -104,6 +123,15 @@ async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force:
     await db.jobs.update_one(
         {"_id": ObjectId(job_id)},
         {"$set": {"last_run": datetime.now()}}
+    )
+    
+    # Log activity
+    await log_activity(
+        action="analysis_run",
+        entity_type="job",
+        description=f"Started analysis for {len(candidates)} candidate(s) in job: {job.get('title', 'Unknown')}",
+        entity_id=job_id,
+        metadata={"candidates_count": len(candidates), "force": force}
     )
     
     # Process candidates in background
@@ -137,6 +165,15 @@ async def update_job_status(job_id: str, status: str = Body(..., embed=True)):
     await db.jobs.update_one(
         {"_id": ObjectId(job_id)},
         {"$set": {"status": status}}
+    )
+    
+    # Log activity
+    await log_activity(
+        action="job_status_updated",
+        entity_type="job",
+        description=f"Updated job status to {status}: {job.get('title', 'Unknown')}",
+        entity_id=job_id,
+        metadata={"status": status, "previous_status": job.get("status")}
     )
     
     # Fetch updated job

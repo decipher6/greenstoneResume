@@ -7,6 +7,7 @@ import os
 
 from database import get_db
 from models import UserSignup, UserLogin, User
+from routes.activity_logs import log_activity
 
 router = APIRouter()
 security = HTTPBearer()
@@ -67,6 +68,15 @@ async def signup(user_data: UserSignup):
     # Create token
     token = create_token(user_id, user_data.email)
     
+    # Log activity
+    await log_activity(
+        action="user_signed_up",
+        entity_type="user",
+        description=f"New user signed up: {user_data.name} ({user_data.email})",
+        entity_id=user_id,
+        user_id=user_id
+    )
+    
     return {
         "message": "User created successfully",
         "token": token,
@@ -95,12 +105,22 @@ async def login(user_data: UserLogin):
     
     # Create token
     token = create_token(str(user["_id"]), user["email"])
+    user_id = str(user["_id"])
+    
+    # Log activity
+    await log_activity(
+        action="user_logged_in",
+        entity_type="user",
+        description=f"User logged in: {user.get('name', user['email'])}",
+        entity_id=user_id,
+        user_id=user_id
+    )
     
     return {
         "message": "Login successful",
         "token": token,
         "user": {
-            "id": str(user["_id"]),
+            "id": user_id,
             "email": user["email"],
             "name": user.get("name", user["email"].split("@")[0])
         }

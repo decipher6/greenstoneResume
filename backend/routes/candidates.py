@@ -13,6 +13,7 @@ from models import Candidate, CandidateStatus, ContactInfo, ScoreBreakdown, Crit
 from utils.cv_parser import parse_resume
 from utils.entity_extraction import extract_contact_info, extract_name
 from utils.ai_scoring import score_resume_with_llm, calculate_composite_score
+from routes.activity_logs import log_activity
 
 router = APIRouter()
 
@@ -89,6 +90,16 @@ async def upload_candidates_bulk(
     await db.jobs.update_one(
         {"_id": ObjectId(job_id)},
         {"$inc": {"candidate_count": len(uploaded_candidates)}}
+    )
+    
+    # Log activity
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    await log_activity(
+        action="candidates_uploaded",
+        entity_type="candidate",
+        description=f"Uploaded {len(uploaded_candidates)} candidate(s) for job: {job.get('title', 'Unknown') if job else 'Unknown'}",
+        entity_id=job_id,
+        metadata={"count": len(uploaded_candidates), "job_id": job_id}
     )
     
     return {"uploaded": len(uploaded_candidates), "candidates": uploaded_candidates}
@@ -178,6 +189,15 @@ async def re_analyze_candidate(candidate_id: str, background_tasks: BackgroundTa
     # Trigger re-analysis in background
     background_tasks.add_task(process_candidate_analysis, job_id, candidate_id)
     
+    # Log activity
+    await log_activity(
+        action="candidate_reanalyzed",
+        entity_type="candidate",
+        description=f"Re-analysis started for candidate: {candidate.get('name', 'Unknown')}",
+        entity_id=candidate_id,
+        metadata={"job_id": job_id}
+    )
+    
     return {
         "message": "Re-analysis started for candidate",
         "candidate_id": candidate_id
@@ -208,6 +228,15 @@ async def delete_candidate(candidate_id: str):
     await db.jobs.update_one(
         {"_id": ObjectId(job_id)},
         {"$inc": {"candidate_count": -1}}
+    )
+    
+    # Log activity
+    await log_activity(
+        action="candidate_deleted",
+        entity_type="candidate",
+        description=f"Deleted candidate: {candidate_name}",
+        entity_id=candidate_id,
+        metadata={"job_id": job_id, "job_title": job_title}
     )
     
     return {"message": "Candidate deleted successfully"}
@@ -376,6 +405,19 @@ async def process_candidate_analysis(job_id: str, candidate_id: str):
                     "ai_justification": scoring_result["justification"],
                     "analyzed_at": datetime.now()
                 }
+            }
+        )
+        
+        # Log activity
+        await log_activity(
+            action="candidate_analyzed",
+            entity_type="candidate",
+            description=f"Completed analysis for candidate: {candidate.get('name', 'Unknown')}",
+            entity_id=candidate_id,
+            metadata={
+                "job_id": job_id,
+                "overall_score": score_breakdown.get("overall_score", 0),
+                "resume_score": score_breakdown.get("resume_score", 0)
             }
         )
         

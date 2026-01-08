@@ -3,6 +3,7 @@ from typing import List
 from bson import ObjectId
 from database import get_db
 from models import EmailSend
+from routes.activity_logs import log_activity
 
 router = APIRouter()
 
@@ -49,6 +50,19 @@ async def send_emails(email_data: EmailSend):
             "subject": subject
         })
         sent_count += 1
+    
+    # Log activity
+    await log_activity(
+        action="email_sent",
+        entity_type="email",
+        description=f"Sent {sent_count} email(s) for job: {job.get('title', 'Unknown')}",
+        entity_id=email_data.job_id,
+        metadata={
+            "candidate_count": sent_count,
+            "template_type": email_data.template.template_type,
+            "candidate_ids": email_data.candidate_ids
+        }
+    )
     
     return {
         "message": f"[DEMO] Email functionality is for demonstration purposes only. {sent_count} emails would be sent.",

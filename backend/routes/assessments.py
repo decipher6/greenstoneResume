@@ -9,6 +9,7 @@ import re
 from database import get_db
 from models import CCATResult, PersonalityResult, PersonalityTraits
 from utils.cv_parser import parse_pdf
+from routes.activity_logs import log_activity
 
 router = APIRouter()
 
@@ -195,6 +196,26 @@ async def upload_candidate_assessments(
         {"_id": ObjectId(candidate_id)},
         {"$set": {"score_breakdown": existing_breakdown}}
     )
+    
+    # Log activity
+    assessment_types = []
+    if ccat_uploaded:
+        assessment_types.append("CCAT")
+    if personality_uploaded:
+        assessment_types.append("Personality")
+    
+    if assessment_types:
+        await log_activity(
+            action="assessment_uploaded",
+            entity_type="assessment",
+            description=f"Uploaded {', '.join(assessment_types)} assessment(s) for candidate: {candidate.get('name', 'Unknown')}",
+            entity_id=candidate_id,
+            metadata={
+                "ccat_uploaded": ccat_uploaded,
+                "personality_uploaded": personality_uploaded,
+                "job_id": candidate.get("job_id")
+            }
+        )
     
     return {
         "message": "Assessment results uploaded successfully",
