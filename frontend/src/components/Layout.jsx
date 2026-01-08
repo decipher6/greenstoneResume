@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, BarChart3, Settings, Search, Bell, User, LogOut } from 'lucide-react'
+import { LayoutDashboard, Briefcase, BarChart3, Settings, Bell, User, LogOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const Layout = ({ children, pageTitle, pageSubtitle }) => {
@@ -96,14 +96,6 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
             <p className="text-sm text-gray-400">{subtitle}</p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="glass-input flex items-center gap-2 w-64">
-              <Search size={18} className="text-gray-400" />
-              <input
-                type="text"
-                placeholder="Q Search..."
-                className="bg-transparent border-0 outline-0 w-full"
-              />
-            </div>
             <button className="relative p-2 rounded-lg hover:bg-glass-100 transition-colors">
               <Bell size={20} />
               <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full"></span>

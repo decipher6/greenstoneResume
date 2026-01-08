@@ -30,6 +30,7 @@ export const getJobs = () => api.get('/jobs')
 export const getJob = (jobId) => api.get(`/jobs/${jobId}`)
 export const createJob = (data) => api.post('/jobs', data)
 export const deleteJob = (jobId) => api.delete(`/jobs/${jobId}`)
+export const updateJobStatus = (jobId, status) => api.patch(`/jobs/${jobId}/status`, { status })
 export const runAnalysis = (jobId, force = false) => api.post(`/jobs/${jobId}/run-analysis?force=${force}`)
 export const reAnalyzeCandidate = (candidateId) => api.post(`/candidates/${candidateId}/re-analyze`)
 

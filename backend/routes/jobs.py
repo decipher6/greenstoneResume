@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query, Body
 from typing import List
 from datetime import datetime
 from bson import ObjectId
@@ -116,3 +116,31 @@ async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force:
         "force": force
     }
 
+@router.patch("/{job_id}/status", response_model=Job)
+async def update_job_status(job_id: str, status: str = Body(..., embed=True)):
+    """Update job status"""
+    db = get_db()
+    
+    # Validate status
+    if status not in ["active", "paused", "closed"]:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be 'active', 'paused', or 'closed'")
+    
+    try:
+        job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid job ID")
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Update status
+    await db.jobs.update_one(
+        {"_id": ObjectId(job_id)},
+        {"$set": {"status": status}}
+    )
+    
+    # Fetch updated job
+    updated_job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    updated_job["id"] = str(updated_job["_id"])
+    
+    return Job(**updated_job)
