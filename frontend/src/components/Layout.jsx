@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, BarChart3, Settings, User, LogOut } from 'lucide-react'
+import { LayoutDashboard, Briefcase, BarChart3, Settings, User, LogOut, Clock } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const Layout = ({ children, pageTitle, pageSubtitle }) => {
@@ -10,6 +10,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/jobs', icon: Briefcase, label: 'Job Posts' },
     { path: '/reports', icon: BarChart3, label: 'Reports' },
+    { path: '/activity-logs', icon: Clock, label: 'Activity Logs' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ]
 
@@ -21,6 +22,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
       return { title: 'Job Posts', subtitle: 'Manage your open positions and track candidates' }
     }
     if (location.pathname === '/reports') return { title: 'Reports & Analytics', subtitle: 'Global insights across all positions' }
+    if (location.pathname === '/activity-logs') return { title: 'Activity Logs', subtitle: 'View system activity and events' }
     if (location.pathname === '/settings') return { title: 'Settings', subtitle: 'Manage your preferences and configurations' }
     if (location.pathname.startsWith('/candidates/')) return { title: 'Candidate Profile', subtitle: 'Detailed candidate evaluation' }
     return { title: 'Greenstone Talent AI', subtitle: '' }

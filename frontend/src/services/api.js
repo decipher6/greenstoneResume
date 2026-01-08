@@ -66,5 +66,8 @@ export const getTopCandidates = (jobId, limit = 5) => api.get(`/analytics/top-ca
 // Email
 export const sendEmails = (data) => api.post('/email/send', data)
 
+// Activity Logs
+export const getActivityLogs = (limit = 100, skip = 0) => api.get(`/activity-logs?limit=${limit}&skip=${skip}`)
+
 export default api
 

@@ -111,3 +111,13 @@ class EmailSend(BaseModel):
     candidate_ids: List[str]
     template: EmailTemplate
     job_id: str
+
+class ActivityLog(BaseModel):
+    id: Optional[str] = None
+    user_id: Optional[str] = None
+    action: str  # e.g., "job_created", "candidate_uploaded", "analysis_run", "email_sent"
+    entity_type: str  # e.g., "job", "candidate", "email"
+    entity_id: Optional[str] = None
+    description: str
+    metadata: Optional[Dict] = None
+    created_at: Optional[datetime] = None

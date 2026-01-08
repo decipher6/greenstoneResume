@@ -10,6 +10,7 @@ import JobDetail from './pages/JobDetail'
 import CandidateProfile from './pages/CandidateProfile'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import ActivityLogs from './pages/ActivityLogs'
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -105,6 +106,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <Settings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activity-logs"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ActivityLogs />
             </Layout>
           </ProtectedRoute>
         }
