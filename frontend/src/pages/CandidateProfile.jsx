@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Brain, Mail, FileText, Upload, RefreshCw } from 'lucide-react'
-import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate } from '../services/api'
+import { ArrowLeft, User, Brain, Mail, FileText, Upload, RefreshCw, Calendar, Send, Trash2 } from 'lucide-react'
+import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
+import SendEmailModal from '../components/SendEmailModal'
+import SendInterviewModal from '../components/SendInterviewModal'
 
 const CandidateProfile = () => {
   const { candidateId } = useParams()
@@ -14,6 +16,8 @@ const CandidateProfile = () => {
   const [error, setError] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [reAnalyzing, setReAnalyzing] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [showInterviewModal, setShowInterviewModal] = useState(false)
 
   useEffect(() => {
     fetchCandidate()
@@ -111,6 +115,27 @@ const CandidateProfile = () => {
     }
   }
 
+  const handleDelete = async () => {
+    const confirmed = await showConfirm({
+      title: 'Delete Candidate',
+      message: 'Are you sure you want to delete this candidate? This action cannot be undone.',
+      type: 'confirm',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    })
+    
+    if (confirmed) {
+      try {
+        await deleteCandidate(candidateId)
+        await showAlert('Success', 'Candidate deleted successfully.', 'success')
+        navigate(candidate.job_id ? `/jobs/${candidate.job_id}` : '/jobs')
+      } catch (error) {
+        console.error('Error deleting candidate:', error)
+        await showAlert('Error', 'Failed to delete candidate. Please try again.', 'error')
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -178,40 +203,68 @@ const CandidateProfile = () => {
 
       {/* Header */}
       <div className="glass-card p-6">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-6">
+          <div className="flex-1">
             <h2 className="text-3xl font-bold">{candidate.name || 'Unknown Candidate'}</h2>
             <p className="text-lg text-gray-400 mt-1">{jobTitle}</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-start gap-6">
             <div className="text-right">
               <p className="text-sm text-gray-400">Resume Score</p>
               <p className="text-4xl font-bold text-primary-400">{resumeScore.toFixed(1)}/10</p>
             </div>
-            <div className="border-l border-glass-200 pl-4 flex flex-col gap-2">
-              <button
-                onClick={handleReAnalyze}
-                disabled={reAnalyzing}
-                className="glass-button flex items-center gap-2"
-                title="Re-analyze candidate with updated AI scoring"
-              >
-                <RefreshCw size={18} className={reAnalyzing ? 'animate-spin' : ''} />
-                {reAnalyzing ? 'Re-analyzing...' : 'Re-analyze'}
-              </button>
-              <label className="glass-button-secondary cursor-pointer flex items-center gap-2" title="Upload CCAT and Personality assessments">
-                <Upload size={18} />
-                {uploading ? 'Uploading...' : 'Upload Assessments'}
-                <input
-                  type="file"
-                  accept=".csv,.pdf"
-                  onChange={handleAssessmentUpload}
-                  className="hidden"
-                  disabled={uploading}
-                />
-              </label>
-              <p className="text-xs text-gray-400 max-w-[200px]">
-                CSV or PDF with CCAT percentile and personality scores
-              </p>
+            <div className="border-l border-glass-200 pl-6 flex flex-col gap-3 min-w-[280px]">
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setShowInterviewModal(true)}
+                  className="glass-button flex items-center justify-center gap-2 text-sm"
+                >
+                  <Calendar size={16} />
+                  Invite to Interview
+                </button>
+                <button
+                  onClick={() => setShowEmailModal(true)}
+                  className="glass-button-secondary flex items-center justify-center gap-2 text-sm"
+                >
+                  <Send size={16} />
+                  Send Rejection
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="glass-button-secondary flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 col-span-2"
+                >
+                  <Trash2 size={16} />
+                  Delete Candidate
+                </button>
+              </div>
+              
+              {/* Analysis Buttons */}
+              <div className="pt-2 border-t border-glass-200 space-y-2">
+                <button
+                  onClick={handleReAnalyze}
+                  disabled={reAnalyzing}
+                  className="glass-button w-full flex items-center justify-center gap-2 text-sm"
+                  title="Re-analyze candidate with updated AI scoring"
+                >
+                  <RefreshCw size={16} className={reAnalyzing ? 'animate-spin' : ''} />
+                  {reAnalyzing ? 'Re-analyzing...' : 'Re-analyze'}
+                </button>
+                <label className="glass-button-secondary cursor-pointer w-full flex items-center justify-center gap-2 text-sm" title="Upload CCAT and Personality assessments">
+                  <Upload size={16} />
+                  {uploading ? 'Uploading...' : 'Upload Assessments'}
+                  <input
+                    type="file"
+                    accept=".csv,.pdf"
+                    onChange={handleAssessmentUpload}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                </label>
+                <p className="text-xs text-gray-400 text-center">
+                  CSV or PDF with CCAT percentile and personality scores
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -229,9 +282,9 @@ const CandidateProfile = () => {
               <p className="text-2xl font-bold">{overallScore.toFixed(1)}/10</p>
             </div>
           </div>
-          <p className="text-sm text-gray-300 mt-2">
+          {/* <p className="text-sm text-gray-300 mt-2">
             {candidate.ai_justification || 'Score based on comprehensive evaluation.'}
-          </p>
+          </p> */}
         </div>
 
         <div className="glass-card p-6">
@@ -294,9 +347,9 @@ const CandidateProfile = () => {
         )}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-2 gap-6">
-        {criterionData.length > 0 && (
+      {/* Criterion Scores Section */}
+      {criterionData.length > 0 && (
+        <div className="grid grid-cols-2 gap-6">
           <div className="glass-card p-6">
             <h3 className="text-lg font-semibold mb-2">Criterion Scores</h3>
             <p className="text-sm text-gray-400 mb-4">Performance across evaluation criteria (1-10 scale)</p>
@@ -329,9 +382,32 @@ const CandidateProfile = () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        )}
 
-        {personalityData.length > 0 && (
+          <div className="glass-card p-6">
+            <h3 className="text-lg font-semibold mb-4">Criterion Breakdown</h3>
+            <div className="space-y-4">
+              {candidate.criterion_scores?.map((criterion, index) => (
+                <div key={index}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">{criterion.criterion_name}</span>
+                    <span className="text-sm font-semibold">{parseFloat(criterion.score || 0).toFixed(1)}/10</span>
+                  </div>
+                  <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
+                      style={{ width: `${((parseFloat(criterion.score || 0)) / 10) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Personality Profile Section */}
+      {personalityData.length > 0 && (
+        <div className="grid grid-cols-2 gap-6">
           <div className="glass-card p-6">
             <h3 className="text-lg font-semibold mb-2">Personality Profile</h3>
             <p className="text-sm text-gray-400 mb-4">Big Five personality traits (1-10 scale)</p>
@@ -368,34 +444,7 @@ const CandidateProfile = () => {
               </RadarChart>
             </ResponsiveContainer>
           </div>
-        )}
-      </div>
 
-      {/* Detailed Breakdowns */}
-      <div className="grid grid-cols-2 gap-6">
-        {criterionData.length > 0 && (
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4">Criterion Breakdown</h3>
-            <div className="space-y-4">
-              {candidate.criterion_scores?.map((criterion, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">{criterion.criterion_name}</span>
-                    <span className="text-sm font-semibold">{parseFloat(criterion.score || 0).toFixed(1)}/10</span>
-                  </div>
-                  <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
-                      style={{ width: `${((parseFloat(criterion.score || 0)) / 10) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {personalityData.length > 0 && (
           <div className="glass-card p-6">
             <h3 className="text-lg font-semibold mb-4">Personality Traits</h3>
             <div className="space-y-4">
@@ -415,8 +464,31 @@ const CandidateProfile = () => {
               ))}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Email Modals */}
+      {showEmailModal && candidate && (
+        <SendEmailModal
+          jobId={candidate.job_id}
+          candidateIds={[candidateId]}
+          onClose={() => {
+            setShowEmailModal(false)
+            fetchCandidate()
+          }}
+        />
+      )}
+
+      {showInterviewModal && candidate && (
+        <SendInterviewModal
+          jobId={candidate.job_id}
+          candidateIds={[candidateId]}
+          onClose={() => {
+            setShowInterviewModal(false)
+            fetchCandidate()
+          }}
+        />
+      )}
     </div>
   )
 }
