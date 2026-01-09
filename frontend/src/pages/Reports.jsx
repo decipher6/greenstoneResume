@@ -109,20 +109,27 @@ const Reports = () => {
                 data={[{ name: 'Senior', value: 100 }]}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={({ cx, cy, name, percent }) => (
-                  <text 
-                    x={cx} 
-                    y={cy} 
-                    fill="#8EC197" 
-                    textAnchor="middle" 
-                    dominantBaseline="central"
-                    fontSize={14}
-                    fontWeight="bold"
-                  >
-                    {`${name} ${(percent * 100).toFixed(0)}%`}
-                  </text>
-                )}
+                labelLine={true}
+                label={({ name, percent, cx, cy, midAngle, innerRadius, outerRadius }) => {
+                  const RADIAN = Math.PI / 180
+                  const radius = outerRadius + 20 // Position label outside the pie
+                  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+                  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+                  
+                  return (
+                    <text 
+                      x={x} 
+                      y={y} 
+                      fill="#8EC197" 
+                      textAnchor={x > cx ? 'start' : 'end'} 
+                      dominantBaseline="central"
+                      fontSize={16}
+                      fontWeight="bold"
+                    >
+                      {`${name} ${(percent * 100).toFixed(0)}%`}
+                    </text>
+                  )
+                }}
                 outerRadius={100}
                 fill="#8EC197"
                 dataKey="value"
@@ -131,12 +138,14 @@ const Reports = () => {
               </Pie>
               <Tooltip 
                 contentStyle={{ 
-                  backgroundColor: 'rgba(10, 10, 15, 0.9)', 
-                  border: '1px solid rgba(255,255,255,0.2)',
+                  backgroundColor: 'rgba(10, 10, 15, 0.95)', 
+                  border: '1px solid rgba(142, 193, 151, 0.5)',
                   borderRadius: '8px',
-                  color: '#8EC197'
+                  color: '#FFFFFF'
                 }}
-                labelStyle={{ color: '#8EC197' }}
+                labelStyle={{ color: '#8EC197', fontWeight: 'bold', fontSize: 14 }}
+                itemStyle={{ color: '#FFFFFF', fontSize: 14 }}
+                formatter={(value, name) => [`${value}`, name]}
               />
             </PieChart>
           </ResponsiveContainer>
