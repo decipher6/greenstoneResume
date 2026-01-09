@@ -28,6 +28,16 @@
    DATABASE_NAME=greenstone_talent
    CORS_ORIGINS=http://localhost:5173,http://localhost:3000
    DEBUG=false
+   
+   # Email Configuration (SMTP)
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your_email@gmail.com
+   SMTP_PASSWORD=your_app_password
+   SMTP_FROM_EMAIL=your_email@gmail.com
+   SMTP_FROM_NAME=Greenstone Talent Team
+   SMTP_USE_TLS=true
+   EMAIL_ENABLED=true
    ```
 
 ## Run the Backend
@@ -53,9 +63,61 @@ Visit:
 - `http://localhost:8000/api/health` - Health check
 - `http://localhost:8000/docs` - Interactive API documentation (Swagger UI)
 
+## Email Configuration
+
+The email functionality uses SMTP to send emails. Here's how to configure it:
+
+### Gmail Setup (Recommended for Development)
+
+1. **Enable 2-Step Verification** on your Google account
+2. **Generate an App Password**:
+   - Go to Google Account settings → Security
+   - Under "2-Step Verification", click "App passwords"
+   - Generate a new app password for "Mail"
+   - Copy the 16-character password
+
+3. **Set in `.env`**:
+   ```env
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your_email@gmail.com
+   SMTP_PASSWORD=your_16_char_app_password
+   SMTP_FROM_EMAIL=your_email@gmail.com
+   SMTP_FROM_NAME=Greenstone Talent Team
+   SMTP_USE_TLS=true
+   EMAIL_ENABLED=true
+   ```
+
+### Other Email Providers
+
+**Outlook/Office 365**:
+```env
+SMTP_HOST=smtp.office365.com
+SMTP_PORT=587
+SMTP_USER=your_email@outlook.com
+SMTP_PASSWORD=your_password
+SMTP_USE_TLS=true
+```
+
+**Custom SMTP Server**:
+```env
+SMTP_HOST=your_smtp_server.com
+SMTP_PORT=587
+SMTP_USER=your_username
+SMTP_PASSWORD=your_password
+SMTP_USE_TLS=true
+```
+
+**Note**: Set `EMAIL_ENABLED=false` to disable email sending (emails will be logged but not sent).
+
 ## Troubleshooting
 
 - **Import errors**: Make sure you're in the `backend/` directory when running
 - **MongoDB connection errors**: Check your `MONGODB_URI` in `.env`
 - **GROQ_API_KEY errors**: Make sure your Groq API key is set in `.env`
+- **Email errors**: 
+  - Verify SMTP credentials are correct
+  - For Gmail, make sure you're using an App Password, not your regular password
+  - Check that `EMAIL_ENABLED=true` in `.env`
+  - Check server logs for detailed error messages
 
