@@ -35,18 +35,14 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
       {/* Sidebar */}
       <div className="w-64 glass-card m-4 rounded-2xl p-6 flex flex-col">
         {/* Logo */}
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex flex-col items-center gap-3 mb-8">
           <img 
             src="/logo.svg" 
             alt="Greenstone Logo" 
             className="w-30 h-30 object-contain"
           />
-          <div className="flex flex-col">
-            <h1 className="text-lg font-bold leading-tight">
-              <span>Talent</span>
-              <br />
-              <span>AI</span>
-            </h1>
+          <div className="text-center">
+            <h1 className="text-lg font-bold">Talent AI</h1>
           </div>
         </div>
 
