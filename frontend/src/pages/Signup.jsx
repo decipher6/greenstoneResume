@@ -40,8 +40,15 @@ const Signup = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a0a0f] to-[#1a1a2e] p-4">
       <div className="glass-card w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl font-bold text-white">G</span>
+          <div className="flex flex-col items-center gap-3 mb-4">
+            <img 
+              src="/logo.svg" 
+              alt="Greenstone Logo" 
+              className="w-32 h-32 object-contain"
+            />
+            <div className="text-center">
+              <p className="text-xs text-gray-400">Talent Management AI</p>
+            </div>
           </div>
           <h1 className="text-3xl font-bold mb-2">Create Account</h1>
           <p className="text-gray-400">Sign up for Greenstone Talent AI</p>
