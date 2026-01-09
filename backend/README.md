@@ -85,8 +85,15 @@ The email functionality uses SMTP to send emails. Here's how to configure it:
    SMTP_FROM_EMAIL=your_email@gmail.com
    SMTP_FROM_NAME=Greenstone Talent Team
    SMTP_USE_TLS=true
+   SMTP_USE_SSL=false
+   SMTP_TIMEOUT=30
    EMAIL_ENABLED=true
    ```
+   
+   **Note**: If you encounter connection timeout errors:
+   - Try port 465 with SSL: Set `SMTP_PORT=465` and `SMTP_USE_SSL=true`
+   - Increase timeout: Set `SMTP_TIMEOUT=60` (seconds)
+   - The system will automatically try alternative Gmail ports if the primary fails
 
 ### Other Email Providers
 
@@ -119,5 +126,11 @@ SMTP_USE_TLS=true
   - Verify SMTP credentials are correct
   - For Gmail, make sure you're using an App Password, not your regular password
   - Check that `EMAIL_ENABLED=true` in `.env`
+  - **Connection timeout errors**:
+    - Try using port 465 with SSL: `SMTP_PORT=465` and `SMTP_USE_SSL=true`
+    - Increase timeout: `SMTP_TIMEOUT=60`
+    - Check if your network/firewall blocks SMTP ports (587, 465)
+    - If running on a cloud platform (Render, Heroku, etc.), ensure outbound SMTP is allowed
+    - The system will automatically try alternative Gmail ports if primary fails
   - Check server logs for detailed error messages
 
