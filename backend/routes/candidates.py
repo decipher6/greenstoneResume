@@ -110,13 +110,18 @@ async def get_candidates_by_job(
     min_resume_score: Optional[float] = None,
     min_ccat_score: Optional[float] = None,
     min_overall_score: Optional[float] = None,
-    sort_by: Optional[str] = "overall_score"  # overall_score, resume_score, ccat_score, created_at
+    sort_by: Optional[str] = "overall_score",  # overall_score, resume_score, ccat_score, created_at
+    name: Optional[str] = None  # Search by candidate name
 ):
     """Get all candidates for a job with optional filtering and sorting"""
     db = get_db()
     
     # Build query
     query = {"job_id": job_id}
+    
+    # Add name search filter (case-insensitive partial match)
+    if name and name.strip():
+        query["name"] = {"$regex": name.strip(), "$options": "i"}
     
     # Add score filters
     if min_resume_score is not None or min_ccat_score is not None or min_overall_score is not None:

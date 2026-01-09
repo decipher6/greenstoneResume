@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
   runAnalysis, deleteCandidate, getTopCandidates
@@ -22,6 +22,7 @@ const JobDetail = () => {
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [showInterviewModal, setShowInterviewModal] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [nameSearch, setNameSearch] = useState('')
   const [filters, setFilters] = useState({
     min_resume_score: '',
     min_ccat_score: '',
@@ -46,7 +47,7 @@ const JobDetail = () => {
   useEffect(() => {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, topCandidatesLimit])
+  }, [jobId, topCandidatesLimit, filters])
 
   const fetchData = async () => {
     try {
@@ -54,6 +55,7 @@ const JobDetail = () => {
       if (filters.min_resume_score) params.append('min_resume_score', filters.min_resume_score)
       if (filters.min_ccat_score) params.append('min_ccat_score', filters.min_ccat_score)
       if (filters.min_overall_score) params.append('min_overall_score', filters.min_overall_score)
+      if (nameSearch.trim()) params.append('name', nameSearch.trim())
       // Default to sorting by overall_score descending if no sort_by specified
       params.append('sort_by', filters.sort_by || 'overall_score')
       
@@ -195,6 +197,7 @@ const JobDetail = () => {
       sort_by: 'overall_score'
     }
     setFilters(clearedFilters)
+    setNameSearch('')
     // Fetch with cleared filters
     setTimeout(() => {
       const params = new URLSearchParams()
@@ -321,15 +324,47 @@ const JobDetail = () => {
 
       {/* Candidates Table */}
       <div className="glass-card overflow-hidden">
-        <div className="p-6 border-b border-glass-200 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Candidates</h3>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="glass-button-secondary flex items-center gap-2"
-          >
-            <Filter size={18} />
-            {showFilters ? 'Hide' : 'Show'} Filters
-          </button>
+        <div className="p-6 border-b border-glass-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Candidates</h3>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="glass-button-secondary flex items-center gap-2"
+            >
+              <Filter size={18} />
+              {showFilters ? 'Hide' : 'Show'} Filters
+            </button>
+          </div>
+          
+          {/* Name Search */}
+          <div className="glass-input flex items-center gap-2">
+            <Search size={18} className="text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search candidates by name..."
+              className="bg-transparent border-0 outline-0 w-full"
+              value={nameSearch}
+              onChange={(e) => {
+                setNameSearch(e.target.value)
+                // Debounce search - wait 300ms after user stops typing
+                clearTimeout(window.searchTimeout)
+                window.searchTimeout = setTimeout(() => {
+                  fetchData()
+                }, 300)
+              }}
+            />
+            {nameSearch && (
+              <button
+                onClick={() => {
+                  setNameSearch('')
+                  fetchData()
+                }}
+                className="p-1 rounded hover:bg-glass-200 transition-colors"
+              >
+                <X size={16} className="text-gray-400" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Bulk Actions */}
