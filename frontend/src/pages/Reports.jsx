@@ -41,7 +41,8 @@ const Reports = () => {
       }))
     : []
 
-  const COLORS = ['#14a869', '#3b82f6', '#9333ea', '#ec4899', '#f59e0b']
+  // Greenstone color palette
+  const COLORS = ['#014421', '#8EC197', '#948A54', '#7F7F7F', '#E2E2E2']
 
   return (
     <div className="space-y-6">
@@ -83,7 +84,7 @@ const Reports = () => {
                   borderRadius: '8px'
                 }}
               />
-              <Bar dataKey="count" fill="#14a869" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="count" fill="#014421" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -100,10 +101,10 @@ const Reports = () => {
                 labelLine={false}
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 outerRadius={100}
-                fill="#14a869"
+                fill="#014421"
                 dataKey="value"
               >
-                <Cell fill="#14a869" />
+                <Cell fill="#014421" />
               </Pie>
               <Tooltip 
                 contentStyle={{ 
@@ -148,7 +149,7 @@ const Reports = () => {
                 labelStyle={{ color: '#fff' }}
                 formatter={(value) => [`${value.toFixed(1)}/10`, 'Average Score']}
               />
-              <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="value" fill="#8EC197" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (

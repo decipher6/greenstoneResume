@@ -13,16 +13,23 @@ export default {
           200: 'rgba(255, 255, 255, 0.2)',
         },
         'primary': {
-          50: '#e6f7f0',
-          100: '#b3e6d1',
-          200: '#80d5b2',
-          300: '#4dc493',
-          400: '#1ab374',
-          500: '#14a869',
-          600: '#0f8d54',
-          700: '#0a723f',
-          800: '#05572a',
-          900: '#003c15',
+          50: '#e6f0eb',
+          100: '#b3d1c4',
+          200: '#80b29d',
+          300: '#4d9376',
+          400: '#1a744f',
+          500: '#014421', // Greenstone Primary (Pantone 3537 C)
+          600: '#01361a',
+          700: '#012814',
+          800: '#001a0d',
+          900: '#000c07',
+        },
+        'greenstone': {
+          primary: '#014421', // Pantone 3537 C
+          mint: '#8EC197', // Pantone 139-12 C
+          gold: '#948A54', // Pantone 619 U
+          platinum: '#7F7F7F', // Pantone 8401 C
+          silver: '#E2E2E2', // Pantone 5523 M
         },
       },
       backdropBlur: {

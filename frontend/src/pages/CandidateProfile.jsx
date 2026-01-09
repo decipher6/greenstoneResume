@@ -378,7 +378,7 @@ const CandidateProfile = () => {
                   }}
                   labelStyle={{ color: '#fff' }}
                 />
-                <Bar dataKey="score" fill="#14a869" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="score" fill="#014421" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
