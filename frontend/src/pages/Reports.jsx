@@ -31,7 +31,8 @@ const Reports = () => {
 
   const scoreData = scoreDist ? Object.entries(scoreDist).map(([range, count]) => ({
     range,
-    count: count / (Object.values(scoreDist).reduce((a, b) => a + b, 0) || 1)
+    count: Number(count), // Use actual count, not proportion
+    proportion: count / (Object.values(scoreDist).reduce((a, b) => a + b, 0) || 1) // Keep proportion for display if needed
   })) : []
 
   const deptData = deptScores && Array.isArray(deptScores) 
@@ -75,16 +76,26 @@ const Reports = () => {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={scoreData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-              <XAxis dataKey="range" stroke="#888" />
-              <YAxis stroke="#888" />
+              <XAxis 
+                dataKey="range" 
+                stroke="#8EC197" 
+                tick={{ fill: '#8EC197', fontSize: 12 }}
+              />
+              <YAxis 
+                stroke="#8EC197" 
+                tick={{ fill: '#8EC197', fontSize: 12 }}
+              />
               <Tooltip 
                 contentStyle={{ 
                   backgroundColor: 'rgba(10, 10, 15, 0.9)', 
                   border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '8px'
+                  borderRadius: '8px',
+                  color: '#8EC197'
                 }}
+                labelStyle={{ color: '#8EC197' }}
+                formatter={(value) => [value, 'Count']}
               />
-              <Bar dataKey="count" fill="#014421" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="count" fill="#8EC197" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -99,9 +110,21 @@ const Reports = () => {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ cx, cy, name, percent }) => (
+                  <text 
+                    x={cx} 
+                    y={cy} 
+                    fill="#8EC197" 
+                    textAnchor="middle" 
+                    dominantBaseline="central"
+                    fontSize={14}
+                    fontWeight="bold"
+                  >
+                    {`${name} ${(percent * 100).toFixed(0)}%`}
+                  </text>
+                )}
                 outerRadius={100}
-                fill="#014421"
+                fill="#8EC197"
                 dataKey="value"
               >
                 <Cell fill="#014421" />
@@ -110,8 +133,10 @@ const Reports = () => {
                 contentStyle={{ 
                   backgroundColor: 'rgba(10, 10, 15, 0.9)', 
                   border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '8px'
+                  borderRadius: '8px',
+                  color: '#8EC197'
                 }}
+                labelStyle={{ color: '#8EC197' }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -128,25 +153,25 @@ const Reports = () => {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
               <XAxis 
                 dataKey="name" 
-                stroke="#888" 
+                stroke="#8EC197" 
                 angle={-45} 
                 textAnchor="end" 
                 height={80}
-                tick={{ fill: '#888', fontSize: 12 }}
+                tick={{ fill: '#8EC197', fontSize: 12 }}
               />
               <YAxis 
-                stroke="#888" 
+                stroke="#8EC197" 
                 domain={[0, 10]}
-                tick={{ fill: '#888', fontSize: 12 }}
+                tick={{ fill: '#8EC197', fontSize: 12 }}
               />
               <Tooltip 
                 contentStyle={{ 
                   backgroundColor: 'rgba(10, 10, 15, 0.9)', 
                   border: '1px solid rgba(255,255,255,0.2)',
                   borderRadius: '8px',
-                  color: '#fff'
+                  color: '#8EC197'
                 }}
-                labelStyle={{ color: '#fff' }}
+                labelStyle={{ color: '#8EC197' }}
                 formatter={(value) => [`${value.toFixed(1)}/10`, 'Average Score']}
               />
               <Bar dataKey="value" fill="#8EC197" radius={[8, 8, 0, 0]} />
