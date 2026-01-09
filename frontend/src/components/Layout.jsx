@@ -39,7 +39,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
           <img 
             src="/logo.svg" 
             alt="Greenstone Logo" 
-            className="w-10 h-10 object-contain"
+            className="w-20 h-20 object-contain"
           />
           <div>
             <h1 className="text-lg font-bold">Greenstone</h1>
