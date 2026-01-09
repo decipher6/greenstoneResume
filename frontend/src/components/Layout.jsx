@@ -41,9 +41,12 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
             alt="Greenstone Logo" 
             className="w-30 h-30 object-contain"
           />
-          <div>
-            <h1 className="text-lg font-bold">Greenstone</h1>
-            <p className="text-xs text-gray-400">Talent AI</p>
+          <div className="flex flex-col">
+            <h1 className="text-lg font-bold leading-tight">
+              <span>Talent</span>
+              <br />
+              <span>AI</span>
+            </h1>
           </div>
         </div>
 
