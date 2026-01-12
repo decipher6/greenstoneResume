@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X, FileText, XCircle } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
   runAnalysis, deleteCandidate, getTopCandidates, updateCandidate
@@ -32,6 +32,9 @@ const JobDetail = () => {
   const [autoAnalyze, setAutoAnalyze] = useState(true)
   const [editingField, setEditingField] = useState(null) // { candidateId, field }
   const [editValues, setEditValues] = useState({}) // { candidateId: { name, email, phone } }
+  const [isDragging, setIsDragging] = useState(false)
+  const [pendingFiles, setPendingFiles] = useState([])
+  const [isUploading, setIsUploading] = useState(false)
 
   // Load autoAnalyze setting from localStorage on mount
   useEffect(() => {
@@ -77,46 +80,70 @@ const JobDetail = () => {
     }
   }
 
-  const handleFileUpload = async (e) => {
-    const files = Array.from(e.target.files)
-    if (files.length === 0) return
-
+  const validateFiles = (files) => {
+    const fileArray = Array.from(files)
+    
     // Validate file limit (50 CVs max)
-    if (files.length > 50) {
-      await showAlert(
-        'File Limit Exceeded',
-        `Maximum 50 files allowed. You selected ${files.length} files. Please select fewer files.`,
-        'error'
-      )
-      e.target.value = '' // Reset input
-      return
+    if (fileArray.length > 50) {
+      return {
+        valid: false,
+        error: `Maximum 50 files allowed. You selected ${fileArray.length} files. Please select fewer files.`,
+        errorTitle: 'File Limit Exceeded'
+      }
     }
 
     // Validate file formats
     const allowedExtensions = ['.pdf', '.docx', '.doc']
-    const invalidFiles = files.filter(file => {
+    const invalidFiles = fileArray.filter(file => {
       const ext = '.' + file.name.split('.').pop().toLowerCase()
       return !allowedExtensions.includes(ext)
     })
 
     if (invalidFiles.length > 0) {
-      await showAlert(
-        'Invalid File Format',
-        `Invalid file format(s): ${invalidFiles.map(f => f.name).join(', ')}\n\nSupported formats: .pdf, .docx, .doc`,
-        'error'
-      )
-      e.target.value = '' // Reset input
+      return {
+        valid: false,
+        error: `Invalid file format(s): ${invalidFiles.map(f => f.name).join(', ')}\n\nSupported formats: .pdf, .docx, .doc`,
+        errorTitle: 'Invalid File Format'
+      }
+    }
+
+    return { valid: true, files: fileArray }
+  }
+
+  const processFiles = (files) => {
+    const validation = validateFiles(files)
+    if (!validation.valid) {
+      showAlert(validation.errorTitle, validation.error, 'error')
       return
     }
 
+    // Add to pending files (avoid duplicates by name)
+    setPendingFiles(prev => {
+      const existingNames = new Set(prev.map(f => f.name))
+      const newFiles = validation.files.filter(f => !existingNames.has(f.name))
+      return [...prev, ...newFiles]
+    })
+  }
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files)
+    if (files.length === 0) return
+    processFiles(files)
+    e.target.value = '' // Reset input
+  }
+
+  const handleUploadPendingFiles = async () => {
+    if (pendingFiles.length === 0) return
+
+    setIsUploading(true)
     try {
-      await uploadCandidatesBulk(jobId, files)
-      await showAlert('Success', `Successfully uploaded ${files.length} file(s)!`, 'success')
+      await uploadCandidatesBulk(jobId, pendingFiles)
+      await showAlert('Success', `Successfully uploaded ${pendingFiles.length} file(s)!`, 'success')
+      setPendingFiles([])
       fetchData()
       
       // Auto-analyze if setting is enabled
       if (autoAnalyze) {
-        // Wait a moment for candidates to be saved, then trigger analysis
         setTimeout(async () => {
           try {
             await runAnalysis(jobId, false) // false = only analyze new candidates
@@ -134,8 +161,40 @@ const JobDetail = () => {
     } catch (error) {
       console.error('Error uploading files:', error)
       await showAlert('Error', 'Error uploading files. Please try again.', 'error')
+    } finally {
+      setIsUploading(false)
     }
-    e.target.value = '' // Reset input after upload
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      processFiles(files)
+    }
+  }
+
+  const removePendingFile = (index) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const clearPendingFiles = () => {
+    setPendingFiles([])
   }
 
 
@@ -322,6 +381,110 @@ const JobDetail = () => {
         </div>
       </div>
 
+      {/* Drag and Drop Zone */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`glass-card p-8 mb-6 transition-all duration-300 ${
+          isDragging
+            ? 'border-2 border-primary-400 border-solid bg-primary-500/10 scale-[1.02]'
+            : 'border-2 border-dashed border-glass-200 bg-glass-50'
+        }`}
+      >
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className={`mb-4 transition-transform duration-300 ${isDragging ? 'scale-110' : ''}`}>
+            <Upload size={48} className={`mx-auto ${isDragging ? 'text-primary-400' : 'text-gray-400'}`} />
+          </div>
+          <h3 className={`text-lg font-semibold mb-2 ${isDragging ? 'text-primary-400' : 'text-white'}`}>
+            {isDragging ? 'Drop files to upload' : 'Drag & Drop Resumes Here'}
+          </h3>
+          <p className="text-sm text-gray-400 mb-4">
+            Drop PDF, DOCX, or DOC files here, or click to browse
+          </p>
+          <label className="glass-button cursor-pointer flex items-center gap-2 inline-flex">
+            <FileText size={18} />
+            Browse Files
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.docx,.doc"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Pending Files Preview */}
+      {pendingFiles.length > 0 && (
+        <div className="glass-card p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText size={20} className="text-primary-400" />
+              <h3 className="text-lg font-semibold">
+                {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''} ready to upload
+              </h3>
+            </div>
+            <button
+              onClick={clearPendingFiles}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Clear All
+            </button>
+          </div>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {pendingFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-3 bg-glass-100 rounded-lg border border-glass-200"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <FileText size={18} className="text-primary-400 flex-shrink-0" />
+                  <span className="text-sm font-medium truncate" title={file.name}>
+                    {file.name}
+                  </span>
+                  <span className="text-xs text-gray-400 flex-shrink-0">
+                    ({(file.size / 1024).toFixed(1)} KB)
+                  </span>
+                </div>
+                <button
+                  onClick={() => removePendingFile(index)}
+                  className="p-1 rounded hover:bg-red-500/20 transition-colors flex-shrink-0"
+                  title="Remove file"
+                >
+                  <XCircle size={18} className="text-red-400" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-3 mt-4">
+            <button
+              onClick={handleUploadPendingFiles}
+              disabled={isUploading}
+              className="glass-button flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isUploading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload size={18} />
+                  Upload All ({pendingFiles.length})
+                </>
+              )}
+            </button>
+            <button
+              onClick={clearPendingFiles}
+              className="glass-button-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Job Description & Criteria */}
       <div className="grid grid-cols-2 gap-6">
