@@ -36,11 +36,11 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
       <div className="w-64 glass-card m-4 rounded-2xl p-6 flex flex-col">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3 mb-8">
-          <img 
-            src="/logo.svg" 
-            alt="Greenstone Logo" 
-            className="w-20 h-20 object-contain"
-          />
+        <img 
+          src="/logo.svg" 
+          alt="Greenstone Logo" 
+          className="w-[72px] h-[72px] object-contain"
+        />
           <div className="text-center">
             <p className="text-sm text-gray-400">Talent Management AI</p>
           </div>
