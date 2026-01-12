@@ -57,7 +57,7 @@ async def send_emails(email_data: EmailSend):
         body = body.replace("[Job Title]", job_title)
         
         # Send actual email
-        success = await email_sender.send_email(
+        success, error_msg = await email_sender.send_email_with_error(
             to_email=candidate_email,
             subject=subject,
             body=body,
@@ -83,8 +83,9 @@ async def send_emails(email_data: EmailSend):
             candidates_failed.append({
                 "candidate_id": candidate_id,
                 "email": candidate_email,
-                "error": "Failed to send email"
+                "error": error_msg or "Failed to send email"
             })
+            logger.error(f"Failed to send email to {candidate_email}: {error_msg}")
     
     # Log activity
     await log_activity(
@@ -112,3 +113,33 @@ async def send_emails(email_data: EmailSend):
         "failed": candidates_failed if candidates_failed else None
     }
 
+@router.post("/test")
+async def test_email():
+    """Test email configuration by sending a test email"""
+    from utils.email_sender import email_sender
+    
+    if not email_sender.is_configured():
+        raise HTTPException(
+            status_code=500,
+            detail="Email not configured. Set SMTP_USER and SMTP_PASSWORD environment variables."
+        )
+    
+    test_email = email_sender.smtp_user  # Send test email to the configured user
+    success, error = await email_sender.send_email_with_error(
+        to_email=test_email,
+        subject="Test Email from Greenstone Talent",
+        body="This is a test email to verify your SMTP configuration is working correctly.",
+        is_html=False
+    )
+    
+    if success:
+        return {
+            "message": "Test email sent successfully!",
+            "to": test_email,
+            "status": "success"
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send test email: {error}"
+        )

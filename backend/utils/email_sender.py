@@ -1,5 +1,6 @@
 import aiosmtplib
 import os
+import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional, Tuple
@@ -41,39 +42,22 @@ class EmailSender:
         Returns:
             Tuple of (success: bool, error_message: Optional[str])
         """
-        smtp = None
         try:
-            # Use SMTP class directly for better control
-            smtp = aiosmtplib.SMTP(
-                hostname=hostname,
-                port=port,
-                timeout=self.timeout,
-            )
-            
-            # Connect with appropriate encryption
-            if use_ssl or port == 465:
-                # Port 465: SSL from the start
-                # Note: aiosmtplib may need SSL context for port 465
-                # For now, try connecting normally - some versions handle it automatically
-                await asyncio.wait_for(smtp.connect(), timeout=self.timeout)
-                # If connect() doesn't handle SSL, we may need to wrap the socket
-                # But let's try the standard approach first
-            else:
-                # Port 587: STARTTLS
-                await asyncio.wait_for(smtp.connect(), timeout=self.timeout)
-                if use_tls:
-                    await asyncio.wait_for(smtp.starttls(), timeout=self.timeout)
-            
-            # Authenticate and send
+            # Use the send() helper function which handles SSL/TLS automatically
+            # It's simpler and more reliable than manual connection management
             await asyncio.wait_for(
-                smtp.login(self.smtp_user, self.smtp_password),
-                timeout=self.timeout
+                aiosmtplib.send(
+                    message,
+                    hostname=hostname,
+                    port=port,
+                    username=self.smtp_user,
+                    password=self.smtp_password,
+                    use_tls=use_tls and not (use_ssl or port == 465),  # STARTTLS for port 587
+                    start_tls=use_tls and not (use_ssl or port == 465),
+                    timeout=self.timeout,
+                ),
+                timeout=self.timeout + 10  # Add buffer for entire operation
             )
-            await asyncio.wait_for(
-                smtp.send_message(message),
-                timeout=self.timeout
-            )
-            await smtp.quit()
             
             return True, None
             
@@ -90,30 +74,25 @@ class EmailSender:
                     await smtp.quit()
                 except:
                     pass
-            return False, str(e)
+            error_msg = str(e)
+            logger.error(f"SMTP error details: {error_msg}")
+            return False, error_msg
     
-    async def send_email(
+    async def send_email_with_error(
         self,
         to_email: str,
         subject: str,
         body: str,
         is_html: bool = False
-    ) -> bool:
+    ) -> Tuple[bool, Optional[str]]:
         """
-        Send an email asynchronously with automatic fallback to alternative methods
-        
-        Args:
-            to_email: Recipient email address
-            subject: Email subject
-            body: Email body (plain text or HTML)
-            is_html: Whether the body is HTML format
+        Send an email and return success status with error message
         
         Returns:
-            True if email was sent successfully, False otherwise
+            Tuple of (success: bool, error_message: Optional[str])
         """
         if not self.is_configured():
-            logger.warning("Email not configured. Set SMTP_USER and SMTP_PASSWORD environment variables.")
-            return False
+            return False, "Email not configured. Set SMTP_USER and SMTP_PASSWORD environment variables."
         
         # Create message
         message = MIMEMultipart("alternative")
@@ -139,25 +118,26 @@ class EmailSender:
         
         if success:
             logger.info(f"Email sent successfully to {to_email}")
-            return True
+            return True, None
         
         # If primary method failed and it's Gmail, try alternative ports/methods
-        if self.smtp_host == "smtp.gmail.com" and not self.use_ssl:
+        if self.smtp_host == "smtp.gmail.com":
             logger.warning(f"Primary method failed: {error}. Trying alternative Gmail configuration...")
             
             # Try port 465 with SSL (alternative Gmail method)
-            logger.info("Trying Gmail port 465 with SSL...")
-            success, error = await self._try_send_with_config(
-                message,
-                "smtp.gmail.com",
-                465,
-                use_tls=False,
-                use_ssl=True
-            )
-            
-            if success:
-                logger.info(f"Email sent successfully to {to_email} using alternative method (port 465)")
-                return True
+            if self.smtp_port != 465:
+                logger.info("Trying Gmail port 465 with SSL...")
+                success, error = await self._try_send_with_config(
+                    message,
+                    "smtp.gmail.com",
+                    465,
+                    use_tls=False,
+                    use_ssl=True
+                )
+                
+                if success:
+                    logger.info(f"Email sent successfully to {to_email} using alternative method (port 465)")
+                    return True, None
             
             # Try port 587 with STARTTLS (if not already tried)
             if self.smtp_port != 587:
@@ -172,11 +152,27 @@ class EmailSender:
                 
                 if success:
                     logger.info(f"Email sent successfully to {to_email} using alternative method (port 587)")
-                    return True
+                    return True, None
         
         # All methods failed
         logger.error(f"Failed to send email to {to_email} after trying all methods. Last error: {error}")
-        return False
+        return False, error
+    
+    async def send_email(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        is_html: bool = False
+    ) -> bool:
+        """
+        Send an email asynchronously (backward compatibility wrapper)
+        
+        Returns:
+            True if email was sent successfully, False otherwise
+        """
+        success, _ = await self.send_email_with_error(to_email, subject, body, is_html)
+        return success
 
 # Global instance
 email_sender = EmailSender()
