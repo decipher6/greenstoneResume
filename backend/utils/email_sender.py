@@ -45,6 +45,28 @@ class EmailSender:
         try:
             # Use the send() helper function which handles SSL/TLS automatically
             # It's simpler and more reliable than manual connection management
+            # For port 465: use SSL from start (use_tls=True)
+            # For port 587: use STARTTLS (start_tls=True)
+            # They are mutually exclusive
+            if use_ssl or port == 465:
+                # Port 465 with SSL - use TLS from start
+                send_kwargs = {
+                    "use_tls": True,
+                    "start_tls": False
+                }
+            elif use_tls and port == 587:
+                # Port 587 with STARTTLS - upgrade connection
+                send_kwargs = {
+                    "use_tls": False,
+                    "start_tls": True
+                }
+            else:
+                # No TLS
+                send_kwargs = {
+                    "use_tls": False,
+                    "start_tls": False
+                }
+            
             await asyncio.wait_for(
                 aiosmtplib.send(
                     message,
@@ -52,9 +74,8 @@ class EmailSender:
                     port=port,
                     username=self.smtp_user,
                     password=self.smtp_password,
-                    use_tls=use_tls and not (use_ssl or port == 465),  # STARTTLS for port 587
-                    start_tls=use_tls and not (use_ssl or port == 465),
                     timeout=self.timeout,
+                    **send_kwargs
                 ),
                 timeout=self.timeout + 10  # Add buffer for entire operation
             )
@@ -62,18 +83,8 @@ class EmailSender:
             return True, None
             
         except asyncio.TimeoutError:
-            if smtp:
-                try:
-                    await smtp.quit()
-                except:
-                    pass
             return False, f"Connection timeout after {self.timeout} seconds"
         except Exception as e:
-            if smtp:
-                try:
-                    await smtp.quit()
-                except:
-                    pass
             error_msg = str(e)
             logger.error(f"SMTP error details: {error_msg}")
             return False, error_msg
