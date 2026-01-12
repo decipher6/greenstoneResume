@@ -251,7 +251,7 @@ const JobDetail = () => {
       <div className="grid grid-cols-2 gap-6">
         <div className="glass-card p-6">
           <h3 className="text-lg font-semibold mb-4">Job Description</h3>
-          <p className="text-gray-300 whitespace-pre-wrap">{job.description}</p>
+          <p className="text-gray-300 text-sm whitespace-pre-wrap">{job.description}</p>
         </div>
 
         <div className="glass-card p-6">
