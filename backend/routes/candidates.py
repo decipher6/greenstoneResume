@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks, Body
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
@@ -177,6 +177,56 @@ async def get_candidate(candidate_id: str):
             if isinstance(value, dict) and "$numberDouble" in value:
                 candidate["score_breakdown"][key] = float(value["$numberDouble"])
     return Candidate(**candidate)
+
+@router.patch("/{candidate_id}")
+async def update_candidate(candidate_id: str, update_data: dict = Body(...)):
+    """Update candidate information (name, email, phone)"""
+    db = get_db()
+    
+    try:
+        candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid candidate ID")
+    
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    # Prepare update fields
+    update_fields = {}
+    
+    if "name" in update_data:
+        update_fields["name"] = update_data["name"]
+    
+    if "contact_info" in update_data:
+        contact_info = candidate.get("contact_info", {})
+        if "email" in update_data["contact_info"]:
+            contact_info["email"] = update_data["contact_info"]["email"]
+        if "phone" in update_data["contact_info"]:
+            contact_info["phone"] = update_data["contact_info"]["phone"]
+        update_fields["contact_info"] = contact_info
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+    
+    # Update candidate
+    await db.candidates.update_one(
+        {"_id": ObjectId(candidate_id)},
+        {"$set": update_fields}
+    )
+    
+    # Log activity
+    await log_activity(
+        action="candidate_updated",
+        entity_type="candidate",
+        description=f"Updated candidate: {update_fields.get('name', candidate.get('name', 'Unknown'))}",
+        entity_id=candidate_id,
+        metadata={"updated_fields": list(update_fields.keys())}
+    )
+    
+    # Return updated candidate
+    updated_candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+    updated_candidate["id"] = str(updated_candidate["_id"])
+    return Candidate(**updated_candidate)
 
 @router.post("/{candidate_id}/re-analyze")
 async def re_analyze_candidate(candidate_id: str, background_tasks: BackgroundTasks):

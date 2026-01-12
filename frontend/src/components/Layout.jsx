@@ -39,10 +39,10 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
           <img 
             src="/logo.svg" 
             alt="Greenstone Logo" 
-            className="w-20 h-20 object-contain"
+            className="w-21 h-21 object-contain"
           />
           <div className="text-center">
-            <p className="text-xs text-gray-400">Talent Management AI</p>
+            <p className="text-sm text-gray-400">Talent Management AI</p>
           </div>
         </div>
 

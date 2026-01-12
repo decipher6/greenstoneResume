@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
-  runAnalysis, deleteCandidate, getTopCandidates
+  runAnalysis, deleteCandidate, getTopCandidates, updateCandidate
 } from '../services/api'
 import api from '../services/api'
 import SendEmailModal from '../components/SendEmailModal'
@@ -30,6 +30,8 @@ const JobDetail = () => {
     sort_by: 'overall_score'
   })
   const [autoAnalyze, setAutoAnalyze] = useState(true)
+  const [editingField, setEditingField] = useState(null) // { candidateId, field }
+  const [editValues, setEditValues] = useState({}) // { candidateId: { name, email, phone } }
 
   // Load autoAnalyze setting from localStorage on mount
   useEffect(() => {
@@ -213,6 +215,80 @@ const JobDetail = () => {
         ? prev.filter(id => id !== candidateId)
         : [...prev, candidateId]
     )
+  }
+
+  const handleFieldEdit = (candidateId, field, value) => {
+    setEditValues(prev => ({
+      ...prev,
+      [candidateId]: {
+        ...prev[candidateId],
+        [field]: value
+      }
+    }))
+  }
+
+  const handleFieldSave = async (candidateId, field) => {
+    const candidate = candidates.find(c => c.id === candidateId)
+    if (!candidate) return
+
+    const currentValue = editValues[candidateId]?.[field]
+    const originalValue = field === 'name' 
+      ? candidate.name 
+      : candidate.contact_info?.[field] || ''
+
+    // If value hasn't changed, just exit edit mode
+    if (currentValue === originalValue) {
+      setEditingField(null)
+      return
+    }
+
+    try {
+      const updateData = {}
+      if (field === 'name') {
+        updateData.name = currentValue || originalValue
+      } else {
+        updateData.contact_info = {
+          ...candidate.contact_info,
+          [field]: currentValue || originalValue
+        }
+      }
+
+      await updateCandidate(candidateId, updateData)
+      await fetchData() // Refresh the data
+      setEditingField(null)
+      setEditValues(prev => {
+        const newValues = { ...prev }
+        delete newValues[candidateId]
+        return newValues
+      })
+    } catch (error) {
+      console.error('Error updating candidate:', error)
+      await showAlert('Error', 'Failed to update candidate. Please try again.', 'error')
+    }
+  }
+
+  const handleFieldCancel = (candidateId) => {
+    setEditingField(null)
+    setEditValues(prev => {
+      const newValues = { ...prev }
+      delete newValues[candidateId]
+      return newValues
+    })
+  }
+
+  const startEditing = (candidateId, field) => {
+    const candidate = candidates.find(c => c.id === candidateId)
+    if (!candidate) return
+
+    setEditingField({ candidateId, field })
+    setEditValues(prev => ({
+      ...prev,
+      [candidateId]: {
+        name: candidate.name,
+        email: candidate.contact_info?.email || '',
+        phone: candidate.contact_info?.phone || ''
+      }
+    }))
   }
 
   if (!job) return <div className="text-center py-12">Loading...</div>
@@ -492,7 +568,6 @@ const JobDetail = () => {
               <th className="px-6 py-4 text-left text-sm font-semibold">Name</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Phone</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Resume/LinkedIn</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Score</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
@@ -508,18 +583,91 @@ const JobDetail = () => {
                     onChange={() => toggleCandidateSelection(candidate.id)}
                   />
                 </td>
-                <td className="px-6 py-4 font-medium">{candidate.name}</td>
-                <td className="px-6 py-4 text-gray-400">{candidate.contact_info?.email || '-'}</td>
-                <td className="px-6 py-4 text-gray-400">{candidate.contact_info?.phone || '-'}</td>
                 <td className="px-6 py-4">
-                  {candidate.linkedin_url ? (
-                    <a href={candidate.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:underline">
-                      LinkedIn
-                    </a>
-                  ) : candidate.resume_file_path ? (
-                    <span className="text-gray-400">Resume</span>
+                  {editingField?.candidateId === candidate.id && editingField?.field === 'name' ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        className="glass-input text-sm w-full"
+                        value={editValues[candidate.id]?.name || candidate.name}
+                        onChange={(e) => handleFieldEdit(candidate.id, 'name', e.target.value)}
+                        onBlur={() => handleFieldSave(candidate.id, 'name')}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleFieldSave(candidate.id, 'name')
+                          } else if (e.key === 'Escape') {
+                            handleFieldCancel(candidate.id)
+                          }
+                        }}
+                        autoFocus
+                      />
+                    </div>
                   ) : (
-                    '-'
+                    <span 
+                      className="font-medium cursor-pointer hover:text-primary-400 transition-colors"
+                      onClick={() => startEditing(candidate.id, 'name')}
+                      title="Click to edit"
+                    >
+                      {candidate.name}
+                    </span>
+                  )}
+                </td>
+                <td className="px-6 py-4">
+                  {editingField?.candidateId === candidate.id && editingField?.field === 'email' ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="email"
+                        className="glass-input text-sm w-full"
+                        value={editValues[candidate.id]?.email || candidate.contact_info?.email || ''}
+                        onChange={(e) => handleFieldEdit(candidate.id, 'email', e.target.value)}
+                        onBlur={() => handleFieldSave(candidate.id, 'email')}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleFieldSave(candidate.id, 'email')
+                          } else if (e.key === 'Escape') {
+                            handleFieldCancel(candidate.id)
+                          }
+                        }}
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <span 
+                      className="text-gray-400 cursor-pointer hover:text-primary-400 transition-colors"
+                      onClick={() => startEditing(candidate.id, 'email')}
+                      title="Click to edit"
+                    >
+                      {candidate.contact_info?.email || '-'}
+                    </span>
+                  )}
+                </td>
+                <td className="px-6 py-4">
+                  {editingField?.candidateId === candidate.id && editingField?.field === 'phone' ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="tel"
+                        className="glass-input text-sm w-full"
+                        value={editValues[candidate.id]?.phone || candidate.contact_info?.phone || ''}
+                        onChange={(e) => handleFieldEdit(candidate.id, 'phone', e.target.value)}
+                        onBlur={() => handleFieldSave(candidate.id, 'phone')}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleFieldSave(candidate.id, 'phone')
+                          } else if (e.key === 'Escape') {
+                            handleFieldCancel(candidate.id)
+                          }
+                        }}
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <span 
+                      className="text-gray-400 cursor-pointer hover:text-primary-400 transition-colors"
+                      onClick={() => startEditing(candidate.id, 'phone')}
+                      title="Click to edit"
+                    >
+                      {candidate.contact_info?.phone || '-'}
+                    </span>
                   )}
                 </td>
                 <td className="px-6 py-4">
@@ -534,19 +682,13 @@ const JobDetail = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex flex-col gap-1">
-                    {candidate.score_breakdown?.resume_score && (
-                      <span className="font-semibold">
-                        Resume: {parseFloat(candidate.score_breakdown.resume_score).toFixed(1)}/10
-                      </span>
-                    )}
-                    {candidate.score_breakdown?.ccat_score && (
-                      <span className="text-xs text-gray-400">
-                        CCAT: {parseFloat(candidate.score_breakdown.ccat_score).toFixed(1)}/10
-                      </span>
-                    )}
-                    {!candidate.score_breakdown?.resume_score && '-'}
-                  </div>
+                  {candidate.score_breakdown?.resume_score ? (
+                    <span className="font-semibold">
+                      {parseFloat(candidate.score_breakdown.resume_score).toFixed(1)}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
