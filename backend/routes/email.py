@@ -143,3 +143,4 @@ async def test_email():
             status_code=500,
             detail=f"Failed to send test email: {error}"
         )
+

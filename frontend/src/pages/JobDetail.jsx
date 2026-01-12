@@ -256,12 +256,18 @@ const JobDetail = () => {
 
         <div className="glass-card p-6">
           <h3 className="text-lg font-semibold mb-4">Evaluation Criteria</h3>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {job.evaluation_criteria?.map((criterion, index) => (
-              <div key={index} className="glass-card p-4 bg-glass-100">
+              <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{criterion.name}</span>
-                  <span className="text-primary-400 font-semibold">{criterion.weight}%</span>
+                  <span className="text-sm font-medium text-white">{criterion.name}</span>
+                  <span className="text-primary-400 font-semibold text-sm">{criterion.weight}%</span>
+                </div>
+                <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-primary-400 to-primary-500 transition-all duration-500"
+                    style={{ width: `${Math.min(criterion.weight, 100)}%` }}
+                  />
                 </div>
               </div>
             ))}
