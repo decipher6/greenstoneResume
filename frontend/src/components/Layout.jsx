@@ -87,13 +87,15 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="glass-card m-4 mb-0 rounded-2xl p-6">
-          <div>
-            <h2 className="text-2xl font-bold">{title}</h2>
-            <p className="text-sm text-gray-400">{subtitle}</p>
-          </div>
-        </header>
+        {/* Header - Hidden for Dashboard */}
+        {location.pathname !== '/' && (
+          <header className="glass-card m-4 mb-0 rounded-2xl p-6">
+            <div>
+              <h2 className="text-2xl font-bold">{title}</h2>
+              <p className="text-sm text-gray-400">{subtitle}</p>
+            </div>
+          </header>
+        )}
 
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto p-4">

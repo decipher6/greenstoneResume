@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Briefcase, Users, CheckCircle, TrendingUp, ArrowUpRight, Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown } from 'lucide-react'
+import { Briefcase, Users, ArrowUpRight, Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown } from 'lucide-react'
 import { getDashboardStats, getJobs, deleteJob } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
 import { useModal } from '../context/ModalContext'
@@ -142,7 +142,7 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <StatCard
           icon={Briefcase}
           label="Active Jobs"
@@ -155,117 +155,106 @@ const Dashboard = () => {
           value={stats?.total_candidates || 0}
           color="purple"
         />
-        <StatCard
-          icon={CheckCircle}
-          label="Analyzed"
-          value={stats?.analyzed || 0}
-          color="pink"
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Avg Score"
-          value={`${stats?.avg_score || 0}/10`}
-          color="orange"
-        />
       </div>
 
-      {/* Search and Filters with Add Job Button */}
-      <div className="flex items-center gap-4">
-        <div className="glass-card p-4 flex-1">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="glass-input flex items-center gap-2 flex-1">
-            <Search size={18} className="text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by title, department, status, or candidate count..."
-              className="bg-transparent border-0 outline-0 w-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
+      {/* Combined Search, Filters, Add Job Button, and Table */}
+      <div className="glass-card overflow-hidden">
+        {/* Search and Filters with Add Job Button */}
+        <div className="p-4 border-b border-glass-200">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="glass-input flex items-center gap-2 flex-1">
+              <Search size={18} className="text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by title, department, status, or candidate count..."
+                className="bg-transparent border-0 outline-0 w-full"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="p-1 rounded hover:bg-glass-200 transition-colors"
+                >
+                  <X size={16} className="text-gray-400" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`glass-button-secondary flex items-center gap-2 ${showFilters ? 'bg-glass-200' : ''}`}
+            >
+              <Filter size={18} />
+              Filters
+            </button>
+            {(searchQuery || Object.values(filters).some(f => f)) && (
               <button
-                onClick={() => setSearchQuery('')}
-                className="p-1 rounded hover:bg-glass-200 transition-colors"
+                onClick={clearFilters}
+                className="glass-button-secondary flex items-center gap-2 text-sm"
               >
-                <X size={16} className="text-gray-400" />
+                <X size={16} />
+                Clear
               </button>
             )}
-          </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`glass-button-secondary flex items-center gap-2 ${showFilters ? 'bg-glass-200' : ''}`}
-          >
-            <Filter size={18} />
-            Filters
-          </button>
-          {(searchQuery || Object.values(filters).some(f => f)) && (
             <button
-              onClick={clearFilters}
-              className="glass-button-secondary flex items-center gap-2 text-sm"
+              onClick={() => setShowCreateModal(true)}
+              className="glass-button flex items-center gap-2 whitespace-nowrap"
             >
-              <X size={16} />
-              Clear
+              <Plus size={20} />
+              Add Job
             </button>
+          </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-glass-200">
+              <div>
+                <label className="block text-sm font-medium mb-2">Department</label>
+                <select
+                  className="glass-input w-full"
+                  value={filters.department}
+                  onChange={(e) => setFilters({...filters, department: e.target.value})}
+                >
+                  <option value="">All Departments</option>
+                  {departments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Min Candidates</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="glass-input w-full"
+                  placeholder="0"
+                  value={filters.minCandidates}
+                  onChange={(e) => setFilters({...filters, minCandidates: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Max Candidates</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="glass-input w-full"
+                  placeholder="Any"
+                  value={filters.maxCandidates}
+                  onChange={(e) => setFilters({...filters, maxCandidates: e.target.value})}
+                />
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Filter Options */}
-        {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-glass-200">
-            <div>
-              <label className="block text-sm font-medium mb-2">Department</label>
-              <select
-                className="glass-input w-full"
-                value={filters.department}
-                onChange={(e) => setFilters({...filters, department: e.target.value})}
-              >
-                <option value="">All Departments</option>
-                {departments.map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Min Candidates</label>
-              <input
-                type="number"
-                min="0"
-                className="glass-input w-full"
-                placeholder="0"
-                value={filters.minCandidates}
-                onChange={(e) => setFilters({...filters, minCandidates: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Max Candidates</label>
-              <input
-                type="number"
-                min="0"
-                className="glass-input w-full"
-                placeholder="Any"
-                value={filters.maxCandidates}
-                onChange={(e) => setFilters({...filters, maxCandidates: e.target.value})}
-              />
-            </div>
-          </div>
-        )}
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="glass-button flex items-center gap-2 whitespace-nowrap"
-        >
-          <Plus size={20} />
-          Add Job
-        </button>
-      </div>
-
-      <div className="glass-card overflow-hidden">
-        <div className="p-4 border-b border-glass-200 flex items-center justify-between">
+        {/* Table */}
+        <div className="p-4 border-b border-glass-200">
           <p className="text-sm text-gray-400">
             Showing {filteredJobs.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full">
           <thead className="bg-glass-100 border-b border-glass-200">
             <tr>
               <th className="px-6 py-4 text-left text-sm font-semibold">Title</th>
@@ -340,6 +329,7 @@ const Dashboard = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showCreateModal && (
