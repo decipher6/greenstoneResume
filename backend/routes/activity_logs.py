@@ -39,12 +39,27 @@ async def get_activity_logs(
     skip: int = Query(0, ge=0)
 ):
     """Get activity logs, ordered by most recent first"""
+    from bson import ObjectId
     db = get_db()
     logs = []
     async for log in db.activity_logs.find().sort("created_at", -1).skip(skip).limit(limit):
         log["id"] = str(log["_id"])
         if "created_at" not in log:
             log["created_at"] = datetime.now()
+        
+        # Fetch user name if user_id exists
+        if log.get("user_id"):
+            try:
+                user = await db.users.find_one({"_id": ObjectId(log["user_id"])})
+                if user:
+                    log["user_name"] = user.get("name", "Unknown User")
+                else:
+                    log["user_name"] = "Unknown User"
+            except:
+                log["user_name"] = "Unknown User"
+        else:
+            log["user_name"] = None
+        
         logs.append(ActivityLog(**log))
     return logs
 
