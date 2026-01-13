@@ -36,19 +36,6 @@ const JobDetail = () => {
   const [pendingFiles, setPendingFiles] = useState([])
   const [isUploading, setIsUploading] = useState(false)
 
-  // Load autoAnalyze setting from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('appSettings')
-    if (saved) {
-      try {
-        const settings = JSON.parse(saved)
-        setAutoAnalyze(settings.autoAnalyze ?? true)
-      } catch (e) {
-        console.error('Error loading settings:', e)
-      }
-    }
-  }, [])
-
   useEffect(() => {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -496,13 +483,14 @@ const JobDetail = () => {
         </div>
       )}
 
-      {/* Job Description & Criteria */}
-      <div className="grid grid-cols-2 gap-6">
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-semibold mb-4">Job Description</h3>
-          <p className="text-gray-300 text-sm whitespace-pre-wrap">{job.description}</p>
-        </div>
+      {/* Job Description */}
+      <div className="glass-card p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-4">Job Description</h3>
+        <p className="text-gray-300 text-sm whitespace-pre-wrap">{job.description}</p>
+      </div>
 
+      {/* Evaluation Criteria & Top Candidate Scores */}
+      <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="glass-card p-6">
           <h3 className="text-lg font-semibold mb-4">Evaluation Criteria</h3>
           <div className="space-y-4">
@@ -522,60 +510,65 @@ const JobDetail = () => {
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Top Candidate Scores */}
-      {topCandidates.length > 0 && (
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Top Candidate Scores</h3>
-              <p className="text-sm text-gray-400">Ranked by resume score (1-10 scale)</p>
+        {/* Top Candidate Scores */}
+        {topCandidates.length > 0 ? (
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Top Candidate Scores</h3>
+                <p className="text-sm text-gray-400">Ranked by resume score (1-10 scale)</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-400">Show top:</label>
+                <select
+                  value={topCandidatesLimit}
+                  onChange={(e) => {
+                    const newLimit = parseInt(e.target.value)
+                    setTopCandidatesLimit(newLimit)
+                    fetchData()
+                  }}
+                  className="glass-input text-sm w-20"
+                >
+                  <option value={3}>3</option>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={20}>20</option>
+                </select>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-400">Show top:</label>
-              <select
-                value={topCandidatesLimit}
-                onChange={(e) => {
-                  const newLimit = parseInt(e.target.value)
-                  setTopCandidatesLimit(newLimit)
-                  fetchData()
-                }}
-                className="glass-input text-sm w-20"
-              >
-                <option value={3}>3</option>
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={15}>15</option>
-                <option value={20}>20</option>
-              </select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {topCandidates.map((candidate) => (
-              <div key={candidate.id} className="flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <Link
-                      to={`/candidates/${candidate.id}`}
-                      className="text-sm font-medium hover:text-primary-400 transition-colors cursor-pointer"
-                    >
-                      {candidate.name}
-                    </Link>
-                    <span className="text-sm font-semibold">{parseFloat(candidate.score).toFixed(1)}/10</span>
-                  </div>
-                  <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
-                      style={{ width: `${Math.min((parseFloat(candidate.score) / 10) * 100, 100)}%` }}
-                    />
+            <div className="space-y-2">
+              {topCandidates.map((candidate) => (
+                <div key={candidate.id} className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <Link
+                        to={`/candidates/${candidate.id}`}
+                        className="text-sm font-medium hover:text-primary-400 transition-colors cursor-pointer"
+                      >
+                        {candidate.name}
+                      </Link>
+                      <span className="text-sm font-semibold">{parseFloat(candidate.score).toFixed(1)}/10</span>
+                    </div>
+                    <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
+                        style={{ width: `${Math.min((parseFloat(candidate.score) / 10) * 100, 100)}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="glass-card p-6">
+            <h3 className="text-lg font-semibold mb-4">Top Candidate Scores</h3>
+            <p className="text-sm text-gray-400">No candidates analyzed yet</p>
+          </div>
+        )}
+      </div>
 
       {/* Candidates Table */}
       <div className="glass-card overflow-hidden">

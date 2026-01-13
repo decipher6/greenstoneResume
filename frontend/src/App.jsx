@@ -8,8 +8,6 @@ import Dashboard from './pages/Dashboard'
 import JobPosts from './pages/JobPosts'
 import JobDetail from './pages/JobDetail'
 import CandidateProfile from './pages/CandidateProfile'
-import Reports from './pages/Reports'
-import Settings from './pages/Settings'
 import ActivityLogs from './pages/ActivityLogs'
 
 const ProtectedRoute = ({ children }) => {
@@ -86,26 +84,6 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <CandidateProfile />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/reports"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Reports />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Settings />
             </Layout>
           </ProtectedRoute>
         }
