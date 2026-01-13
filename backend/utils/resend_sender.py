@@ -1,7 +1,7 @@
 import os
 from typing import Optional, Tuple
 import logging
-from resend import Resend
+import resend
 
 logger = logging.getLogger(__name__)
 
@@ -11,19 +11,18 @@ class ResendEmailSender:
         self.from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
         self.from_name = os.getenv("RESEND_FROM_NAME", "Greenstone Talent Team")
         self.enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
-        self.resend_client = None
         
         if self.api_key:
             try:
-                self.resend_client = Resend(api_key=self.api_key)
+                resend.api_key = self.api_key
             except Exception as e:
-                logger.error(f"Failed to initialize Resend client: {e}")
+                logger.error(f"Failed to set Resend API key: {e}")
     
     def is_configured(self) -> bool:
         """Check if Resend is properly configured"""
         if not self.enabled:
             return False
-        return bool(self.api_key and self.resend_client)
+        return bool(self.api_key)
     
     async def send_email_with_error(
         self,
@@ -59,7 +58,9 @@ class ResendEmailSender:
             
             def send_email():
                 try:
-                    return self.resend_client.emails.send(params)
+                    # Set API key before sending (in case it wasn't set during init)
+                    resend.api_key = self.api_key
+                    return resend.Emails.send(params)
                 except Exception as e:
                     raise e
             
