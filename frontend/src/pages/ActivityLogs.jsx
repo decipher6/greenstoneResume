@@ -25,6 +25,8 @@ const ActivityLogs = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
     const date = new Date(dateString)
+    // Add 4 hours to fix timezone offset
+    date.setHours(date.getHours() + 4)
     
     return date.toLocaleString('en-US', { 
       timeZone: 'Asia/Dubai',
@@ -73,9 +75,9 @@ const ActivityLogs = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-white">
                   {log.description}
-                  {log.user_name && (
-                    <span className="text-gray-400 ml-2">— {log.user_name}</span>
-                  )}
+                  <span className="text-gray-400 ml-2">
+                    — {log.user_name || 'System'}
+                  </span>
                 </p>
               </div>
               <div className="text-xs text-gray-500 whitespace-nowrap">
