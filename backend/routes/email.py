@@ -157,20 +157,16 @@ async def get_interview_mailto_links(
         body = template.get("body", "").replace("[Candidate Name]", candidate_name)
         body = body.replace("[Job Title]", job_title)
         
-        # Create mailto link
-        mailto_params = {
-            "to": candidate_email,
-            "subject": subject,
-            "body": body
-        }
-        
-        # Build mailto URL
-        mailto_url = "mailto:" + candidate_email
+        # Build mailto URL with proper encoding
+        # urllib.parse.quote automatically encodes newlines as %0A
+        mailto_url = "mailto:" + urllib.parse.quote(candidate_email, safe='')
         params = []
         if subject:
-            params.append(f"subject={urllib.parse.quote(subject)}")
+            params.append(f"subject={urllib.parse.quote(subject, safe='')}")
         if body:
-            params.append(f"body={urllib.parse.quote(body)}")
+            # URL encode the body (newlines will be encoded as %0A automatically)
+            body_encoded = urllib.parse.quote(body, safe='')
+            params.append(f"body={body_encoded}")
         
         if params:
             mailto_url += "?" + "&".join(params)

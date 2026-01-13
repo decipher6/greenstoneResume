@@ -46,8 +46,14 @@ Greenstone Talent Team`,
   }
 
   const handleOpenMailto = (mailtoUrl, candidateName) => {
-    // Open mailto link which will open the default email client (Outlook, Mail, etc.)
-    window.location.href = mailtoUrl
+    // Create a temporary anchor element and click it to open mailto link
+    // This is more reliable than window.location.href
+    const link = document.createElement('a')
+    link.href = mailtoUrl
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   return (
@@ -114,17 +120,18 @@ Greenstone Talent Team`,
             <h3 className="text-lg font-semibold mb-4">Click to Open Outlook</h3>
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {generatedLinks.map((link) => (
-                <button
+                <a
                   key={link.candidate_id}
-                  onClick={() => handleOpenMailto(link.mailto_url, link.candidate_name)}
-                  className="w-full p-3 glass-card bg-glass-100 border border-glass-200 rounded-lg hover:bg-glass-200 transition-colors text-left flex items-center justify-between group"
+                  href={link.mailto_url}
+                  className="w-full p-3 glass-card bg-glass-100 border border-glass-200 rounded-lg hover:bg-glass-200 transition-colors text-left flex items-center justify-between group block cursor-pointer no-underline"
+                  style={{ textDecoration: 'none' }}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white truncate">{link.candidate_name}</div>
                     <div className="text-sm text-gray-400 truncate">{link.email}</div>
                   </div>
                   <ExternalLink size={18} className="text-primary-400 flex-shrink-0 ml-2 group-hover:scale-110 transition-transform" />
-                </button>
+                </a>
               ))}
             </div>
             <p className="text-xs text-gray-400 mt-3">
