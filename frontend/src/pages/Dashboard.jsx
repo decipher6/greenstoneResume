@@ -355,9 +355,12 @@ const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
 
   return (
     <div className="glass-card p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${colorClasses[color]} flex items-center justify-center`}>
-          <Icon size={24} />
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${colorClasses[color]} flex items-center justify-center flex-shrink-0`}>
+            <Icon size={24} />
+          </div>
+          <div className="text-3xl font-bold">{value}</div>
         </div>
         {trend && (
           <div className={`flex items-center gap-1 text-xs ${trendUp ? 'text-green-400' : 'text-red-400'}`}>
@@ -366,7 +369,6 @@ const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
           </div>
         )}
       </div>
-      <div className="text-3xl font-bold mb-1">{value}</div>
       <div className="text-sm text-gray-400">{label}</div>
     </div>
   )
