@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X, FileText, XCircle, Edit, Save } from 'lucide-react'
 import { 
@@ -35,19 +35,21 @@ const JobDetail = () => {
   const [isDragging, setIsDragging] = useState(false)
   const [pendingFiles, setPendingFiles] = useState([])
   const [isUploading, setIsUploading] = useState(false)
-
+  
+  // Use ref to always get the latest nameSearch value
+  const nameSearchRef = useRef(nameSearch)
   useEffect(() => {
-    fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, topCandidatesLimit, filters])
+    nameSearchRef.current = nameSearch
+  }, [nameSearch])
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const params = new URLSearchParams()
       if (filters.min_resume_score) params.append('min_resume_score', filters.min_resume_score)
       if (filters.min_ccat_score) params.append('min_ccat_score', filters.min_ccat_score)
       if (filters.min_overall_score) params.append('min_overall_score', filters.min_overall_score)
-      if (nameSearch.trim()) params.append('name', nameSearch.trim())
+      // Always use the latest nameSearch value from ref
+      if (nameSearchRef.current.trim()) params.append('name', nameSearchRef.current.trim())
       // Default to sorting by overall_score descending if no sort_by specified
       params.append('sort_by', filters.sort_by || 'overall_score')
       
@@ -65,7 +67,21 @@ const JobDetail = () => {
     } catch (error) {
       console.error('Error fetching data:', error)
     }
-  }
+  }, [jobId, topCandidatesLimit, filters])
+
+  // Debounce name search to avoid excessive API calls
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchData()
+    }, 300)
+    
+    return () => clearTimeout(timeoutId)
+  }, [nameSearch, fetchData])
+
+  // Fetch data when other filters change (immediate)
+  useEffect(() => {
+    fetchData()
+  }, [jobId, topCandidatesLimit, filters, fetchData])
 
   const validateFiles = (files) => {
     const fileArray = Array.from(files)
@@ -594,18 +610,12 @@ const JobDetail = () => {
               value={nameSearch}
               onChange={(e) => {
                 setNameSearch(e.target.value)
-                // Debounce search - wait 300ms after user stops typing
-                clearTimeout(window.searchTimeout)
-                window.searchTimeout = setTimeout(() => {
-                  fetchData()
-                }, 300)
               }}
             />
             {nameSearch && (
               <button
                 onClick={() => {
                   setNameSearch('')
-                  fetchData()
                 }}
                 className="p-1 rounded hover:bg-glass-200 transition-colors"
               >
