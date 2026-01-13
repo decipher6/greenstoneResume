@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, User, LogOut, Clock } from 'lucide-react'
+import { LayoutDashboard, User, LogOut, Clock } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const Layout = ({ children, pageTitle, pageSubtitle }) => {
@@ -8,7 +8,6 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/jobs', icon: Briefcase, label: 'Job Posts' },
     { path: '/activity-logs', icon: Clock, label: 'Activity Logs' },
   ]
 
@@ -16,8 +15,8 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
     if (pageTitle) return { title: pageTitle, subtitle: pageSubtitle || '' }
     
     if (location.pathname === '/') return { title: 'Dashboard', subtitle: 'Overview of your talent pipeline' }
-    if (location.pathname === '/jobs' || location.pathname.startsWith('/jobs/')) {
-      return { title: 'Job Posts', subtitle: 'Manage your open positions and track candidates' }
+    if (location.pathname.startsWith('/jobs/')) {
+      return { title: 'Job Detail', subtitle: 'View and manage job post details' }
     }
     if (location.pathname === '/activity-logs') return { title: 'Activity Logs', subtitle: 'View system activity and events' }
     if (location.pathname.startsWith('/candidates/')) return { title: 'Candidate Profile', subtitle: 'Detailed candidate evaluation' }

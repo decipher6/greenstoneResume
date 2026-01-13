@@ -1,16 +1,28 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Briefcase, Users, CheckCircle, TrendingUp, ArrowUpRight, Plus } from 'lucide-react'
-import { getDashboardStats } from '../services/api'
+import { Link } from 'react-router-dom'
+import { Briefcase, Users, CheckCircle, TrendingUp, ArrowUpRight, Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown } from 'lucide-react'
+import { getDashboardStats, getJobs, deleteJob } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
+import { useModal } from '../context/ModalContext'
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null)
+  const [jobs, setJobs] = useState([])
+  const [filteredJobs, setFilteredJobs] = useState([])
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const navigate = useNavigate()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    department: '',
+    minCandidates: '',
+    maxCandidates: ''
+  })
+  const [lastRunSort, setLastRunSort] = useState('latest') // 'latest' or 'oldest'
+  const { showConfirm, showAlert } = useModal()
 
   useEffect(() => {
     fetchData()
+    fetchJobs()
   }, [])
 
   const fetchData = async () => {
@@ -22,21 +34,113 @@ const Dashboard = () => {
     }
   }
 
+  const fetchJobs = async () => {
+    try {
+      const response = await getJobs()
+      setJobs(response.data)
+      setFilteredJobs(response.data)
+    } catch (error) {
+      console.error('Error fetching jobs:', error)
+    }
+  }
+
+  useEffect(() => {
+    applyFilters()
+  }, [searchQuery, filters, jobs, lastRunSort])
+
+  const applyFilters = () => {
+    let filtered = [...jobs]
+
+    // Search filter (searches in title, department)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(job => 
+        job.title?.toLowerCase().includes(query) ||
+        job.department?.toLowerCase().includes(query) ||
+        String(job.candidate_count || 0).includes(query)
+      )
+    }
+
+    // Department filter
+    if (filters.department) {
+      filtered = filtered.filter(job => 
+        job.department?.toLowerCase() === filters.department.toLowerCase()
+      )
+    }
+
+    // Candidate count filters
+    if (filters.minCandidates) {
+      const min = parseInt(filters.minCandidates)
+      filtered = filtered.filter(job => (job.candidate_count || 0) >= min)
+    }
+
+    if (filters.maxCandidates) {
+      const max = parseInt(filters.maxCandidates)
+      filtered = filtered.filter(job => (job.candidate_count || 0) <= max)
+    }
+
+    // Sort by last_run
+    filtered.sort((a, b) => {
+      const aDate = a.last_run ? new Date(a.last_run).getTime() : 0
+      const bDate = b.last_run ? new Date(b.last_run).getTime() : 0
+      
+      if (lastRunSort === 'latest') {
+        return bDate - aDate // Latest first (descending)
+      } else {
+        return aDate - bDate // Oldest first (ascending)
+      }
+    })
+
+    setFilteredJobs(filtered)
+  }
+
+  const toggleLastRunSort = () => {
+    setLastRunSort(prev => prev === 'latest' ? 'oldest' : 'latest')
+  }
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setFilters({
+      department: '',
+      minCandidates: '',
+      maxCandidates: ''
+    })
+    setLastRunSort('latest')
+  }
+
+  const handleDelete = async (jobId) => {
+    const confirmed = await showConfirm({
+      title: 'Delete Job Post',
+      message: 'Are you sure you want to delete this job? This action cannot be undone and will also delete all associated candidates.',
+      type: 'confirm',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    })
+    
+    if (confirmed) {
+      try {
+        await deleteJob(jobId)
+        fetchJobs()
+        fetchData() // Refresh stats
+        await showAlert('Success', 'Job post deleted successfully.', 'success')
+      } catch (error) {
+        console.error('Error deleting job:', error)
+        await showAlert('Error', 'Failed to delete job post. Please try again.', 'error')
+      }
+    }
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Never'
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  // Get unique departments for filter
+  const departments = [...new Set(jobs.map(job => job.department).filter(Boolean))].sort()
+
   return (
     <div className="space-y-6">
-      {/* Hero Section with Create Job Button */}
-      <div className="glass-card p-8 text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Greenstone Talent AI</h1>
-        <p className="text-gray-400 mb-6 text-lg">Intelligent candidate screening and evaluation platform</p>
-        <button 
-          onClick={() => setShowCreateModal(true)} 
-          className="glass-button text-lg px-8 py-4 flex items-center gap-3 mx-auto"
-        >
-          <Plus size={24} />
-          Create Job Post
-        </button>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-4 gap-4">
         <StatCard
@@ -65,12 +169,185 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* Search and Filters with Add Job Button */}
+      <div className="flex items-center gap-4">
+        <div className="glass-card p-4 flex-1">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="glass-input flex items-center gap-2 flex-1">
+            <Search size={18} className="text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by title, department, status, or candidate count..."
+              className="bg-transparent border-0 outline-0 w-full"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="p-1 rounded hover:bg-glass-200 transition-colors"
+              >
+                <X size={16} className="text-gray-400" />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`glass-button-secondary flex items-center gap-2 ${showFilters ? 'bg-glass-200' : ''}`}
+          >
+            <Filter size={18} />
+            Filters
+          </button>
+          {(searchQuery || Object.values(filters).some(f => f)) && (
+            <button
+              onClick={clearFilters}
+              className="glass-button-secondary flex items-center gap-2 text-sm"
+            >
+              <X size={16} />
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Filter Options */}
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-glass-200">
+            <div>
+              <label className="block text-sm font-medium mb-2">Department</label>
+              <select
+                className="glass-input w-full"
+                value={filters.department}
+                onChange={(e) => setFilters({...filters, department: e.target.value})}
+              >
+                <option value="">All Departments</option>
+                {departments.map(dept => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Min Candidates</label>
+              <input
+                type="number"
+                min="0"
+                className="glass-input w-full"
+                placeholder="0"
+                value={filters.minCandidates}
+                onChange={(e) => setFilters({...filters, minCandidates: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Max Candidates</label>
+              <input
+                type="number"
+                min="0"
+                className="glass-input w-full"
+                placeholder="Any"
+                value={filters.maxCandidates}
+                onChange={(e) => setFilters({...filters, maxCandidates: e.target.value})}
+              />
+            </div>
+          </div>
+        )}
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="glass-button flex items-center gap-2 whitespace-nowrap"
+        >
+          <Plus size={20} />
+          Add Job
+        </button>
+      </div>
+
+      <div className="glass-card overflow-hidden">
+        <div className="p-4 border-b border-glass-200 flex items-center justify-between">
+          <p className="text-sm text-gray-400">
+            Showing {filteredJobs.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <table className="w-full">
+          <thead className="bg-glass-100 border-b border-glass-200">
+            <tr>
+              <th className="px-6 py-4 text-left text-sm font-semibold">Title</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold">Department</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold"># Candidates</th>
+              <th 
+                className="px-6 py-4 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                onClick={toggleLastRunSort}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Last Run</span>
+                  <ArrowUpDown size={14} className="text-gray-400" />
+                  {lastRunSort === 'latest' && (
+                    <span className="text-xs text-gray-400">(Latest first)</span>
+                  )}
+                  {lastRunSort === 'oldest' && (
+                    <span className="text-xs text-gray-400">(Oldest first)</span>
+                  )}
+                </div>
+              </th>
+              <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredJobs.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
+                  No jobs found matching your search criteria.
+                </td>
+              </tr>
+            ) : (
+              filteredJobs.map((job) => (
+              <tr key={job.id} className="border-b border-glass-200 hover:bg-glass-100 transition-colors">
+                <td className="px-6 py-4">
+                  <Link to={`/jobs/${job.id}`} className="font-medium hover:text-primary-400">
+                    {job.title}
+                  </Link>
+                </td>
+                <td className="px-6 py-4 text-gray-400">{job.department}</td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    <Users size={16} className="text-gray-400" />
+                    {job.candidate_count || 0}
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={16} />
+                    {formatDate(job.last_run)}
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      to={`/jobs/${job.id}`}
+                      className="p-2 rounded-lg hover:bg-glass-200 transition-colors"
+                      title="View Job"
+                    >
+                      <Eye size={18} className="text-gray-400" />
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(job.id)}
+                      className="p-2 rounded-lg hover:bg-red-500/20 transition-colors"
+                      title="Delete Job"
+                    >
+                      <LucideTrash size={18} className="text-red-400" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
       {showCreateModal && (
         <CreateJobModal
           onClose={() => {
             setShowCreateModal(false)
+            fetchJobs()
             fetchData()
-            navigate('/jobs')
           }}
         />
       )}

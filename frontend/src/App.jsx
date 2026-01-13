@@ -5,7 +5,6 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
-import JobPosts from './pages/JobPosts'
 import JobDetail from './pages/JobDetail'
 import CandidateProfile from './pages/CandidateProfile'
 import ActivityLogs from './pages/ActivityLogs'
@@ -54,16 +53,6 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <Dashboard />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/jobs"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <JobPosts />
             </Layout>
           </ProtectedRoute>
         }
