@@ -158,8 +158,9 @@ async def get_interview_mailto_links(
         body = body.replace("[Job Title]", job_title)
         
         # Build mailto URL with proper encoding
-        # urllib.parse.quote automatically encodes newlines as %0A
-        mailto_url = "mailto:" + urllib.parse.quote(candidate_email, safe='')
+        # Email address should NOT be encoded in the mailto: part
+        # Format: mailto:email@example.com?subject=...&body=...
+        mailto_url = "mailto:" + candidate_email
         params = []
         if subject:
             params.append(f"subject={urllib.parse.quote(subject, safe='')}")
