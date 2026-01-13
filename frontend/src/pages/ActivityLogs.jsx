@@ -71,10 +71,12 @@ const ActivityLogs = () => {
               className="flex items-center gap-4 py-3 border-b border-glass-200 text-sm"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-white">{log.description}</p>
-                {log.user_name && (
-                  <p className="text-gray-400 text-xs mt-1">by {log.user_name}</p>
-                )}
+                <p className="text-white">
+                  {log.description}
+                  {log.user_name && (
+                    <span className="text-gray-400 ml-2">— {log.user_name}</span>
+                  )}
+                </p>
               </div>
               <div className="text-xs text-gray-500 whitespace-nowrap">
                 {formatDate(log.created_at)}
