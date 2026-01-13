@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X, FileText, XCircle } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X, FileText, XCircle, Edit, Save } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
   runAnalysis, deleteCandidate, getTopCandidates, updateCandidate
@@ -30,7 +30,7 @@ const JobDetail = () => {
     sort_by: 'overall_score'
   })
   const [autoAnalyze, setAutoAnalyze] = useState(true)
-  const [editingField, setEditingField] = useState(null) // { candidateId, field }
+  const [editingCandidateId, setEditingCandidateId] = useState(null) // candidateId being edited
   const [editValues, setEditValues] = useState({}) // { candidateId: { name, email, phone } }
   const [isDragging, setIsDragging] = useState(false)
   const [pendingFiles, setPendingFiles] = useState([])
@@ -286,35 +286,29 @@ const JobDetail = () => {
     }))
   }
 
-  const handleFieldSave = async (candidateId, field) => {
+  const handleRowSave = async (candidateId) => {
     const candidate = candidates.find(c => c.id === candidateId)
     if (!candidate) return
 
-    const currentValue = editValues[candidateId]?.[field]
-    const originalValue = field === 'name' 
-      ? candidate.name 
-      : candidate.contact_info?.[field] || ''
-
-    // If value hasn't changed, just exit edit mode
-    if (currentValue === originalValue) {
-      setEditingField(null)
+    const edited = editValues[candidateId]
+    if (!edited) {
+      setEditingCandidateId(null)
       return
     }
 
     try {
-      const updateData = {}
-      if (field === 'name') {
-        updateData.name = currentValue || originalValue
-      } else {
-        updateData.contact_info = {
+      const updateData = {
+        name: edited.name || candidate.name,
+        contact_info: {
           ...candidate.contact_info,
-          [field]: currentValue || originalValue
+          email: edited.email !== undefined ? edited.email : (candidate.contact_info?.email || ''),
+          phone: edited.phone !== undefined ? edited.phone : (candidate.contact_info?.phone || '')
         }
       }
 
       await updateCandidate(candidateId, updateData)
       await fetchData() // Refresh the data
-      setEditingField(null)
+      setEditingCandidateId(null)
       setEditValues(prev => {
         const newValues = { ...prev }
         delete newValues[candidateId]
@@ -326,8 +320,8 @@ const JobDetail = () => {
     }
   }
 
-  const handleFieldCancel = (candidateId) => {
-    setEditingField(null)
+  const handleRowCancel = (candidateId) => {
+    setEditingCandidateId(null)
     setEditValues(prev => {
       const newValues = { ...prev }
       delete newValues[candidateId]
@@ -335,11 +329,12 @@ const JobDetail = () => {
     })
   }
 
-  const startEditing = (candidateId, field) => {
+  const startEditingRow = (candidateId, e) => {
+    e.stopPropagation() // Prevent row click
     const candidate = candidates.find(c => c.id === candidateId)
     if (!candidate) return
 
-    setEditingField({ candidateId, field })
+    setEditingCandidateId(candidateId)
     setEditValues(prev => ({
       ...prev,
       [candidateId]: {
@@ -348,6 +343,21 @@ const JobDetail = () => {
         phone: candidate.contact_info?.phone || ''
       }
     }))
+  }
+
+  const handleRowClick = (candidateId, e) => {
+    // Don't navigate if clicking on checkbox, edit button, delete button, or if editing
+    if (
+      e.target.closest('input[type="checkbox"]') ||
+      e.target.closest('button') ||
+      e.target.closest('input[type="text"]') ||
+      e.target.closest('input[type="email"]') ||
+      e.target.closest('input[type="tel"]') ||
+      editingCandidateId === candidateId
+    ) {
+      return
+    }
+    navigate(`/candidates/${candidateId}`)
   }
 
   if (!job) return <div className="text-center py-12">Loading...</div>
@@ -738,8 +748,16 @@ const JobDetail = () => {
           </thead>
           <tbody>
             {candidates.map((candidate) => (
-              <tr key={candidate.id} className="border-b border-glass-200 hover:bg-glass-100 transition-colors">
-                <td className="px-6 py-4">
+              <tr 
+                key={candidate.id} 
+                className={`border-b border-glass-200 transition-colors ${
+                  editingCandidateId === candidate.id 
+                    ? 'bg-primary-500/5' 
+                    : 'hover:bg-glass-100 cursor-pointer'
+                }`}
+                onClick={(e) => handleRowClick(candidate.id, e)}
+              >
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selectedCandidates.includes(candidate.id)}
@@ -747,93 +765,52 @@ const JobDetail = () => {
                   />
                 </td>
                 <td className="px-6 py-4">
-                  {editingField?.candidateId === candidate.id && editingField?.field === 'name' ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        className="glass-input text-sm w-full"
-                        value={editValues[candidate.id]?.name || candidate.name}
-                        onChange={(e) => handleFieldEdit(candidate.id, 'name', e.target.value)}
-                        onBlur={() => handleFieldSave(candidate.id, 'name')}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleFieldSave(candidate.id, 'name')
-                          } else if (e.key === 'Escape') {
-                            handleFieldCancel(candidate.id)
-                          }
-                        }}
-                        autoFocus
-                      />
-                    </div>
+                  {editingCandidateId === candidate.id ? (
+                    <input
+                      type="text"
+                      className="glass-input text-sm w-full"
+                      value={editValues[candidate.id]?.name || candidate.name}
+                      onChange={(e) => handleFieldEdit(candidate.id, 'name', e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                    />
                   ) : (
-                    <span 
-                      className="font-medium cursor-pointer hover:text-primary-400 transition-colors"
-                      onClick={() => startEditing(candidate.id, 'name')}
-                      title="Click to edit"
-                    >
+                    <span className="font-medium">
                       {candidate.name}
                     </span>
                   )}
                 </td>
                 <td className="px-6 py-4">
-                  {editingField?.candidateId === candidate.id && editingField?.field === 'email' ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="email"
-                        className="glass-input text-sm w-full"
-                        value={editValues[candidate.id]?.email || candidate.contact_info?.email || ''}
-                        onChange={(e) => handleFieldEdit(candidate.id, 'email', e.target.value)}
-                        onBlur={() => handleFieldSave(candidate.id, 'email')}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleFieldSave(candidate.id, 'email')
-                          } else if (e.key === 'Escape') {
-                            handleFieldCancel(candidate.id)
-                          }
-                        }}
-                        autoFocus
-                      />
-                    </div>
+                  {editingCandidateId === candidate.id ? (
+                    <input
+                      type="email"
+                      className="glass-input text-sm w-full"
+                      value={editValues[candidate.id]?.email || candidate.contact_info?.email || ''}
+                      onChange={(e) => handleFieldEdit(candidate.id, 'email', e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
                   ) : (
-                    <span 
-                      className="text-gray-400 cursor-pointer hover:text-primary-400 transition-colors"
-                      onClick={() => startEditing(candidate.id, 'email')}
-                      title="Click to edit"
-                    >
+                    <span className="text-gray-400">
                       {candidate.contact_info?.email || '-'}
                     </span>
                   )}
                 </td>
                 <td className="px-6 py-4">
-                  {editingField?.candidateId === candidate.id && editingField?.field === 'phone' ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="tel"
-                        className="glass-input text-sm w-full"
-                        value={editValues[candidate.id]?.phone || candidate.contact_info?.phone || ''}
-                        onChange={(e) => handleFieldEdit(candidate.id, 'phone', e.target.value)}
-                        onBlur={() => handleFieldSave(candidate.id, 'phone')}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleFieldSave(candidate.id, 'phone')
-                          } else if (e.key === 'Escape') {
-                            handleFieldCancel(candidate.id)
-                          }
-                        }}
-                        autoFocus
-                      />
-                    </div>
+                  {editingCandidateId === candidate.id ? (
+                    <input
+                      type="tel"
+                      className="glass-input text-sm w-full"
+                      value={editValues[candidate.id]?.phone || candidate.contact_info?.phone || ''}
+                      onChange={(e) => handleFieldEdit(candidate.id, 'phone', e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
                   ) : (
-                    <span 
-                      className="text-gray-400 cursor-pointer hover:text-primary-400 transition-colors"
-                      onClick={() => startEditing(candidate.id, 'phone')}
-                      title="Click to edit"
-                    >
+                    <span className="text-gray-400">
                       {candidate.contact_info?.phone || '-'}
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     candidate.status === 'analyzed' 
                       ? 'bg-green-500/20 text-green-400 border border-green-500/30'
@@ -844,7 +821,7 @@ const JobDetail = () => {
                     {candidate.status}
                   </span>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   {candidate.score_breakdown?.resume_score ? (
                     <span className="font-semibold">
                       {parseFloat(candidate.score_breakdown.resume_score).toFixed(1)}
@@ -853,20 +830,52 @@ const JobDetail = () => {
                     '-'
                   )}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-2">
-                    <Link
-                      to={`/candidates/${candidate.id}`}
-                      className="p-2 rounded-lg hover:bg-glass-200 transition-colors"
-                    >
-                      <Eye size={18} className="text-gray-400" />
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(candidate.id)}
-                      className="p-2 rounded-lg hover:bg-red-500/20 transition-colors"
-                    >
-                      <Trash2 size={18} className="text-red-400" />
-                    </button>
+                    {editingCandidateId === candidate.id ? (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRowSave(candidate.id)
+                          }}
+                          className="p-2 rounded-lg hover:bg-green-500/20 transition-colors"
+                          title="Save changes"
+                        >
+                          <Save size={18} className="text-green-400" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRowCancel(candidate.id)
+                          }}
+                          className="p-2 rounded-lg hover:bg-gray-500/20 transition-colors"
+                          title="Cancel editing"
+                        >
+                          <X size={18} className="text-gray-400" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => startEditingRow(candidate.id, e)}
+                          className="p-2 rounded-lg hover:bg-glass-200 transition-colors"
+                          title="Edit candidate"
+                        >
+                          <Edit size={18} className="text-gray-400" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(candidate.id)
+                          }}
+                          className="p-2 rounded-lg hover:bg-red-500/20 transition-colors"
+                          title="Delete candidate"
+                        >
+                          <Trash2 size={18} className="text-red-400" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
