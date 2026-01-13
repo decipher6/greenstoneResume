@@ -112,6 +112,11 @@ class EmailSend(BaseModel):
     template: EmailTemplate
     job_id: str
 
+class InterviewLinksRequest(BaseModel):
+    job_id: str
+    candidate_ids: List[str]
+    template: EmailTemplate
+
 class ActivityLog(BaseModel):
     id: Optional[str] = None
     user_id: Optional[str] = None

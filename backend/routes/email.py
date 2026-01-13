@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Body, Depends
 from typing import List, Optional
 from bson import ObjectId
 from database import get_db
-from models import EmailSend
+from models import EmailSend, InterviewLinksRequest
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
 from utils.resend_sender import resend_sender
@@ -125,23 +125,21 @@ async def send_emails(email_data: EmailSend, user_id: Optional[str] = Depends(ge
 
 @router.post("/interview-links")
 async def get_interview_mailto_links(
-    job_id: str = Body(...),
-    candidate_ids: List[str] = Body(...),
-    template: dict = Body(...),
+    request: InterviewLinksRequest,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """Generate mailto links for interview invitations"""
     db = get_db()
     
     # Verify job exists
-    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    job = await db.jobs.find_one({"_id": ObjectId(request.job_id)})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
     job_title = job.get("title", "Position")
     mailto_links = []
     
-    for candidate_id in candidate_ids:
+    for candidate_id in request.candidate_ids:
         candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
         if not candidate:
             continue
@@ -153,8 +151,8 @@ async def get_interview_mailto_links(
         candidate_name = candidate.get("name", "Candidate")
         
         # Replace placeholders in template
-        subject = template.get("subject", "").replace("[Job Title]", job_title)
-        body = template.get("body", "").replace("[Candidate Name]", candidate_name)
+        subject = request.template.subject.replace("[Job Title]", job_title)
+        body = request.template.body.replace("[Candidate Name]", candidate_name)
         body = body.replace("[Job Title]", job_title)
         
         # Build mailto URL with proper encoding
@@ -184,12 +182,12 @@ async def get_interview_mailto_links(
         action="interview_links_generated",
         entity_type="email",
         description=f"Generated interview mailto links for {len(mailto_links)} candidate(s) for job: {job.get('title', 'Unknown')}",
-        entity_id=job_id,
+        entity_id=request.job_id,
         user_id=user_id,
         metadata={
             "candidate_count": len(mailto_links),
             "template_type": "interview",
-            "candidate_ids": candidate_ids
+            "candidate_ids": request.candidate_ids
         }
     )
     

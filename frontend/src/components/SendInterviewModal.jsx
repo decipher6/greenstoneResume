@@ -120,18 +120,21 @@ Greenstone Talent Team`,
             <h3 className="text-lg font-semibold mb-4">Click to Open Outlook</h3>
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {generatedLinks.map((link) => (
-                <a
+                <button
                   key={link.candidate_id}
-                  href={link.mailto_url}
-                  className="w-full p-3 glass-card bg-glass-100 border border-glass-200 rounded-lg hover:bg-glass-200 transition-colors text-left flex items-center justify-between group block cursor-pointer no-underline"
-                  style={{ textDecoration: 'none' }}
+                  onClick={() => {
+                    // Use window.location.href to open mailto link
+                    // This is the most reliable method for opening email clients
+                    window.location.href = link.mailto_url
+                  }}
+                  className="w-full p-3 glass-card bg-glass-100 border border-glass-200 rounded-lg hover:bg-glass-200 transition-colors text-left flex items-center justify-between group cursor-pointer"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white truncate">{link.candidate_name}</div>
                     <div className="text-sm text-gray-400 truncate">{link.email}</div>
                   </div>
                   <ExternalLink size={18} className="text-primary-400 flex-shrink-0 ml-2 group-hover:scale-110 transition-transform" />
-                </a>
+                </button>
               ))}
             </div>
             <p className="text-xs text-gray-400 mt-3">
