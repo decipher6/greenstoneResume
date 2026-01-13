@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { X, Mail } from 'lucide-react'
-import { sendEmails } from '../services/api'
+import { X, Mail, ExternalLink } from 'lucide-react'
+import { getInterviewLinks } from '../services/api'
 import { useModal } from '../context/ModalContext'
 
 const SendInterviewModal = ({ jobId, candidateIds, onClose }) => {
@@ -19,21 +19,35 @@ Best regards,
 Greenstone Talent Team`,
     template_type: 'interview'
   })
+  const [generatedLinks, setGeneratedLinks] = useState([])
+  const [isGenerating, setIsGenerating] = useState(false)
 
-  const handleSubmit = async (e) => {
+  const handleGenerateLinks = async (e) => {
     e.preventDefault()
+    setIsGenerating(true)
     try {
-      const response = await sendEmails({ job_id: jobId, candidate_ids: candidateIds, template })
+      const response = await getInterviewLinks({ 
+        job_id: jobId, 
+        candidate_ids: candidateIds, 
+        template 
+      })
+      setGeneratedLinks(response.data.links || [])
       await showAlert(
-        'Emails Sent',
-        response.data.message || `Demo: Emails would be sent to ${candidateIds.length} candidates`,
+        'Links Generated',
+        `Generated ${response.data.links?.length || 0} mailto link(s). Click on each link to open Outlook with the pre-filled email.`,
         'success'
       )
-      onClose()
     } catch (error) {
-      console.error('Error sending emails:', error)
-      await showAlert('Error', 'Error sending emails. Please try again.', 'error')
+      console.error('Error generating links:', error)
+      await showAlert('Error', 'Error generating mailto links. Please try again.', 'error')
+    } finally {
+      setIsGenerating(false)
     }
+  }
+
+  const handleOpenMailto = (mailtoUrl, candidateName) => {
+    // Open mailto link which will open the default email client (Outlook, Mail, etc.)
+    window.location.href = mailtoUrl
   }
 
   return (
@@ -57,7 +71,7 @@ Greenstone Talent Team`,
           <p className="text-sm text-gray-400">{candidateIds.length} candidate{candidateIds.length !== 1 ? 's' : ''} selected</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleGenerateLinks} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">Email Subject</label>
             <input
@@ -84,11 +98,40 @@ Greenstone Talent Team`,
             <button type="button" onClick={onClose} className="glass-button-secondary">
               Cancel
             </button>
-            <button type="submit" className="glass-button bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
-              Send {candidateIds.length} Email{candidateIds.length !== 1 ? 's' : ''}
+            <button 
+              type="submit" 
+              disabled={isGenerating}
+              className="glass-button bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? 'Generating...' : `Generate ${candidateIds.length} Link${candidateIds.length !== 1 ? 's' : ''}`}
             </button>
           </div>
         </form>
+
+        {/* Generated Mailto Links */}
+        {generatedLinks.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-glass-200">
+            <h3 className="text-lg font-semibold mb-4">Click to Open Outlook</h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {generatedLinks.map((link) => (
+                <button
+                  key={link.candidate_id}
+                  onClick={() => handleOpenMailto(link.mailto_url, link.candidate_name)}
+                  className="w-full p-3 glass-card bg-glass-100 border border-glass-200 rounded-lg hover:bg-glass-200 transition-colors text-left flex items-center justify-between group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white truncate">{link.candidate_name}</div>
+                    <div className="text-sm text-gray-400 truncate">{link.email}</div>
+                  </div>
+                  <ExternalLink size={18} className="text-primary-400 flex-shrink-0 ml-2 group-hover:scale-110 transition-transform" />
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              Clicking a link will open your default email client (Outlook, Mail, etc.) with the pre-filled message.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
