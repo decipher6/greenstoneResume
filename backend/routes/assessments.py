@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
@@ -10,13 +10,15 @@ from database import get_db
 from models import CCATResult, PersonalityResult, PersonalityTraits
 from utils.cv_parser import parse_pdf
 from routes.activity_logs import log_activity
+from routes.auth import get_current_user_id
 
 router = APIRouter()
 
 @router.post("/candidate/{candidate_id}/upload")
 async def upload_candidate_assessments(
     candidate_id: str,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """Upload combined CCAT and Personality test results for a specific candidate (CSV or PDF)"""
     db = get_db()
@@ -210,6 +212,7 @@ async def upload_candidate_assessments(
             entity_type="assessment",
             description=f"Uploaded {', '.join(assessment_types)} assessment(s) for candidate: {candidate.get('name', 'Unknown')}",
             entity_id=candidate_id,
+            user_id=user_id,
             metadata={
                 "ccat_uploaded": ccat_uploaded,
                 "personality_uploaded": personality_uploaded,

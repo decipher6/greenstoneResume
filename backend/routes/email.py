@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Body
-from typing import List
+from fastapi import APIRouter, HTTPException, Body, Depends
+from typing import List, Optional
 from bson import ObjectId
 from database import get_db
 from models import EmailSend
 from routes.activity_logs import log_activity
+from routes.auth import get_current_user_id
 from utils.email_sender import email_sender
 import logging
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/send")
-async def send_emails(email_data: EmailSend):
+async def send_emails(email_data: EmailSend, user_id: Optional[str] = Depends(get_current_user_id)):
     """Send emails to candidates"""
     db = get_db()
     
@@ -93,6 +94,7 @@ async def send_emails(email_data: EmailSend):
         entity_type="email",
         description=f"Sent {sent_count} email(s) for job: {job.get('title', 'Unknown')}",
         entity_id=email_data.job_id,
+        user_id=user_id,
         metadata={
             "candidate_count": sent_count,
             "failed_count": failed_count,

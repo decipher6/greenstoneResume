@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks, Body
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks, Body, Depends
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
@@ -14,6 +14,7 @@ from utils.cv_parser import parse_resume
 from utils.entity_extraction import extract_contact_info, extract_name
 from utils.ai_scoring import score_resume_with_llm, calculate_composite_score
 from routes.activity_logs import log_activity
+from routes.auth import get_current_user_id
 
 router = APIRouter()
 
@@ -23,7 +24,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upload-bulk")
 async def upload_candidates_bulk(
     job_id: str = Form(...),
-    files: List[UploadFile] = File(...)
+    files: List[UploadFile] = File(...),
+    user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """Upload multiple candidate CVs (max 50 files)"""
     db = get_db()
@@ -99,6 +101,7 @@ async def upload_candidates_bulk(
         entity_type="candidate",
         description=f"Uploaded {len(uploaded_candidates)} candidate(s) for job: {job.get('title', 'Unknown') if job else 'Unknown'}",
         entity_id=job_id,
+        user_id=user_id,
         metadata={"count": len(uploaded_candidates), "job_id": job_id}
     )
     
@@ -179,7 +182,7 @@ async def get_candidate(candidate_id: str):
     return Candidate(**candidate)
 
 @router.patch("/{candidate_id}")
-async def update_candidate(candidate_id: str, update_data: dict = Body(...)):
+async def update_candidate(candidate_id: str, update_data: dict = Body(...), user_id: Optional[str] = Depends(get_current_user_id)):
     """Update candidate information (name, email, phone)"""
     db = get_db()
     
@@ -220,6 +223,7 @@ async def update_candidate(candidate_id: str, update_data: dict = Body(...)):
         entity_type="candidate",
         description=f"Updated candidate: {update_fields.get('name', candidate.get('name', 'Unknown'))}",
         entity_id=candidate_id,
+        user_id=user_id,
         metadata={"updated_fields": list(update_fields.keys())}
     )
     
@@ -229,7 +233,7 @@ async def update_candidate(candidate_id: str, update_data: dict = Body(...)):
     return Candidate(**updated_candidate)
 
 @router.post("/{candidate_id}/re-analyze")
-async def re_analyze_candidate(candidate_id: str, background_tasks: BackgroundTasks):
+async def re_analyze_candidate(candidate_id: str, background_tasks: BackgroundTasks, user_id: Optional[str] = Depends(get_current_user_id)):
     """Re-analyze a specific candidate with updated LLM scoring"""
     db = get_db()
     
@@ -250,6 +254,7 @@ async def re_analyze_candidate(candidate_id: str, background_tasks: BackgroundTa
         entity_type="candidate",
         description=f"Re-analysis started for candidate: {candidate.get('name', 'Unknown')}",
         entity_id=candidate_id,
+        user_id=user_id,
         metadata={"job_id": job_id}
     )
     
@@ -259,7 +264,7 @@ async def re_analyze_candidate(candidate_id: str, background_tasks: BackgroundTa
     }
 
 @router.delete("/{candidate_id}")
-async def delete_candidate(candidate_id: str):
+async def delete_candidate(candidate_id: str, user_id: Optional[str] = Depends(get_current_user_id)):
     """Delete a candidate"""
     db = get_db()
     
@@ -291,6 +296,7 @@ async def delete_candidate(candidate_id: str):
         entity_type="candidate",
         description=f"Deleted candidate: {candidate_name}",
         entity_id=candidate_id,
+        user_id=user_id,
         metadata={"job_id": job_id, "job_title": job_title}
     )
     

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Query, Body
-from typing import List
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query, Body, Depends
+from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
 
@@ -8,6 +8,7 @@ from models import Job, JobCreate, JobStatus
 from utils.ai_scoring import score_resume_with_llm
 from routes.candidates import process_candidate_analysis
 from routes.activity_logs import log_activity
+from routes.auth import get_current_user_id
 
 router = APIRouter()
 
@@ -39,7 +40,7 @@ async def get_job(job_id: str):
     return Job(**job)
 
 @router.post("/", response_model=Job)
-async def create_job(job: JobCreate):
+async def create_job(job: JobCreate, user_id: Optional[str] = Depends(get_current_user_id)):
     """Create a new job post"""
     db = get_db()
     
@@ -65,13 +66,14 @@ async def create_job(job: JobCreate):
         entity_type="job",
         description=f"Created job: {job.title}",
         entity_id=job_dict["id"],
+        user_id=user_id,
         metadata={"department": job.department, "status": "active"}
     )
     
     return Job(**job_dict)
 
 @router.delete("/{job_id}")
-async def delete_job(job_id: str):
+async def delete_job(job_id: str, user_id: Optional[str] = Depends(get_current_user_id)):
     """Delete a job post"""
     db = get_db()
     
@@ -93,13 +95,14 @@ async def delete_job(job_id: str):
         action="job_deleted",
         entity_type="job",
         description=f"Deleted job: {job_title}",
-        entity_id=job_id
+        entity_id=job_id,
+        user_id=user_id
     )
     
     return {"message": "Job deleted successfully"}
 
 @router.post("/{job_id}/run-analysis", response_model=dict)
-async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force: bool = Query(False)):
+async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force: bool = Query(False), user_id: Optional[str] = Depends(get_current_user_id)):
     """Run AI analysis on all uploaded candidates for a job. Set force=True to re-analyze already analyzed candidates."""
     db = get_db()
     
@@ -131,6 +134,7 @@ async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force:
         entity_type="job",
         description=f"Started analysis for {len(candidates)} candidate(s) in job: {job.get('title', 'Unknown')}",
         entity_id=job_id,
+        user_id=user_id,
         metadata={"candidates_count": len(candidates), "force": force}
     )
     
@@ -145,7 +149,7 @@ async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force:
     }
 
 @router.patch("/{job_id}/status", response_model=Job)
-async def update_job_status(job_id: str, status: str = Body(..., embed=True)):
+async def update_job_status(job_id: str, status: str = Body(..., embed=True), user_id: Optional[str] = Depends(get_current_user_id)):
     """Update job status"""
     db = get_db()
     
@@ -173,6 +177,7 @@ async def update_job_status(job_id: str, status: str = Body(..., embed=True)):
         entity_type="job",
         description=f"Updated job status to {status}: {job.get('title', 'Unknown')}",
         entity_id=job_id,
+        user_id=user_id,
         metadata={"status": status, "previous_status": job.get("status")}
     )
     

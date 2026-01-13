@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta
 from bson import ObjectId
 from jose import jwt, JWTError
+from typing import Optional
 import os
 
 from database import get_db
@@ -125,6 +126,17 @@ async def login(user_data: UserLogin):
             "name": user.get("name", user["email"].split("@")[0])
         }
     }
+
+async def get_current_user_id(credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))) -> Optional[str]:
+    """Get current user ID from token (optional dependency - returns None if no token)"""
+    if not credentials:
+        return None
+    try:
+        token = credentials.credentials
+        payload = decode_token(token)
+        return payload.get("user_id")
+    except:
+        return None
 
 @router.get("/me")
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
