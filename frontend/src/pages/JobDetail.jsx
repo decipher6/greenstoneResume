@@ -636,37 +636,43 @@ const JobDetail = () => {
             <div className="p-6 border-b border-glass-200">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Candidates</h3>
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="glass-button-secondary flex items-center gap-2"
-                >
-                  <Filter size={18} />
-                  {showFilters ? 'Hide' : 'Show'} Filters
-                </button>
               </div>
               
-              {/* Name Search */}
-              <div className="glass-input flex items-center gap-2">
-                <Search size={18} className="text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search candidates by name..."
-                  className="bg-transparent border-0 outline-0 w-full"
-                  value={nameSearch}
-                  onChange={(e) => {
-                    setNameSearch(e.target.value)
-                  }}
-                />
-                {nameSearch && (
-                  <button
-                    onClick={() => {
-                      setNameSearch('')
+              {/* Name Search and Filter */}
+              <div className="flex items-center gap-3">
+                <div className="glass-input flex items-center gap-2 w-64">
+                  <Search size={18} className="text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search candidates by name..."
+                    className="bg-transparent border-0 outline-0 w-full"
+                    value={nameSearch}
+                    onChange={(e) => {
+                      setNameSearch(e.target.value)
                     }}
-                    className="p-1 rounded hover:bg-glass-200 transition-colors"
-                  >
-                    <X size={16} className="text-gray-400" />
-                  </button>
-                )}
+                  />
+                  {nameSearch && (
+                    <button
+                      onClick={() => {
+                        setNameSearch('')
+                      }}
+                      className="p-1 rounded hover:bg-glass-200 transition-colors"
+                    >
+                      <X size={16} className="text-gray-400" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
+                    showFilters 
+                      ? 'bg-glass-200 text-primary-400' 
+                      : 'hover:bg-glass-200 text-gray-400'
+                  }`}
+                  title={showFilters ? 'Hide Filters' : 'Show Filters'}
+                >
+                  <Filter size={18} />
+                </button>
               </div>
             </div>
 
