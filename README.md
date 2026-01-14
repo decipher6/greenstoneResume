@@ -11,17 +11,18 @@ Intelligent candidate screening platform with AI-powered resume analysis.
 
 -  Job post creation and management
 -  Bulk CV upload (up to 50 files: .pdf, .docx, .doc)
--  AI-powered candidate scoring with Groq LLaMA 3.3
+-  AI-powered candidate scoring with Google Gemini API
 -  Candidate profiles with detailed analytics
 -  Reports and dashboard
 -  Simplified authentication
+-  Activity Logs with filtering (date range, activity type, user) and pagination (30 logs per page). Logs older than 30 days are automatically deleted.
 
 ## Tech Stack
 
 - **Frontend**: React + Vite + Tailwind CSS
 - **Backend**: FastAPI + Python 3.11
 - **Database**: MongoDB Atlas
-- **AI**: Groq API (LLaMA 3.3)
+- **AI**: Google Gemini API
 - **Hosting**: Vercel (Frontend) + Render (Backend)
 
 ## Hosting is done on free tiers of Render so it might take some time for the service to wake up while trying to access the website. The free instance will spin down with inactivity, which can delay requests by 50 seconds or more. So please give the MVP some time after the login fails for the Backend service to be active.

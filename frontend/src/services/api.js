@@ -69,7 +69,26 @@ export const sendEmails = (data) => api.post('/email/send', data)
 export const getInterviewLinks = (data) => api.post('/email/interview-links', data)
 
 // Activity Logs
-export const getActivityLogs = (limit = 100, skip = 0) => api.get(`/activity-logs?limit=${limit}&skip=${skip}`)
+export const getActivityLogs = (params = {}) => {
+  const { limit = 30, skip = 0, start_date, end_date, activity_type, user_id } = params
+  const queryParams = new URLSearchParams({ limit: limit.toString(), skip: skip.toString() })
+  if (start_date) queryParams.append('start_date', start_date)
+  if (end_date) queryParams.append('end_date', end_date)
+  if (activity_type) queryParams.append('activity_type', activity_type)
+  if (user_id) queryParams.append('user_id', user_id)
+  return api.get(`/activity-logs?${queryParams.toString()}`)
+}
+export const getActivityLogsCount = (params = {}) => {
+  const { start_date, end_date, activity_type, user_id } = params
+  const queryParams = new URLSearchParams()
+  if (start_date) queryParams.append('start_date', start_date)
+  if (end_date) queryParams.append('end_date', end_date)
+  if (activity_type) queryParams.append('activity_type', activity_type)
+  if (user_id) queryParams.append('user_id', user_id)
+  return api.get(`/activity-logs/count?${queryParams.toString()}`)
+}
+export const getActivityTypes = () => api.get('/activity-logs/types')
+export const getActivityUsers = () => api.get('/activity-logs/users')
 
 export default api
 
