@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Briefcase, Users, ArrowUpRight, Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown } from 'lucide-react'
-import { getDashboardStats, getJobs, deleteJob } from '../services/api'
+import { getDashboardStats, getJobs, deleteJob, updateJobStatus } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
 import { useModal } from '../context/ModalContext'
 
@@ -127,6 +127,19 @@ const Dashboard = () => {
         console.error('Error deleting job:', error)
         await showAlert('Error', 'Failed to delete job post. Please try again.', 'error')
       }
+    }
+  }
+
+  const handleStatusToggle = async (jobId, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'closed' : 'active'
+    try {
+      await updateJobStatus(jobId, newStatus)
+      fetchJobs()
+      fetchData() // Refresh stats
+      await showAlert('Success', `Job status updated to ${newStatus}.`, 'success')
+    } catch (error) {
+      console.error('Error updating job status:', error)
+      await showAlert('Error', 'Failed to update job status. Please try again.', 'error')
     }
   }
 
@@ -276,13 +289,14 @@ const Dashboard = () => {
                   )}
                 </div>
               </th>
+              <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredJobs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
+                <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
                   No jobs found matching your search criteria.
                 </td>
               </tr>
@@ -306,6 +320,19 @@ const Dashboard = () => {
                     <Calendar size={16} />
                     {formatDate(job.last_run)}
                   </div>
+                </td>
+                <td className="px-6 py-4">
+                  <button
+                    onClick={() => handleStatusToggle(job.id, job.status || 'active')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      (job.status || 'active') === 'active'
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
+                        : 'bg-gray-500/20 text-gray-400 border border-gray-500/30 hover:bg-gray-500/30'
+                    }`}
+                    title={`Click to ${(job.status || 'active') === 'active' ? 'close' : 'activate'} job`}
+                  >
+                    {(job.status || 'active') === 'active' ? 'Active' : 'Closed'}
+                  </button>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
