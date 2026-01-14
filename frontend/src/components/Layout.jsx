@@ -53,7 +53,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                   isActive
-                    ? 'bg-gradient-to-r from-primary-500/20 to-primary-600/20 border border-primary-500/30 text-primary-400'
+                    ? 'bg-gradient-to-r from-primary-500/40 to-primary-600/40 border border-primary-500/50 text-primary-300'
                     : 'text-gray-400 hover:text-white hover:bg-glass-100'
                 }`}
               >
