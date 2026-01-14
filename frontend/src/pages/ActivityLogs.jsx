@@ -1,5 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
-import { Clock, Filter, X, ChevronLeft, ChevronRight, ChevronDown, Search, User } from 'lucide-react'
+import { 
+  Clock, Filter, X, ChevronLeft, ChevronRight, ChevronDown, Search, User,
+  Briefcase, UserPlus, Mail, FileText, Trash2, Upload, Download, CheckCircle,
+  PlayCircle, Settings, LogIn, LogOut, FileCheck
+} from 'lucide-react'
 import { getActivityLogs, getActivityLogsCount, getActivityTypes, getActivityUsers } from '../services/api'
 
 const ActivityLogs = () => {
@@ -147,33 +151,79 @@ const ActivityLogs = () => {
     })
   }
 
-  const getActivityIcon = (entityType) => {
-    switch (entityType?.toLowerCase()) {
+  const getTimelineIcon = (log) => {
+    const description = log.description?.toLowerCase() || ''
+    const entityType = log.entity_type?.toLowerCase() || ''
+    
+    // Check description for specific actions
+    if (description.includes('logged in') || description.includes('login')) {
+      return <LogIn size={16} className="text-blue-400" />
+    }
+    if (description.includes('deleted') || description.includes('delete')) {
+      return <Trash2 size={16} className="text-red-400" />
+    }
+    if (description.includes('uploaded') || description.includes('upload')) {
+      return <Upload size={16} className="text-green-400" />
+    }
+    if (description.includes('completed') || description.includes('complete')) {
+      return <CheckCircle size={16} className="text-green-400" />
+    }
+    if (description.includes('started') || description.includes('start')) {
+      return <PlayCircle size={16} className="text-blue-400" />
+    }
+    if (description.includes('email') || description.includes('sent')) {
+      return <Mail size={16} className="text-purple-400" />
+    }
+    
+    // Fallback to entity type
+    switch (entityType) {
       case 'job':
-        return '📋'
+        return <Briefcase size={16} className="text-blue-400" />
       case 'candidate':
-        return '👤'
+        return <UserPlus size={16} className="text-green-400" />
       case 'email':
-        return '📧'
+        return <Mail size={16} className="text-purple-400" />
       case 'assessment':
-        return '📊'
+        return <FileCheck size={16} className="text-orange-400" />
       default:
-        return '📝'
+        return <FileText size={16} className="text-gray-400" />
     }
   }
 
-  const getActivityColor = (entityType) => {
-    switch (entityType?.toLowerCase()) {
+  const getTimelineIconBg = (log) => {
+    const description = log.description?.toLowerCase() || ''
+    const entityType = log.entity_type?.toLowerCase() || ''
+    
+    if (description.includes('logged in') || description.includes('login')) {
+      return 'bg-blue-500/20'
+    }
+    if (description.includes('deleted') || description.includes('delete')) {
+      return 'bg-red-500/20'
+    }
+    if (description.includes('uploaded') || description.includes('upload')) {
+      return 'bg-green-500/20'
+    }
+    if (description.includes('completed') || description.includes('complete')) {
+      return 'bg-green-500/20'
+    }
+    if (description.includes('started') || description.includes('start')) {
+      return 'bg-blue-500/20'
+    }
+    if (description.includes('email') || description.includes('sent')) {
+      return 'bg-purple-500/20'
+    }
+    
+    switch (entityType) {
       case 'job':
-        return 'bg-blue-500'
+        return 'bg-blue-500/20'
       case 'candidate':
-        return 'bg-green-500'
+        return 'bg-green-500/20'
       case 'email':
-        return 'bg-purple-500'
+        return 'bg-purple-500/20'
       case 'assessment':
-        return 'bg-orange-500'
+        return 'bg-orange-500/20'
       default:
-        return 'bg-gray-400'
+        return 'bg-gray-500/20'
     }
   }
 
@@ -471,71 +521,68 @@ const ActivityLogs = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {Object.entries(groupedLogs).map(([dateKey, dateLogs], dateIndex) => (
             <div key={dateKey} className="relative">
               {/* Date Header */}
-              <h4 className="text-base font-semibold text-gray-300 mb-6 pb-2 border-b border-gray-700">
+              <h4 className="text-sm font-semibold text-gray-300 mb-3 pb-1 border-b border-gray-700">
                 {dateKey}
               </h4>
               
               {/* Timeline with Cards */}
-              <div className="relative pl-20">
+              <div className="relative pl-16">
                 {/* Vertical timeline line */}
-                <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-600"></div>
+                <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-700"></div>
                 
                 {/* Log entries as cards */}
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {dateLogs.map((log, logIndex) => {
                     const isLast = logIndex === dateLogs.length - 1 && dateIndex === Object.keys(groupedLogs).length - 1
                     return (
                       <div key={log.id} className="relative flex items-start">
                         {/* Timestamp on the left */}
-                        <div className="absolute left-0 w-16 text-right">
-                          <span className="text-xs text-gray-500 font-medium">
+                        <div className="absolute left-0 w-12 text-right pr-2">
+                          <span className="text-xs text-gray-500">
                             {formatTime(log.created_at)}
                           </span>
                         </div>
                         
-                        {/* Timeline circle */}
-                        <div className="absolute left-8 transform -translate-x-1/2 flex items-center justify-center z-10">
-                          <div className={`w-5 h-5 rounded-full ${getActivityColor(log.entity_type)} flex items-center justify-center shadow-md`}>
-                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                        {/* Timeline icon */}
+                        <div className="absolute left-6 transform -translate-x-1/2 flex items-center justify-center z-10">
+                          <div className={`w-7 h-7 rounded-full ${getTimelineIconBg(log)} flex items-center justify-center border-2 border-gray-700`}>
+                            {getTimelineIcon(log)}
                           </div>
                           {/* Connecting line */}
                           {!isLast && (
-                            <div className="absolute left-1/2 top-5 w-0.5 h-full bg-gray-600 transform -translate-x-1/2"></div>
+                            <div className="absolute left-1/2 top-7 w-0.5 h-full bg-gray-700 transform -translate-x-1/2"></div>
                           )}
                         </div>
                         
                         {/* Card content */}
-                        <div className="ml-12 flex-1">
-                          <div className="bg-white/5 border border-gray-700 rounded-lg p-4 hover:bg-white/10 transition-colors">
-                            {/* User info */}
-                            <div className="flex items-center gap-2 mb-2">
+                        <div className="ml-10 flex-1">
+                          <div className="bg-white/5 border border-gray-700 rounded-lg p-3 hover:bg-white/10 transition-colors">
+                            {/* User info and description in one row */}
+                            <div className="flex items-center gap-3">
                               {log.user_name ? (
-                                <>
-                                  <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-xs font-medium text-white">
-                                    {getUserInitials(log.user_name)}
-                                  </div>
-                                  <div>
-                                    <div className="text-sm font-medium text-white">{log.user_name}</div>
-                                  </div>
-                                </>
+                                <div className="w-7 h-7 rounded-full bg-primary-500 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
+                                  {getUserInitials(log.user_name)}
+                                </div>
                               ) : (
-                                <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
-                                    <User size={16} className="text-gray-400" />
-                                  </div>
-                                  <div className="text-sm text-gray-400">System</div>
+                                <div className="w-7 h-7 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                                  <User size={14} className="text-gray-400" />
                                 </div>
                               )}
-                            </div>
-                            
-                            {/* Activity description */}
-                            <div className="flex items-start gap-2">
-                              <span className="text-lg mt-0.5">{getActivityIcon(log.entity_type)}</span>
-                              <p className="text-sm text-gray-200 leading-relaxed">{log.description}</p>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {log.user_name && (
+                                    <span className="text-xs font-medium text-gray-300">{log.user_name}</span>
+                                  )}
+                                  {!log.user_name && (
+                                    <span className="text-xs text-gray-400">System</span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-200 leading-snug">{log.description}</p>
+                              </div>
                             </div>
                           </div>
                         </div>
