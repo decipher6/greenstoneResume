@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Brain, Mail, FileText, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Download } from 'lucide-react'
+import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle } from 'lucide-react'
 import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
@@ -502,27 +502,16 @@ const CandidateProfile = () => {
                 {/* Contact Information */}
                 <div className="glass-card p-6">
                   <h3 className="text-lg font-semibold mb-4">Contact Information</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Mail size={16} className="text-gray-400" />
-                      <span className="text-gray-300">{candidate.contact_info?.email || '-'}</span>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Mail size={20} className="text-gray-400 flex-shrink-0" />
+                      <span className="text-base font-medium text-white">{candidate.contact_info?.email || '-'}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <User size={16} className="text-gray-400" />
-                      <span className="text-gray-300">{candidate.contact_info?.phone || '-'}</span>
+                    <div className="flex items-center gap-3">
+                      <User size={20} className="text-gray-400 flex-shrink-0" />
+                      <span className="text-base font-medium text-white">{candidate.contact_info?.phone || '-'}</span>
                     </div>
                   </div>
-                  {candidate.resume_file_path && (
-                    <div className="flex gap-2 mt-4">
-                      <button className="glass-button flex-1 flex items-center justify-center gap-2 text-sm">
-                        <FileText size={16} />
-                        View Resume
-                      </button>
-                      <button className="glass-button-secondary flex items-center justify-center gap-2 text-sm px-4">
-                        <Download size={16} />
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -567,11 +556,11 @@ const CandidateProfile = () => {
                           <div key={index}>
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium">{criterion.criterion_name}</span>
-                              <span className="text-sm font-semibold">{score.toFixed(1)}/10</span>
+                              <span className="text-sm font-semibold text-emerald-400">{score.toFixed(1)}/10</span>
                             </div>
                             <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
+                                className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500"
                                 style={{ width: `${(score / 10) * 100}%` }}
                               />
                             </div>
@@ -690,7 +679,6 @@ const CandidateProfile = () => {
           candidateIds={[candidateId]}
           onClose={() => {
             setShowEmailModal(false)
-            fetchCandidate()
           }}
         />
       )}
@@ -701,7 +689,6 @@ const CandidateProfile = () => {
           candidateIds={[candidateId]}
           onClose={() => {
             setShowInterviewModal(false)
-            fetchCandidate()
           }}
         />
       )}
