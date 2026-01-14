@@ -162,7 +162,15 @@ const Dashboard = () => {
         {/* Search and Filters with Add Job Button */}
         <div className="p-4 border-b border-glass-200">
           <div className="flex items-center gap-4 mb-4">
-            <div className="glass-input flex items-center gap-2 flex-1">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="glass-button flex items-center gap-2 whitespace-nowrap"
+            >
+              <Plus size={20} />
+              Add Job
+            </button>
+            <div className="flex-1"></div>
+            <div className="glass-input flex items-center gap-2 w-80">
               <Search size={18} className="text-gray-400" />
               <input
                 type="text"
@@ -182,10 +190,14 @@ const Dashboard = () => {
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`glass-button-secondary flex items-center gap-2 ${showFilters ? 'bg-glass-200' : ''}`}
+              className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
+                showFilters 
+                  ? 'bg-glass-200 text-primary-400' 
+                  : 'hover:bg-glass-200 text-gray-400'
+              }`}
+              title="Filters"
             >
               <Filter size={18} />
-              Filters
             </button>
             {(searchQuery || Object.values(filters).some(f => f)) && (
               <button
@@ -196,13 +208,6 @@ const Dashboard = () => {
                 Clear
               </button>
             )}
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="glass-button flex items-center gap-2 whitespace-nowrap"
-            >
-              <Plus size={20} />
-              Add Job
-            </button>
           </div>
 
           {/* Filter Options */}
