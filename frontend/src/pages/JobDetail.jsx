@@ -388,9 +388,9 @@ const JobDetail = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/')}
               className="p-2 rounded-lg hover:bg-glass-200 transition-colors"
-              title="Go back"
+              title="Go to Dashboard"
             >
               <ArrowLeft size={20} className="text-gray-400" />
             </button>

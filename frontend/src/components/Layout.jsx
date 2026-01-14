@@ -87,8 +87,8 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header - Hidden for Dashboard */}
-        {location.pathname !== '/' && (
+        {/* Header - Hidden for Dashboard and Job Detail pages */}
+        {location.pathname !== '/' && !location.pathname.startsWith('/jobs/') && (
           <header className="glass-card m-4 mb-0 rounded-2xl p-6">
             <div>
               <h2 className="text-2xl font-bold">{title}</h2>
