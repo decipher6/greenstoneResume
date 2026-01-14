@@ -167,14 +167,14 @@ const Dashboard = () => {
               className="glass-button flex items-center gap-2 whitespace-nowrap"
             >
               <Plus size={20} />
-              Add Job
+              Create New Job
             </button>
             <div className="flex-1"></div>
             <div className="glass-input flex items-center gap-2 w-80">
-              <Search size={18} className="text-gray-400" />
+              <Search size={22} className="text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by title, department, status, or candidate count..."
+                placeholder="Search by title, department, or candidate count"
                 className="bg-transparent border-0 outline-0 w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -253,11 +253,7 @@ const Dashboard = () => {
         </div>
 
         {/* Table */}
-        <div className="p-4 border-b border-glass-200">
-          <p className="text-sm text-gray-400">
-            Showing {filteredJobs.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}
-          </p>
-        </div>
+        
         <div className="overflow-x-auto">
           <table className="w-full">
           <thead className="bg-glass-100 border-b border-glass-200">
