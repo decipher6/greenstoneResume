@@ -2,20 +2,21 @@ import os
 from typing import Dict, List, Optional
 import numpy as np
 from dotenv import load_dotenv
-from groq import Groq
+import asyncio
+from google import genai
 
 load_dotenv()
 
 # Debug mode - set DEBUG=true in environment to enable debug prints
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not GROQ_API_KEY:
-    raise ValueError("GROQ_API_KEY missing in .env")
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY missing in .env")
 
-# Initialize Groq client
-groq_client = Groq(api_key=GROQ_API_KEY)
+# Initialize Gemini client
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 model = None
 _sentence_transformer_available = False
 
@@ -151,33 +152,31 @@ CRITICAL REQUIREMENTS:
 7. Validate your JSON before returning it"""
     
     try:
-        # Use Groq SDK with improved reasoning
+        # Use Gemini API with improved reasoning
         if DEBUG:
-            print(f"DEBUG: Calling Groq API with model llama-3.3-70b-versatile")
+            print(f"DEBUG: Calling Gemini API with model gemini-3-flash-preview")
             print(f"DEBUG: Evaluating {len(evaluation_criteria)} criteria")
         
-        completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.3,
-            max_completion_tokens=2000,
-            top_p=0.9,
-            stream=False
+        # Combine system message and user prompt for Gemini
+        full_prompt = f"{system_message}\n\n{user_prompt}"
+        
+        # Run Gemini API call in thread pool since it's synchronous
+        response = await asyncio.to_thread(
+            gemini_client.models.generate_content,
+            model="gemini-3-flash-preview",
+            contents=full_prompt
         )
         
-        if not completion or not completion.choices or len(completion.choices) == 0:
-            raise Exception("Empty response from Groq API")
+        if not response:
+            raise Exception("Empty response from Gemini API")
         
-        content = completion.choices[0].message.content
+        content = response.text
         
         if not content:
-            raise Exception("No content in Groq API response")
+            raise Exception("No content in Gemini API response")
         
         if DEBUG:
-            print(f"DEBUG: Received response from Groq API (length: {len(content)} chars)")
+            print(f"DEBUG: Received response from Gemini API (length: {len(content)} chars)")
         
         # Extract JSON from response (handle markdown code blocks and other formats)
         import json
@@ -323,7 +322,7 @@ CRITICAL REQUIREMENTS:
         # Provide more detailed error information
         error_msg = str(e)
         if "API key" in error_msg or "authentication" in error_msg.lower():
-            justification = "LLM evaluation failed: Invalid or missing Groq API key. Please check your .env file."
+            justification = "LLM evaluation failed: Invalid or missing Gemini API key. Please check your .env file."
         elif "rate limit" in error_msg.lower() or "quota" in error_msg.lower():
             justification = "LLM evaluation failed: API rate limit exceeded. Please try again later."
         elif "timeout" in error_msg.lower():

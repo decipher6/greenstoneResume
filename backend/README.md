@@ -3,7 +3,7 @@
 ## Prerequisites
 - Python 3.11+
 - MongoDB connection string
-- Groq API key
+- Google Gemini API key
 
 ## Setup
 
@@ -24,7 +24,7 @@
    Make sure your `.env` file in the `backend/` directory contains:
    ```env
    MONGODB_URI=your_mongodb_connection_string
-   GROQ_API_KEY=your_groq_api_key
+   GEMINI_API_KEY=your_gemini_api_key
    DATABASE_NAME=greenstone_talent
    CORS_ORIGINS=http://localhost:5173,http://localhost:3000
    DEBUG=false
@@ -121,7 +121,7 @@ SMTP_USE_TLS=true
 
 - **Import errors**: Make sure you're in the `backend/` directory when running
 - **MongoDB connection errors**: Check your `MONGODB_URI` in `.env`
-- **GROQ_API_KEY errors**: Make sure your Groq API key is set in `.env`
+- **GEMINI_API_KEY errors**: Make sure your Gemini API key is set in `.env`
 - **Email errors**: 
   - Verify SMTP credentials are correct
   - For Gmail, make sure you're using an App Password, not your regular password
