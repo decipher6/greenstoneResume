@@ -541,9 +541,9 @@ const ActivityLogs = () => {
               </h4>
               
               {/* Timeline with Cards */}
-              <div className="relative pl-28">
+              <div className="relative pl-36">
                 {/* Vertical timeline line */}
-                <div className="absolute left-16 top-0 bottom-0 w-0.5 bg-gray-700"></div>
+                <div className="absolute left-24 top-0 bottom-0 w-0.5 bg-gray-700"></div>
                 
                 {/* Log entries as cards */}
                 <div className="space-y-2">
@@ -552,14 +552,14 @@ const ActivityLogs = () => {
                     return (
                       <div key={log.id} className="relative flex items-start">
                         {/* Timestamp on the left */}
-                        <div className="absolute left-0 w-20 text-right pr-4">
+                        <div className="absolute left-0 w-24 text-right pr-2">
                           <span className="text-xs text-gray-500 whitespace-nowrap">
                             {formatTime(log.created_at)}
                           </span>
                         </div>
                         
                         {/* Timeline icon */}
-                        <div className="absolute left-16 transform -translate-x-1/2 flex items-center justify-center z-10">
+                        <div className="absolute left-24 transform -translate-x-1/2 flex items-center justify-center z-10">
                           <div className={`w-7 h-7 rounded-full ${getTimelineIconBg(log)} flex items-center justify-center border-2 border-gray-700`}>
                             {getTimelineIcon(log)}
                           </div>
@@ -570,7 +570,7 @@ const ActivityLogs = () => {
                         </div>
                         
                         {/* Card content */}
-                        <div className="ml-20 flex-1">
+                        <div className="ml-28 flex-1">
                           <div className="bg-white/5 border border-gray-700 rounded-lg p-3 hover:bg-white/10 transition-colors">
                             {/* User info and description in one row */}
                             <div className="flex items-center gap-3">
