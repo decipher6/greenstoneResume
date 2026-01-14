@@ -171,7 +171,7 @@ const Dashboard = () => {
             </button>
             <div className="flex-1"></div>
             <div className="glass-input flex items-center gap-2 w-80">
-              <Search size={32} className="text-gray-400" />
+              <Search size={18} className="text-gray-400" />
               <input
                 type="text"
                 placeholder="Search by title, department, or candidate count"
