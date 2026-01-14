@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Brain, Mail, FileText, Upload, RefreshCw, Calendar, Send, Trash2 } from 'lucide-react'
-import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate } from '../services/api'
+import { ArrowLeft, User, Brain, Mail, FileText, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Download } from 'lucide-react'
+import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
 import SendEmailModal from '../components/SendEmailModal'
@@ -12,12 +12,15 @@ const CandidateProfile = () => {
   const navigate = useNavigate()
   const { showConfirm, showAlert } = useModal()
   const [candidate, setCandidate] = useState(null)
+  const [job, setJob] = useState(null)
+  const [allCandidates, setAllCandidates] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [reAnalyzing, setReAnalyzing] = useState(false)
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [showInterviewModal, setShowInterviewModal] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
 
   useEffect(() => {
     fetchCandidate()
@@ -28,7 +31,18 @@ const CandidateProfile = () => {
     setError(null)
     try {
       const response = await getCandidate(candidateId)
-      setCandidate(response.data)
+      const candidateData = response.data
+      setCandidate(candidateData)
+      
+      // Fetch job data and all candidates for percentile calculation
+      if (candidateData.job_id) {
+        const [jobResponse, candidatesResponse] = await Promise.all([
+          getJob(candidateData.job_id),
+          getCandidates(candidateData.job_id)
+        ])
+        setJob(jobResponse.data)
+        setAllCandidates(candidatesResponse.data || [])
+      }
     } catch (error) {
       console.error('Error fetching candidate:', error)
       setError('Failed to load candidate data')
@@ -136,6 +150,105 @@ const CandidateProfile = () => {
     }
   }
 
+  // Parse AI justification into structured format
+  const parseAISummary = (justification) => {
+    if (!justification) {
+      return {
+        strengths: [],
+        weaknesses: [],
+        recommendation: ''
+      }
+    }
+
+    const strengths = []
+    const weaknesses = []
+    let recommendation = ''
+
+    // Try to extract strengths (look for patterns like "Strengths:", "Top Strengths:", etc.)
+    const strengthsMatch = justification.match(/(?:strengths?|top strengths?)[:\-]?\s*(.*?)(?:\n|weaknesses?|gaps?|risks?|recommendation|$)/is)
+    if (strengthsMatch) {
+      const strengthsText = strengthsMatch[1]
+      strengths.push(...strengthsText.split(/[•\-\n]/).filter(s => s.trim()).map(s => s.trim()))
+    }
+
+    // Try to extract weaknesses/gaps/risks
+    const weaknessesMatch = justification.match(/(?:weaknesses?|gaps?|risks?|top gaps?)[:\-]?\s*(.*?)(?:\n|recommendation|strengths?|$)/is)
+    if (weaknessesMatch) {
+      const weaknessesText = weaknessesMatch[1]
+      weaknesses.push(...weaknessesText.split(/[•\-\n]/).filter(s => s.trim()).map(s => s.trim()))
+    }
+
+    // Try to extract recommendation
+    const recommendationMatch = justification.match(/(?:recommendation|summary|conclusion)[:\-]?\s*(.*?)$/is)
+    if (recommendationMatch) {
+      recommendation = recommendationMatch[1].trim()
+    } else {
+      // If no structured format, use the whole text as recommendation
+      recommendation = justification
+    }
+
+    // If no structured data found, try to infer from the text
+    if (strengths.length === 0 && weaknesses.length === 0) {
+      const sentences = justification.split(/[.!?]\s+/)
+      sentences.forEach(sentence => {
+        const lower = sentence.toLowerCase()
+        if (lower.includes('strong') || lower.includes('excellent') || lower.includes('good') || lower.includes('certification') || lower.includes('experience')) {
+          strengths.push(sentence.trim())
+        } else if (lower.includes('lack') || lower.includes('missing') || lower.includes('limited') || lower.includes('gap') || lower.includes('risk')) {
+          weaknesses.push(sentence.trim())
+        }
+      })
+    }
+
+    return {
+      strengths: strengths.length > 0 ? strengths : ['No specific strengths identified'],
+      weaknesses: weaknesses.length > 0 ? weaknesses : ['No specific weaknesses identified'],
+      recommendation: recommendation || 'No recommendation available'
+    }
+  }
+
+  // Calculate percentile ranking
+  const calculatePercentile = () => {
+    if (!allCandidates || allCandidates.length === 0 || !candidate?.score_breakdown?.overall_score) {
+      return null
+    }
+
+    const currentScore = parseFloat(candidate.score_breakdown.overall_score)
+    const scores = allCandidates
+      .map(c => parseFloat(c.score_breakdown?.overall_score || 0))
+      .filter(s => !isNaN(s))
+      .sort((a, b) => b - a) // Sort descending
+
+    if (scores.length === 0) return null
+
+    const rank = scores.findIndex(s => s <= currentScore)
+    const percentile = rank === -1 ? 0 : ((scores.length - rank) / scores.length) * 100
+
+    return Math.round(percentile)
+  }
+
+  // Check job requirements match
+  const checkRequirementsMatch = () => {
+    if (!job?.evaluation_criteria || !candidate?.criterion_scores) {
+      return []
+    }
+
+    return job.evaluation_criteria.map(criterion => {
+      const criterionScore = candidate.criterion_scores?.find(
+        cs => cs.criterion_name.toLowerCase() === criterion.name.toLowerCase()
+      )
+      const score = criterionScore ? parseFloat(criterionScore.score || 0) : 0
+      const isMet = score >= 6.0 // Consider 6+ as meeting requirement
+
+      return {
+        name: criterion.name,
+        score,
+        isMet,
+        weight: criterion.weight
+      }
+    })
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -189,7 +302,14 @@ const CandidateProfile = () => {
     : null
 
   // Get job title from candidate data or use default
-  const jobTitle = candidate.job_title || 'Senior Software Engineer'
+  const jobTitle = candidate.job_title || job?.title || 'Senior Software Engineer'
+  const statusBadge = candidate.status === 'shortlisted' ? 'Shortlisted' : 
+                     candidate.status === 'rejected' ? 'Rejected' : 
+                     candidate.status === 'analyzed' ? 'Analyzed' : 'Uploaded'
+  
+  const aiSummary = parseAISummary(candidate.ai_justification)
+  const percentile = calculatePercentile()
+  const requirementsMatch = checkRequirementsMatch()
 
   return (
     <div className="space-y-6 pb-8">
@@ -201,271 +321,367 @@ const CandidateProfile = () => {
         Back
       </Link>
 
-      {/* Header */}
+      {/* Header with Candidate Name and Job Title */}
       <div className="glass-card p-6">
-        <div className="flex items-start justify-between gap-6">
+        <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <h2 className="text-3xl font-bold">{candidate.name || 'Unknown Candidate'}</h2>
-            <p className="text-lg text-gray-400 mt-1">{jobTitle}</p>
+            <div className="flex items-center gap-3 mb-2">
+              <h2 className="text-3xl font-bold">{candidate.name || 'Unknown Candidate'}</h2>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                candidate.status === 'shortlisted' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                candidate.status === 'rejected' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+              }`}>
+                {statusBadge}
+              </span>
+            </div>
+            <p className="text-lg text-gray-400">{jobTitle}</p>
           </div>
-          <div className="flex items-start gap-6">
-            <div className="text-right">
-              <p className="text-sm text-gray-400">Resume Score</p>
-              <p className="text-4xl font-bold text-primary-400">{resumeScore.toFixed(1)}/10</p>
-            </div>
-            <div className="border-l border-glass-200 pl-6 flex flex-col gap-3 min-w-[280px]">
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setShowInterviewModal(true)}
-                  className="glass-button flex items-center justify-center gap-2 text-sm"
-                >
-                  <Calendar size={16} />
-                  Invite to Interview
-                </button>
-                <button
-                  onClick={() => setShowEmailModal(true)}
-                  className="glass-button-secondary flex items-center justify-center gap-2 text-sm"
-                >
-                  <Send size={16} />
-                  Send Rejection
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="glass-button-secondary flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 col-span-2"
-                >
-                  <Trash2 size={16} />
-                  Delete Candidate
-                </button>
-              </div>
-              
-              {/* Analysis Buttons */}
-              <div className="pt-2 border-t border-glass-200 space-y-2">
-                <button
-                  onClick={handleReAnalyze}
-                  disabled={reAnalyzing}
-                  className="glass-button w-full flex items-center justify-center gap-2 text-sm"
-                  title="Re-analyze candidate with updated AI scoring"
-                >
-                  <RefreshCw size={16} className={reAnalyzing ? 'animate-spin' : ''} />
-                  {reAnalyzing ? 'Re-analyzing...' : 'Re-analyze'}
-                </button>
-                <label className="glass-button-secondary cursor-pointer w-full flex items-center justify-center gap-2 text-sm" title="Upload CCAT and Personality assessments">
-                  <Upload size={16} />
-                  {uploading ? 'Uploading...' : 'Upload Assessments'}
-                  <input
-                    type="file"
-                    accept=".csv,.pdf"
-                    onChange={handleAssessmentUpload}
-                    className="hidden"
-                    disabled={uploading}
-                  />
-                </label>
-                <p className="text-xs text-gray-400 text-center">
-                  CSV or PDF with CCAT percentile and personality scores
-                </p>
-              </div>
-            </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleReAnalyze}
+              disabled={reAnalyzing}
+              className="glass-button flex items-center gap-2 text-sm"
+              title="Re-analyze candidate with updated AI scoring"
+            >
+              <RefreshCw size={16} className={reAnalyzing ? 'animate-spin' : ''} />
+              {reAnalyzing ? 'Re-analyzing...' : 'Re-score'}
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Score Cards */}
-      <div className="grid grid-cols-3 gap-6">
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary-500/20 to-primary-600/20 border border-primary-500/30 flex items-center justify-center">
-              <User size={24} className="text-primary-400" />
+        {/* Job Requirements Match Checklist */}
+        {requirementsMatch.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-glass-200">
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-sm font-semibold">Job Requirements Match</h3>
+              <HelpCircle size={16} className="text-gray-400" />
             </div>
-            <div>
-              <p className="text-sm text-gray-400">Overall Score</p>
-              <p className="text-2xl font-bold">{overallScore.toFixed(1)}/10</p>
-            </div>
-          </div>
-          {/* <p className="text-sm text-gray-300 mt-2">
-            {candidate.ai_justification || 'Score based on comprehensive evaluation.'}
-          </p> */}
-        </div>
-
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 flex items-center justify-center">
-              <FileText size={24} className="text-green-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-400">Resume Score</p>
-              <p className="text-2xl font-bold">{resumeScore.toFixed(1)}/10</p>
-            </div>
-          </div>
-          {ccatScore && (
-            <div className="mt-4 pt-4 border-t border-glass-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Brain size={18} className="text-purple-400" />
-                  <p className="text-sm text-gray-400">CCAT Score</p>
+            <div className="flex flex-wrap gap-2">
+              {requirementsMatch.map((req, index) => (
+                <div
+                  key={index}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${
+                    req.isMet
+                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  }`}
+                >
+                  {req.isMet ? (
+                    <CheckCircle size={16} className="flex-shrink-0" />
+                  ) : (
+                    <XCircle size={16} className="flex-shrink-0" />
+                  )}
+                  <span>{req.name}</span>
                 </div>
-                <p className="text-lg font-semibold text-purple-400">{ccatScore.toFixed(1)}/10</p>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Cognitive ability assessment (separate from overall)</p>
-            </div>
-          )}
-        </div>
-
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 flex items-center justify-center">
-              <Mail size={24} className="text-blue-400" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-400">Contact</p>
-              <p className="text-xs text-gray-300">{candidate.contact_info?.email || '-'}</p>
-              <p className="text-xs text-gray-300">{candidate.contact_info?.phone || '-'}</p>
+              ))}
             </div>
           </div>
-          {candidate.resume_file_path && (
-            <a href="#" className="text-sm text-primary-400 hover:underline flex items-center gap-1">
-              <FileText size={14} />
-              Resume
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* AI Summary */}
-      <div className="glass-card p-6">
-        <h3 className="text-lg font-semibold mb-3">AI-Generated Summary</h3>
-        <p className="text-gray-300">
-          {candidate.ai_justification || 'Score calculated using semantic similarity analysis. Click "Re-analyze" to get detailed LLM-generated evaluation.'}
-        </p>
-        {!candidate.ai_justification && (
-          <button
-            onClick={handleReAnalyze}
-            className="mt-4 glass-button-secondary text-sm"
-          >
-            Generate AI Summary
-          </button>
         )}
       </div>
 
-      {/* Criterion Scores Section */}
-      {criterionData.length > 0 && (
-        <div className="grid grid-cols-2 gap-6">
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-2">Criterion Scores</h3>
-            <p className="text-sm text-gray-400 mb-4">Performance across evaluation criteria (1-10 scale)</p>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={criterionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#888" 
-                  angle={-45} 
-                  textAnchor="end" 
-                  height={80}
-                  tick={{ fill: '#888', fontSize: 12 }}
-                />
-                <YAxis 
-                  stroke="#888" 
-                  domain={[0, 10]}
-                  tick={{ fill: '#888', fontSize: 12 }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(10, 10, 15, 0.95)', 
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                  labelStyle={{ color: '#fff' }}
-                />
-                <Bar dataKey="score" fill="#8EC197" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4">Criterion Breakdown</h3>
-            <div className="space-y-4">
-              {candidate.criterion_scores?.map((criterion, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">{criterion.criterion_name}</span>
-                    <span className="text-sm font-semibold">{parseFloat(criterion.score || 0).toFixed(1)}/10</span>
-                  </div>
-                  <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
-                      style={{ width: `${((parseFloat(criterion.score || 0)) / 10) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+      {/* Tabs */}
+      <div className="glass-card">
+        <div className="border-b border-glass-200">
+          <div className="flex gap-6 px-6">
+            {['overview', 'resume', 'assessments', 'notes'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab
+                    ? 'border-primary-400 text-primary-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'notes' && ' & Activity'}
+              </button>
+            ))}
           </div>
         </div>
-      )}
 
-      {/* Personality Profile Section */}
-      {personalityData.length > 0 && (
-        <div className="grid grid-cols-2 gap-6">
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-2">Personality Profile</h3>
-            <p className="text-sm text-gray-400 mb-4">Big Five personality traits (1-10 scale)</p>
-            <ResponsiveContainer width="100%" height={300}>
-              <RadarChart data={personalityData}>
-                <PolarGrid stroke="rgba(255,255,255,0.2)" />
-                <PolarAngleAxis 
-                  dataKey="trait" 
-                  stroke="#888"
-                  tick={{ fill: '#888', fontSize: 12 }}
-                />
-                <PolarRadiusAxis 
-                  angle={90} 
-                  domain={[0, 10]} 
-                  stroke="#888"
-                  tick={{ fill: '#888', fontSize: 12 }}
-                />
-                <Radar
-                  name="Personality"
-                  dataKey="value"
-                  stroke="#9333ea"
-                  fill="#9333ea"
-                  fillOpacity={0.6}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(10, 10, 15, 0.95)', 
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                  labelStyle={{ color: '#fff' }}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4">Personality Traits</h3>
-            <div className="space-y-4">
-              {personalityData.map((trait, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">{trait.trait}</span>
-                    <span className="text-sm font-semibold">{trait.value.toFixed(1)}/10</span>
+        <div className="p-6">
+          {activeTab === 'overview' && (
+            <div className="grid grid-cols-3 gap-6">
+              {/* Left Column - AI Summary and Scores */}
+              <div className="col-span-2 space-y-6">
+                {/* AI Summary Section */}
+                <div className="glass-card p-6">
+                  <h3 className="text-lg font-semibold mb-4">AI Summary</h3>
+                  
+                  {/* Overall Score */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-400">Software Core</span>
+                      <span className="text-2xl font-bold text-primary-400">{overallScore.toFixed(1)}/10</span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-xs text-gray-400">Medium confidence</span>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Resume</span>
+                        <span className="font-medium">{resumeScore.toFixed(1)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Assessment</span>
+                        <span className="font-medium">{ccatScore ? ccatScore.toFixed(1) : 'Not uploaded yet'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Culture Fit</span>
+                        <span className="font-medium">{personalityScore ? personalityScore.toFixed(1) : 'Not uploaded yet'}</span>
+                      </div>
+                    </div>
+                    {(!ccatScore || !personalityScore) && (
+                      <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <p className="text-xs text-yellow-400">
+                          Upload assessments to complete scoring.
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
-                      style={{ width: `${(trait.value / 10) * 100}%` }}
-                    />
+
+                  {/* Percentile Ranking */}
+                  {percentile !== null && (
+                    <div className="mb-6 pt-6 border-t border-glass-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-400">Percentile Ranking</span>
+                        <span className="text-xl font-bold text-primary-400">{percentile}th</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        This candidate ranks in the {percentile}th percentile among all applicants for this position.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* AI-Generated Summary */}
+                  <div className="pt-6 border-t border-glass-200">
+                    <h4 className="text-md font-semibold mb-4">AI-Generated Summary</h4>
+                    
+                    {/* Top Strengths */}
+                    <div className="mb-4">
+                      <h5 className="text-sm font-medium text-gray-300 mb-2">Top Strengths</h5>
+                      <ul className="space-y-1">
+                        {aiSummary.strengths.map((strength, index) => (
+                          <li key={index} className="flex items-start gap-2 text-sm text-gray-300">
+                            <CheckCircle size={16} className="text-green-400 flex-shrink-0 mt-0.5" />
+                            <span>{strength}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Top Gaps / Risks */}
+                    <div className="mb-4">
+                      <h5 className="text-sm font-medium text-gray-300 mb-2">Top Gaps / Risks</h5>
+                      <ul className="space-y-1">
+                        {aiSummary.weaknesses.map((weakness, index) => (
+                          <li key={index} className="flex items-start gap-2 text-sm text-gray-300">
+                            <XCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+                            <span>{weakness}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Recommendation */}
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-300 mb-2">Recommendation</h5>
+                      <p className="text-sm text-gray-300 flex items-start gap-2">
+                        <CheckCircle size={16} className="text-green-400 flex-shrink-0 mt-0.5" />
+                        <span>{aiSummary.recommendation}</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Right Column - Contact Info, Action Buttons, Criterion Breakdown */}
+              <div className="space-y-6">
+                {/* Contact Information */}
+                <div className="glass-card p-6">
+                  <h3 className="text-lg font-semibold mb-4">Contact Information</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Mail size={16} className="text-gray-400" />
+                      <span className="text-gray-300">{candidate.contact_info?.email || '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <User size={16} className="text-gray-400" />
+                      <span className="text-gray-300">{candidate.contact_info?.phone || '-'}</span>
+                    </div>
+                  </div>
+                  {candidate.resume_file_path && (
+                    <div className="flex gap-2 mt-4">
+                      <button className="glass-button flex-1 flex items-center justify-center gap-2 text-sm">
+                        <FileText size={16} />
+                        View Resume
+                      </button>
+                      <button className="glass-button-secondary flex items-center justify-center gap-2 text-sm px-4">
+                        <Download size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="glass-card p-6">
+                  <h3 className="text-lg font-semibold mb-4">Actions</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setShowInterviewModal(true)}
+                      className="glass-button w-full flex items-center justify-center gap-2 text-sm bg-green-500/20 hover:bg-green-500/30 border-green-500/30"
+                    >
+                      <Calendar size={16} />
+                      Invite to Interview
+                    </button>
+                    <button
+                      onClick={() => setShowEmailModal(true)}
+                      className="glass-button-secondary w-full flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 border-red-500/30"
+                    >
+                      <Send size={16} />
+                      Reject
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      className="glass-button-secondary w-full flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 border-red-500/30"
+                    >
+                      <Trash2 size={16} />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                {/* Criterion Breakdown - Bottom Right */}
+                {candidate.criterion_scores && candidate.criterion_scores.length > 0 && (
+                  <div className="glass-card p-6">
+                    <h3 className="text-lg font-semibold mb-4">Criterion Breakdown</h3>
+                    <div className="space-y-4">
+                      {candidate.criterion_scores.map((criterion, index) => {
+                        const score = parseFloat(criterion.score || 0)
+                        const scoreText = score >= 7 ? 'Strong performance' : 
+                                         score >= 5 ? 'Moderate performance' : 
+                                         'Needs improvement'
+                        return (
+                          <div key={index}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium">{criterion.criterion_name}</span>
+                              <span className="text-sm font-semibold">{score.toFixed(1)}/10</span>
+                            </div>
+                            <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
+                                style={{ width: `${(score / 10) * 100}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{scoreText}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {activeTab === 'resume' && (
+            <div className="glass-card p-6">
+              <h3 className="text-lg font-semibold mb-4">Resume</h3>
+              {candidate.resume_text ? (
+                <div className="prose prose-invert max-w-none">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-glass-100 p-4 rounded-lg">
+                    {candidate.resume_text}
+                  </pre>
+                </div>
+              ) : (
+                <p className="text-gray-400">No resume text available.</p>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'assessments' && (
+            <div className="space-y-6">
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Assessments</h3>
+                  <label className="glass-button-secondary cursor-pointer flex items-center gap-2 text-sm" title="Upload CCAT and Personality assessments">
+                    <Upload size={16} />
+                    {uploading ? 'Uploading...' : 'Upload Assessments'}
+                    <input
+                      type="file"
+                      accept=".csv,.pdf"
+                      onChange={handleAssessmentUpload}
+                      className="hidden"
+                      disabled={uploading}
+                    />
+                  </label>
+                </div>
+                
+                {ccatScore && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-400">CCAT Score</span>
+                      <span className="text-lg font-semibold text-purple-400">{ccatScore.toFixed(1)}/10</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Cognitive ability assessment</p>
+                  </div>
+                )}
+
+                {personalityData.length > 0 && (
+                  <div>
+                    <h4 className="text-md font-semibold mb-4">Personality Profile</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <RadarChart data={personalityData}>
+                        <PolarGrid stroke="rgba(255,255,255,0.2)" />
+                        <PolarAngleAxis 
+                          dataKey="trait" 
+                          stroke="#888"
+                          tick={{ fill: '#888', fontSize: 12 }}
+                        />
+                        <PolarRadiusAxis 
+                          angle={90} 
+                          domain={[0, 10]} 
+                          stroke="#888"
+                          tick={{ fill: '#888', fontSize: 12 }}
+                        />
+                        <Radar
+                          name="Personality"
+                          dataKey="value"
+                          stroke="#9333ea"
+                          fill="#9333ea"
+                          fillOpacity={0.6}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'rgba(10, 10, 15, 0.95)', 
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: '8px',
+                            color: '#fff'
+                          }}
+                          labelStyle={{ color: '#fff' }}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {!ccatScore && personalityData.length === 0 && (
+                  <p className="text-gray-400 text-sm">No assessment data available. Upload assessments to see results.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div className="glass-card p-6">
+              <h3 className="text-lg font-semibold mb-4">Notes & Activity</h3>
+              <p className="text-gray-400 text-sm">Activity log and notes feature coming soon.</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Email Modals */}
       {showEmailModal && candidate && (
