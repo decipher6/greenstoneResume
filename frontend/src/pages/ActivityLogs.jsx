@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Clock, Filter, X, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { Clock, Filter, X, ChevronLeft, ChevronRight, ChevronDown, Search, User } from 'lucide-react'
 import { getActivityLogs, getActivityLogsCount, getActivityTypes, getActivityUsers } from '../services/api'
 
 const ActivityLogs = () => {
@@ -9,20 +9,21 @@ const ActivityLogs = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [activityTypes, setActivityTypes] = useState([])
   const [users, setUsers] = useState([])
+  const [filteredUsers, setFilteredUsers] = useState([])
   
   // Filter states
   const [showDateFilter, setShowDateFilter] = useState(false)
   const [showTypeFilter, setShowTypeFilter] = useState(false)
-  const [showUserFilter, setShowUserFilter] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [selectedType, setSelectedType] = useState('')
+  const [userSearch, setUserSearch] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
   
   // Refs for closing dropdowns on outside click
   const dateFilterRef = useRef(null)
   const typeFilterRef = useRef(null)
-  const userFilterRef = useRef(null)
+  const userSearchRef = useRef(null)
   
   const logsPerPage = 30
 
@@ -36,6 +37,19 @@ const ActivityLogs = () => {
     fetchCount()
   }, [currentPage, startDate, endDate, selectedType, selectedUserId])
 
+  // Filter users based on search
+  useEffect(() => {
+    if (userSearch.trim() === '') {
+      setFilteredUsers([])
+      setSelectedUserId('')
+    } else {
+      const filtered = users.filter(user => 
+        user.name.toLowerCase().includes(userSearch.toLowerCase())
+      )
+      setFilteredUsers(filtered)
+    }
+  }, [userSearch, users])
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -45,8 +59,11 @@ const ActivityLogs = () => {
       if (typeFilterRef.current && !typeFilterRef.current.contains(event.target)) {
         setShowTypeFilter(false)
       }
-      if (userFilterRef.current && !userFilterRef.current.contains(event.target)) {
-        setShowUserFilter(false)
+      if (userSearchRef.current && !userSearchRef.current.contains(event.target)) {
+        // Don't close if clicking on the dropdown results
+        if (!event.target.closest('.user-search-results')) {
+          // Keep search open but clear results if clicking outside
+        }
       }
     }
 
@@ -156,8 +173,17 @@ const ActivityLogs = () => {
       case 'assessment':
         return 'bg-orange-500'
       default:
-        return 'bg-gray-500'
+        return 'bg-gray-400'
     }
+  }
+
+  const getUserInitials = (name) => {
+    if (!name) return '?'
+    const parts = name.split(' ')
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase()
+    }
+    return name.substring(0, 2).toUpperCase()
   }
 
   const groupLogsByDate = (logs) => {
@@ -182,8 +208,21 @@ const ActivityLogs = () => {
     setStartDate('')
     setEndDate('')
     setSelectedType('')
+    setUserSearch('')
     setSelectedUserId('')
     setCurrentPage(1)
+  }
+
+  const handleUserSelect = (userId, userName) => {
+    setSelectedUserId(userId)
+    setUserSearch(userName)
+    setFilteredUsers([])
+  }
+
+  const clearUserFilter = () => {
+    setUserSearch('')
+    setSelectedUserId('')
+    setFilteredUsers([])
   }
 
   const hasActiveFilters = startDate || endDate || selectedType || selectedUserId
@@ -217,7 +256,6 @@ const ActivityLogs = () => {
               onClick={() => {
                 setShowDateFilter(!showDateFilter)
                 setShowTypeFilter(false)
-                setShowUserFilter(false)
               }}
               className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
                 (startDate || endDate) 
@@ -274,7 +312,6 @@ const ActivityLogs = () => {
               onClick={() => {
                 setShowTypeFilter(!showTypeFilter)
                 setShowDateFilter(false)
-                setShowUserFilter(false)
               }}
               className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
                 selectedType 
@@ -286,14 +323,14 @@ const ActivityLogs = () => {
               <ChevronDown size={14} className={`transition-transform ${showTypeFilter ? 'rotate-180' : ''}`} />
             </button>
             {showTypeFilter && (
-              <div className="absolute top-full left-0 mt-2 bg-glass-200 rounded-lg p-2 z-50 min-w-[200px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto">
+              <div className="absolute top-full left-0 mt-2 bg-gray-800 rounded-lg p-2 z-50 min-w-[200px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto">
                 <select
                   value={selectedType}
                   onChange={(e) => {
                     setSelectedType(e.target.value)
                     setShowTypeFilter(false)
                   }}
-                  className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 bg-gray-700 rounded border border-glass-300 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">All Types</option>
                   {activityTypes.map(type => (
@@ -304,38 +341,44 @@ const ActivityLogs = () => {
             )}
           </div>
 
-          {/* User Filter */}
-          <div className="relative" ref={userFilterRef}>
-            <button
-              onClick={() => {
-                setShowUserFilter(!showUserFilter)
-                setShowDateFilter(false)
-                setShowTypeFilter(false)
-              }}
-              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-                selectedUserId 
-                  ? 'bg-primary-500 hover:bg-primary-600 text-white' 
-                  : 'bg-glass-200 hover:bg-glass-300 text-gray-300'
-              }`}
-            >
-              Who Made the Changes
-              <ChevronDown size={14} className={`transition-transform ${showUserFilter ? 'rotate-180' : ''}`} />
-            </button>
-            {showUserFilter && (
-              <div className="absolute top-full left-0 mt-2 bg-glass-200 rounded-lg p-2 z-50 min-w-[220px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto">
-                <select
-                  value={selectedUserId}
-                  onChange={(e) => {
-                    setSelectedUserId(e.target.value)
-                    setShowUserFilter(false)
-                  }}
-                  className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          {/* User Search Filter */}
+          <div className="relative" ref={userSearchRef}>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="User"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className={`pl-10 pr-8 py-2 rounded-lg text-sm transition-colors ${
+                  selectedUserId 
+                    ? 'bg-primary-500 text-white placeholder-gray-300' 
+                    : 'bg-glass-200 text-gray-300 placeholder-gray-500'
+                } focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[150px]`}
+              />
+              {selectedUserId && (
+                <button
+                  onClick={clearUserFilter}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
                 >
-                  <option value="">All Users</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>{user.name}</option>
-                  ))}
-                </select>
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            {filteredUsers.length > 0 && (
+              <div className="absolute top-full left-0 mt-2 bg-gray-800 rounded-lg z-50 min-w-[200px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto user-search-results">
+                {filteredUsers.map(user => (
+                  <button
+                    key={user.id}
+                    onClick={() => handleUserSelect(user.id, user.name)}
+                    className="w-full px-4 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center text-xs">
+                      {getUserInitials(user.name)}
+                    </div>
+                    {user.name}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -416,7 +459,7 @@ const ActivityLogs = () => {
         </div>
       )}
 
-      {/* Logs Display with Timeline */}
+      {/* Logs Display with Timeline - Card Style */}
       {logs.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <Clock size={48} className="mx-auto mb-4 opacity-50" />
@@ -432,49 +475,67 @@ const ActivityLogs = () => {
           {Object.entries(groupedLogs).map(([dateKey, dateLogs], dateIndex) => (
             <div key={dateKey} className="relative">
               {/* Date Header */}
-              <h4 className="text-sm font-semibold text-gray-400 mb-4 pb-2 border-b border-glass-200">
+              <h4 className="text-base font-semibold text-gray-300 mb-6 pb-2 border-b border-gray-700">
                 {dateKey}
               </h4>
               
-              {/* Timeline */}
-              <div className="relative pl-8">
-                {/* Vertical line for the timeline */}
-                <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-glass-300"></div>
+              {/* Timeline with Cards */}
+              <div className="relative pl-20">
+                {/* Vertical timeline line */}
+                <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-600"></div>
                 
-                {/* Log entries */}
-                <div className="space-y-0">
+                {/* Log entries as cards */}
+                <div className="space-y-4">
                   {dateLogs.map((log, logIndex) => {
                     const isLast = logIndex === dateLogs.length - 1 && dateIndex === Object.keys(groupedLogs).length - 1
                     return (
-                      <div key={log.id} className="relative flex items-start gap-4 pb-6">
+                      <div key={log.id} className="relative flex items-start">
+                        {/* Timestamp on the left */}
+                        <div className="absolute left-0 w-16 text-right">
+                          <span className="text-xs text-gray-500 font-medium">
+                            {formatTime(log.created_at)}
+                          </span>
+                        </div>
+                        
                         {/* Timeline circle */}
-                        <div className="absolute left-0 flex items-center justify-center">
-                          <div className={`relative z-10 w-6 h-6 rounded-full ${getActivityColor(log.entity_type)} flex items-center justify-center`}>
+                        <div className="absolute left-8 transform -translate-x-1/2 flex items-center justify-center z-10">
+                          <div className={`w-5 h-5 rounded-full ${getActivityColor(log.entity_type)} flex items-center justify-center shadow-md`}>
                             <div className="w-2 h-2 bg-white rounded-full"></div>
                           </div>
-                          {/* Connecting line (except for last item) */}
+                          {/* Connecting line */}
                           {!isLast && (
-                            <div className="absolute left-3 top-6 w-0.5 h-full bg-glass-300"></div>
+                            <div className="absolute left-1/2 top-5 w-0.5 h-full bg-gray-600 transform -translate-x-1/2"></div>
                           )}
                         </div>
                         
-                        {/* Log content */}
-                        <div className="flex-1 min-w-0 ml-8">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-lg">{getActivityIcon(log.entity_type)}</span>
-                                <p className="text-white text-sm">{log.description}</p>
-                              </div>
-                              <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
-                                <span className="font-medium">{formatTime(log.created_at)}</span>
-                                {log.user_name && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{log.user_name}</span>
-                                  </>
-                                )}
-                              </div>
+                        {/* Card content */}
+                        <div className="ml-12 flex-1">
+                          <div className="bg-white/5 border border-gray-700 rounded-lg p-4 hover:bg-white/10 transition-colors">
+                            {/* User info */}
+                            <div className="flex items-center gap-2 mb-2">
+                              {log.user_name ? (
+                                <>
+                                  <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-xs font-medium text-white">
+                                    {getUserInitials(log.user_name)}
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-medium text-white">{log.user_name}</div>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                                    <User size={16} className="text-gray-400" />
+                                  </div>
+                                  <div className="text-sm text-gray-400">System</div>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Activity description */}
+                            <div className="flex items-start gap-2">
+                              <span className="text-lg mt-0.5">{getActivityIcon(log.entity_type)}</span>
+                              <p className="text-sm text-gray-200 leading-relaxed">{log.description}</p>
                             </div>
                           </div>
                         </div>
