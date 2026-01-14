@@ -143,11 +143,10 @@ const ActivityLogs = () => {
   const formatDateOnly = (dateString) => {
     if (!dateString) return 'N/A'
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    })
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = date.toLocaleDateString('en-US', { month: 'short' })
+    const year = date.getFullYear()
+    return `${day} ${month} ${year}`
   }
 
   const getTimelineIcon = (log) => {
@@ -240,11 +239,10 @@ const ActivityLogs = () => {
     logs.forEach(log => {
       if (!log.created_at) return
       const date = new Date(log.created_at)
-      const dateKey = date.toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      })
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = date.toLocaleDateString('en-US', { month: 'short' })
+      const year = date.getFullYear()
+      const dateKey = `${day} ${month} ${year}`
       if (!grouped[dateKey]) {
         grouped[dateKey] = []
       }

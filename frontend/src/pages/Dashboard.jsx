@@ -146,7 +146,10 @@ const Dashboard = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'Never'
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = date.toLocaleDateString('en-US', { month: 'short' })
+    const year = date.getFullYear()
+    return `${day} ${month} ${year}`
   }
 
   // Get unique departments for filter
