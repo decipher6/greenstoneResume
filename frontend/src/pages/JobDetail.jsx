@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X, FileText, XCircle, Edit, Save } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X, FileText, XCircle, Edit, Save, ArrowLeft } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
   runAnalysis, deleteCandidate, getTopCandidates, updateCandidate
@@ -35,6 +35,7 @@ const JobDetail = () => {
   const [isDragging, setIsDragging] = useState(false)
   const [pendingFiles, setPendingFiles] = useState([])
   const [isUploading, setIsUploading] = useState(false)
+  const [activeTab, setActiveTab] = useState('candidates') // 'description' or 'candidates'
   
   // Use ref to always get the latest nameSearch value
   const nameSearchRef = useRef(nameSearch)
@@ -363,369 +364,413 @@ const JobDetail = () => {
     navigate(`/candidates/${candidateId}`)
   }
 
+  // Calculate average resume score
+  const calculateAverageResumeScore = () => {
+    const scoredCandidates = candidates.filter(c => 
+      c.score_breakdown?.resume_score !== undefined && 
+      c.score_breakdown?.resume_score !== null
+    )
+    if (scoredCandidates.length === 0) return null
+    const sum = scoredCandidates.reduce((acc, c) => 
+      acc + parseFloat(c.score_breakdown.resume_score), 0
+    )
+    return (sum / scoredCandidates.length).toFixed(1)
+  }
+
+  const averageScore = calculateAverageResumeScore()
+
   if (!job) return <div className="text-center py-12">Loading...</div>
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with Job Name and Average Score */}
       <div className="glass-card p-6 mb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">{job.title}</h2>
-            <p className="text-sm text-gray-400">{job.department} • {job.candidate_count} candidates</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="glass-button cursor-pointer flex items-center gap-2">
-              <Upload size={18} />
-              Upload (.pdf, .docx, .doc)
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.docx,.doc"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
-            <button onClick={handleRunAnalysis} className="glass-button flex items-center gap-2">
-              <Sparkles size={18} />
-              Run AI Analysis
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 rounded-lg hover:bg-glass-200 transition-colors"
+              title="Go back"
+            >
+              <ArrowLeft size={20} className="text-gray-400" />
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Drag and Drop Zone */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`glass-card p-8 mb-6 transition-all duration-300 ${
-          isDragging
-            ? 'border-2 border-primary-400 border-solid bg-primary-500/10 scale-[1.02]'
-            : 'border-2 border-dashed border-glass-200 bg-glass-50'
-        }`}
-      >
-        <div className="flex flex-col items-center justify-center text-center">
-          <div className={`mb-4 transition-transform duration-300 ${isDragging ? 'scale-110' : ''}`}>
-            <Upload size={48} className={`mx-auto ${isDragging ? 'text-primary-400' : 'text-gray-400'}`} />
-          </div>
-          <h3 className={`text-lg font-semibold mb-2 ${isDragging ? 'text-primary-400' : 'text-white'}`}>
-            {isDragging ? 'Drop files to upload' : 'Drag & Drop Resumes Here'}
-          </h3>
-          <p className="text-sm text-gray-400 mb-4">
-            Drop PDF, DOCX, or DOC files here, or click to browse
-          </p>
-          <label className="glass-button cursor-pointer flex items-center gap-2 inline-flex">
-            <FileText size={18} />
-            Browse Files
-            <input
-              type="file"
-              multiple
-              accept=".pdf,.docx,.doc"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
-        </div>
-      </div>
-
-      {/* Pending Files Preview */}
-      {pendingFiles.length > 0 && (
-        <div className="glass-card p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <FileText size={20} className="text-primary-400" />
-              <h3 className="text-lg font-semibold">
-                {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''} ready to upload
-              </h3>
+            <div>
+              <h1 className="text-3xl font-bold">{job.title}</h1>
+              <p className="text-sm text-gray-400 mt-1">{job.department} • {job.candidate_count} candidates</p>
             </div>
-            <button
-              onClick={clearPendingFiles}
-              className="text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              Clear All
-            </button>
           </div>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {pendingFiles.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 bg-glass-100 rounded-lg border border-glass-200"
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <FileText size={18} className="text-primary-400 flex-shrink-0" />
-                  <span className="text-sm font-medium truncate" title={file.name}>
-                    {file.name}
-                  </span>
-                  <span className="text-xs text-gray-400 flex-shrink-0">
-                    ({(file.size / 1024).toFixed(1)} KB)
-                  </span>
-                </div>
-                <button
-                  onClick={() => removePendingFile(index)}
-                  className="p-1 rounded hover:bg-red-500/20 transition-colors flex-shrink-0"
-                  title="Remove file"
-                >
-                  <XCircle size={18} className="text-red-400" />
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-3 mt-4">
-            <button
-              onClick={handleUploadPendingFiles}
-              disabled={isUploading}
-              className="glass-button flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isUploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload size={18} />
-                  Upload All ({pendingFiles.length})
-                </>
-              )}
-            </button>
-            <button
-              onClick={clearPendingFiles}
-              className="glass-button-secondary"
-            >
-              Cancel
-            </button>
-          </div>
+          {averageScore !== null && (
+            <div className="flex flex-col items-end">
+              <span className="text-sm text-gray-400">Average Resume Score</span>
+              <span className="text-2xl font-bold text-primary-400">{averageScore}/10</span>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* Job Description */}
-      <div className="glass-card p-6 mb-6">
-        <h3 className="text-lg font-semibold mb-4">Job Description</h3>
-        <p className="text-gray-300 text-sm whitespace-pre-wrap">{job.description}</p>
       </div>
 
-      {/* Evaluation Criteria & Top Candidate Scores */}
-      <div className="grid grid-cols-2 gap-6 mb-6">
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-semibold mb-4">Evaluation Criteria</h3>
-          <div className="space-y-4">
-            {job.evaluation_criteria?.map((criterion, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-white">{criterion.name}</span>
-                  <span className="text-primary-400 font-semibold text-sm">{criterion.weight}%</span>
-                </div>
-                <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-primary-400 to-primary-500 transition-all duration-500"
-                    style={{ width: `${Math.min(criterion.weight, 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Tab Navigation */}
+      <div className="glass-card p-0 mb-6">
+        <div className="flex border-b border-glass-200">
+          <button
+            onClick={() => setActiveTab('description')}
+            className={`px-6 py-4 font-semibold transition-colors ${
+              activeTab === 'description'
+                ? 'text-primary-400 border-b-2 border-primary-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Job Description & Evaluation Criteria
+          </button>
+          <button
+            onClick={() => setActiveTab('candidates')}
+            className={`px-6 py-4 font-semibold transition-colors ${
+              activeTab === 'candidates'
+                ? 'text-primary-400 border-b-2 border-primary-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Candidates
+          </button>
         </div>
+      </div>
 
-        {/* Top Candidate Scores */}
-        {topCandidates.length > 0 ? (
+      {/* Tab Content */}
+      {activeTab === 'description' && (
+        <div className="space-y-6">
+          {/* Job Description */}
           <div className="glass-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Top Candidate Scores</h3>
-                <p className="text-sm text-gray-400">Ranked by resume score (1-10 scale)</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-400">Show top:</label>
-                <select
-                  value={topCandidatesLimit}
-                  onChange={(e) => {
-                    const newLimit = parseInt(e.target.value)
-                    setTopCandidatesLimit(newLimit)
-                    fetchData()
-                  }}
-                  className="glass-input text-sm w-20"
-                >
-                  <option value={3}>3</option>
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={15}>15</option>
-                  <option value={20}>20</option>
-                </select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {topCandidates.map((candidate) => (
-                <div key={candidate.id} className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <Link
-                        to={`/candidates/${candidate.id}`}
-                        className="text-sm font-medium hover:text-primary-400 transition-colors cursor-pointer"
-                      >
-                        {candidate.name}
-                      </Link>
-                      <span className="text-sm font-semibold">{parseFloat(candidate.score).toFixed(1)}/10</span>
-                    </div>
-                    <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
-                        style={{ width: `${Math.min((parseFloat(candidate.score) / 10) * 100, 100)}%` }}
-                      />
-                    </div>
+            <h3 className="text-lg font-semibold mb-4">Job Description</h3>
+            <p className="text-gray-300 text-sm whitespace-pre-wrap">{job.description}</p>
+          </div>
+
+          {/* Evaluation Criteria */}
+          <div className="glass-card p-6">
+            <h3 className="text-lg font-semibold mb-4">Evaluation Criteria</h3>
+            <div className="space-y-4">
+              {job.evaluation_criteria?.map((criterion, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">{criterion.name}</span>
+                    <span className="text-primary-400 font-semibold text-sm">{criterion.weight}%</span>
+                  </div>
+                  <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary-400 to-primary-500 transition-all duration-500"
+                      style={{ width: `${Math.min(criterion.weight, 100)}%` }}
+                    />
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        ) : (
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4">Top Candidate Scores</h3>
-            <p className="text-sm text-gray-400">No candidates analyzed yet</p>
-          </div>
-        )}
-      </div>
-
-      {/* Candidates Table */}
-      <div className="glass-card overflow-hidden">
-        <div className="p-6 border-b border-glass-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Candidates</h3>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="glass-button-secondary flex items-center gap-2"
-            >
-              <Filter size={18} />
-              {showFilters ? 'Hide' : 'Show'} Filters
-            </button>
-          </div>
-          
-          {/* Name Search */}
-          <div className="glass-input flex items-center gap-2">
-            <Search size={18} className="text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search candidates by name..."
-              className="bg-transparent border-0 outline-0 w-full"
-              value={nameSearch}
-              onChange={(e) => {
-                setNameSearch(e.target.value)
-              }}
-            />
-            {nameSearch && (
-              <button
-                onClick={() => {
-                  setNameSearch('')
-                }}
-                className="p-1 rounded hover:bg-glass-200 transition-colors"
-              >
-                <X size={16} className="text-gray-400" />
-              </button>
-            )}
-          </div>
         </div>
+      )}
 
-        {/* Bulk Actions */}
-        {selectedCandidates.length > 0 && (
-          <div className="p-4 border-b border-glass-200 bg-glass-100 flex items-center justify-between">
-            <span className="text-sm text-gray-400">{selectedCandidates.length} candidates selected</span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowInterviewModal(true)}
-                className="glass-button flex items-center gap-2"
-              >
-                <Calendar size={16} />
-                Invite to Interview ({selectedCandidates.length})
-              </button>
-              <button
-                onClick={() => setShowEmailModal(true)}
-                className="glass-button-secondary flex items-center gap-2"
-              >
-                <Send size={16} />
-                Send Rejection ({selectedCandidates.length})
-              </button>
-              <button
-                onClick={() => {
-                  selectedCandidates.forEach(id => handleDelete(id))
-                  setSelectedCandidates([])
-                }}
-                className="glass-button-secondary flex items-center gap-2 text-red-400 hover:bg-red-500/20"
-              >
-                <Trash2 size={16} />
-                Delete ({selectedCandidates.length})
-              </button>
+      {activeTab === 'candidates' && (
+        <div className="space-y-6">
+          {/* Drag and Drop Zone */}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`glass-card p-8 mb-6 transition-all duration-300 ${
+              isDragging
+                ? 'border-2 border-primary-400 border-solid bg-primary-500/10 scale-[1.02]'
+                : 'border-2 border-dashed border-glass-200 bg-glass-50'
+            }`}
+          >
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className={`mb-4 transition-transform duration-300 ${isDragging ? 'scale-110' : ''}`}>
+                <Upload size={48} className={`mx-auto ${isDragging ? 'text-primary-400' : 'text-gray-400'}`} />
+              </div>
+              <h3 className={`text-lg font-semibold mb-2 ${isDragging ? 'text-primary-400' : 'text-white'}`}>
+                {isDragging ? 'Drop files to upload' : 'Drag & Drop Resumes Here'}
+              </h3>
+              <p className="text-sm text-gray-400 mb-4">
+                Drop PDF, DOCX, or DOC files here, or click to browse
+              </p>
+              <label className="glass-button cursor-pointer flex items-center gap-2 inline-flex">
+                <FileText size={18} />
+                Browse Files
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.docx,.doc"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
-        )}
 
-        {/* Filters */}
-        {showFilters && (
-          <div className="p-6 border-b border-glass-200 bg-glass-100">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Min Resume Score</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  step="0.1"
-                  className="glass-input w-full"
-                  placeholder="0-10"
-                  value={filters.min_resume_score}
-                  onChange={(e) => setFilters({...filters, min_resume_score: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Min CCAT Score</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  step="0.1"
-                  className="glass-input w-full"
-                  placeholder="0-10"
-                  value={filters.min_ccat_score}
-                  onChange={(e) => setFilters({...filters, min_ccat_score: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Min Overall Score</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  step="0.1"
-                  className="glass-input w-full"
-                  placeholder="0-10"
-                  value={filters.min_overall_score}
-                  onChange={(e) => setFilters({...filters, min_overall_score: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Sort By</label>
-                <select
-                  className="glass-input w-full"
-                  value={filters.sort_by}
-                  onChange={(e) => setFilters({...filters, sort_by: e.target.value})}
+          {/* Pending Files Preview */}
+          {pendingFiles.length > 0 && (
+            <div className="glass-card p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FileText size={20} className="text-primary-400" />
+                  <h3 className="text-lg font-semibold">
+                    {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''} ready to upload
+                  </h3>
+                </div>
+                <button
+                  onClick={clearPendingFiles}
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
                 >
-                  <option value="overall_score">Overall Score</option>
-                  <option value="resume_score">Resume Score</option>
-                  <option value="ccat_score">CCAT Score</option>
-                  <option value="created_at">Date Added</option>
-                </select>
+                  Clear All
+                </button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {pendingFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-glass-100 rounded-lg border border-glass-200"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <FileText size={18} className="text-primary-400 flex-shrink-0" />
+                      <span className="text-sm font-medium truncate" title={file.name}>
+                        {file.name}
+                      </span>
+                      <span className="text-xs text-gray-400 flex-shrink-0">
+                        ({(file.size / 1024).toFixed(1)} KB)
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => removePendingFile(index)}
+                      className="p-1 rounded hover:bg-red-500/20 transition-colors flex-shrink-0"
+                      title="Remove file"
+                    >
+                      <XCircle size={18} className="text-red-400" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={handleUploadPendingFiles}
+                  disabled={isUploading}
+                  className="glass-button flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={18} />
+                      Upload All ({pendingFiles.length})
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={clearPendingFiles}
+                  className="glass-button-secondary"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={applyFilters} className="glass-button">
-                Apply Filters
-              </button>
-              <button onClick={clearFilters} className="glass-button-secondary">
-                Clear Filters
-              </button>
+          )}
+
+          {/* Top Candidate Scores */}
+          {topCandidates.length > 0 ? (
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Top Candidate Scores</h3>
+                  <p className="text-sm text-gray-400">Ranked by resume score (1-10 scale)</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-400">Show top:</label>
+                  <select
+                    value={topCandidatesLimit}
+                    onChange={(e) => {
+                      const newLimit = parseInt(e.target.value)
+                      setTopCandidatesLimit(newLimit)
+                      fetchData()
+                    }}
+                    className="glass-input text-sm w-20"
+                  >
+                    <option value={3}>3</option>
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={15}>15</option>
+                    <option value={20}>20</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {topCandidates.map((candidate) => (
+                  <div key={candidate.id} className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <Link
+                          to={`/candidates/${candidate.id}`}
+                          className="text-sm font-medium hover:text-primary-400 transition-colors cursor-pointer"
+                        >
+                          {candidate.name}
+                        </Link>
+                        <span className="text-sm font-semibold">{parseFloat(candidate.score).toFixed(1)}/10</span>
+                      </div>
+                      <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
+                          style={{ width: `${Math.min((parseFloat(candidate.score) / 10) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-        <table className="w-full">
+          ) : (
+            <div className="glass-card p-6">
+              <h3 className="text-lg font-semibold mb-4">Top Candidate Scores</h3>
+              <p className="text-sm text-gray-400">No candidates analyzed yet</p>
+            </div>
+          )}
+
+          {/* Candidates Table */}
+          <div className="glass-card overflow-hidden">
+            <div className="p-6 border-b border-glass-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Candidates</h3>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="glass-button-secondary flex items-center gap-2"
+                >
+                  <Filter size={18} />
+                  {showFilters ? 'Hide' : 'Show'} Filters
+                </button>
+              </div>
+              
+              {/* Name Search */}
+              <div className="glass-input flex items-center gap-2">
+                <Search size={18} className="text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search candidates by name..."
+                  className="bg-transparent border-0 outline-0 w-full"
+                  value={nameSearch}
+                  onChange={(e) => {
+                    setNameSearch(e.target.value)
+                  }}
+                />
+                {nameSearch && (
+                  <button
+                    onClick={() => {
+                      setNameSearch('')
+                    }}
+                    className="p-1 rounded hover:bg-glass-200 transition-colors"
+                  >
+                    <X size={16} className="text-gray-400" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Bulk Actions */}
+            {selectedCandidates.length > 0 && (
+              <div className="p-4 border-b border-glass-200 bg-glass-100 flex items-center justify-between">
+                <span className="text-sm text-gray-400">{selectedCandidates.length} candidates selected</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowInterviewModal(true)}
+                    className="glass-button flex items-center gap-2"
+                  >
+                    <Calendar size={16} />
+                    Invite to Interview ({selectedCandidates.length})
+                  </button>
+                  <button
+                    onClick={() => setShowEmailModal(true)}
+                    className="glass-button-secondary flex items-center gap-2"
+                  >
+                    <Send size={16} />
+                    Send Rejection ({selectedCandidates.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      selectedCandidates.forEach(id => handleDelete(id))
+                      setSelectedCandidates([])
+                    }}
+                    className="glass-button-secondary flex items-center gap-2 text-red-400 hover:bg-red-500/20"
+                  >
+                    <Trash2 size={16} />
+                    Delete ({selectedCandidates.length})
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Filters */}
+            {showFilters && (
+              <div className="p-6 border-b border-glass-200 bg-glass-100">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Min Resume Score</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      className="glass-input w-full"
+                      placeholder="0-10"
+                      value={filters.min_resume_score}
+                      onChange={(e) => setFilters({...filters, min_resume_score: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Min CCAT Score</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      className="glass-input w-full"
+                      placeholder="0-10"
+                      value={filters.min_ccat_score}
+                      onChange={(e) => setFilters({...filters, min_ccat_score: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Min Overall Score</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      className="glass-input w-full"
+                      placeholder="0-10"
+                      value={filters.min_overall_score}
+                      onChange={(e) => setFilters({...filters, min_overall_score: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Sort By</label>
+                    <select
+                      className="glass-input w-full"
+                      value={filters.sort_by}
+                      onChange={(e) => setFilters({...filters, sort_by: e.target.value})}
+                    >
+                      <option value="overall_score">Overall Score</option>
+                      <option value="resume_score">Resume Score</option>
+                      <option value="ccat_score">CCAT Score</option>
+                      <option value="created_at">Date Added</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={applyFilters} className="glass-button">
+                    Apply Filters
+                  </button>
+                  <button onClick={clearFilters} className="glass-button-secondary">
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            )}
+            <table className="w-full">
           <thead className="bg-glass-100 border-b border-glass-200">
             <tr>
               <th className="px-6 py-4 text-left">
@@ -885,7 +930,9 @@ const JobDetail = () => {
             ))}
           </tbody>
         </table>
-      </div>
+          </div>
+        </div>
+      )}
 
       {showEmailModal && (
         <SendEmailModal
