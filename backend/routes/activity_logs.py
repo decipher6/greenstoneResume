@@ -64,6 +64,16 @@ async def get_activity_logs(
     # Build query filter
     query = {}
     
+    # Exclude system jobs (activities without user_id) and apply user filter if provided
+    if user_id:
+        try:
+            query["user_id"] = ObjectId(user_id)
+        except:
+            query["user_id"] = user_id
+    else:
+        # Only show logs with user_id (exclude system jobs)
+        query["user_id"] = {"$ne": None}
+    
     # Date range filter
     if start_date or end_date:
         date_filter = {}
@@ -87,13 +97,6 @@ async def get_activity_logs(
     # Activity type filter
     if activity_type:
         query["entity_type"] = activity_type
-    
-    # User filter
-    if user_id:
-        try:
-            query["user_id"] = ObjectId(user_id)
-        except:
-            query["user_id"] = user_id
     
     logs = []
     async for log in db.activity_logs.find(query).sort("created_at", -1).skip(skip).limit(limit):
@@ -130,6 +133,16 @@ async def get_activity_logs_count(
     # Build query filter (same as get_activity_logs)
     query = {}
     
+    # Exclude system jobs (activities without user_id) and apply user filter if provided
+    if user_id:
+        try:
+            query["user_id"] = ObjectId(user_id)
+        except:
+            query["user_id"] = user_id
+    else:
+        # Only show logs with user_id (exclude system jobs)
+        query["user_id"] = {"$ne": None}
+    
     if start_date or end_date:
         date_filter = {}
         if start_date:
@@ -150,12 +163,6 @@ async def get_activity_logs_count(
     
     if activity_type:
         query["entity_type"] = activity_type
-    
-    if user_id:
-        try:
-            query["user_id"] = ObjectId(user_id)
-        except:
-            query["user_id"] = user_id
     
     count = await db.activity_logs.count_documents(query)
     return {"count": count}

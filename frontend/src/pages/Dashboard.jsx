@@ -187,7 +187,7 @@ const Dashboard = () => {
               <Search size={18} className="text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by title, department, or candidate count"
+                placeholder="Search by title, department, or #candidates"
                 className="bg-transparent border-0 outline-0 w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

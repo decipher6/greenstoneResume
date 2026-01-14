@@ -45,7 +45,11 @@ const ActivityLogs = () => {
   useEffect(() => {
     if (userSearch.trim() === '') {
       setFilteredUsers([])
-      setSelectedUserId('')
+      // Don't clear selectedUserId when search is cleared if a user is already selected
+      // Only clear if userSearch is empty AND no user is selected
+      if (!selectedUserId) {
+        // Already cleared
+      }
     } else {
       const filtered = users.filter(user => 
         user.name.toLowerCase().includes(userSearch.toLowerCase())
@@ -269,7 +273,8 @@ const ActivityLogs = () => {
     setFilteredUsers([])
   }
 
-  const clearUserFilter = () => {
+  const clearUserFilter = (e) => {
+    e.stopPropagation()
     setUserSearch('')
     setSelectedUserId('')
     setFilteredUsers([])
@@ -530,9 +535,9 @@ const ActivityLogs = () => {
               </h4>
               
               {/* Timeline with Cards */}
-              <div className="relative pl-16">
+              <div className="relative pl-20">
                 {/* Vertical timeline line */}
-                <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-700"></div>
+                <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-700"></div>
                 
                 {/* Log entries as cards */}
                 <div className="space-y-2">
@@ -541,14 +546,14 @@ const ActivityLogs = () => {
                     return (
                       <div key={log.id} className="relative flex items-start">
                         {/* Timestamp on the left */}
-                        <div className="absolute left-0 w-12 text-right pr-2">
-                          <span className="text-xs text-gray-500">
+                        <div className="absolute left-0 w-14 text-right pr-2">
+                          <span className="text-xs text-gray-500 whitespace-nowrap">
                             {formatTime(log.created_at)}
                           </span>
                         </div>
                         
                         {/* Timeline icon */}
-                        <div className="absolute left-6 transform -translate-x-1/2 flex items-center justify-center z-10">
+                        <div className="absolute left-8 transform -translate-x-1/2 flex items-center justify-center z-10">
                           <div className={`w-7 h-7 rounded-full ${getTimelineIconBg(log)} flex items-center justify-center border-2 border-gray-700`}>
                             {getTimelineIcon(log)}
                           </div>
@@ -559,7 +564,7 @@ const ActivityLogs = () => {
                         </div>
                         
                         {/* Card content */}
-                        <div className="ml-10 flex-1">
+                        <div className="ml-12 flex-1">
                           <div className="bg-white/5 border border-gray-700 rounded-lg p-3 hover:bg-white/10 transition-colors">
                             {/* User info and description in one row */}
                             <div className="flex items-center gap-3">
