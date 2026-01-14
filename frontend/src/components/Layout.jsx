@@ -37,7 +37,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
           className="w-[72px] h-[72px] object-contain"
         />
           <div className="text-center">
-            <p className="text-sm text-gray-400">Talent Management AI</p>
+            <p className="text-sm text-gray-400">ResumAI</p>
           </div>
         </div>
 
