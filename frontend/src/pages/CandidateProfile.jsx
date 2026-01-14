@@ -337,17 +337,7 @@ const CandidateProfile = () => {
             </div>
             <p className="text-lg text-gray-400">{jobTitle}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleReAnalyze}
-              disabled={reAnalyzing}
-              className="glass-button flex items-center gap-2 text-sm"
-              title="Re-analyze candidate with updated AI scoring"
-            >
-              <RefreshCw size={16} className={reAnalyzing ? 'animate-spin' : ''} />
-              {reAnalyzing ? 'Re-analyzing...' : 'Re-score'}
-            </button>
-          </div>
+          
         </div>
 
         {/* Job Requirements Match Checklist */}
