@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Clock, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Clock, Filter, X, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { getActivityLogs, getActivityLogsCount, getActivityTypes, getActivityUsers } from '../services/api'
 
 const ActivityLogs = () => {
@@ -19,6 +19,11 @@ const ActivityLogs = () => {
   const [selectedType, setSelectedType] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
   
+  // Refs for closing dropdowns on outside click
+  const dateFilterRef = useRef(null)
+  const typeFilterRef = useRef(null)
+  const userFilterRef = useRef(null)
+  
   const logsPerPage = 30
 
   useEffect(() => {
@@ -30,6 +35,26 @@ const ActivityLogs = () => {
     fetchLogs()
     fetchCount()
   }, [currentPage, startDate, endDate, selectedType, selectedUserId])
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dateFilterRef.current && !dateFilterRef.current.contains(event.target)) {
+        setShowDateFilter(false)
+      }
+      if (typeFilterRef.current && !typeFilterRef.current.contains(event.target)) {
+        setShowTypeFilter(false)
+      }
+      if (userFilterRef.current && !userFilterRef.current.contains(event.target)) {
+        setShowUserFilter(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   const fetchActivityTypes = async () => {
     try {
@@ -85,13 +110,10 @@ const ActivityLogs = () => {
     }
   }
 
-  const formatDate = (dateString) => {
+  const formatTime = (dateString) => {
     if (!dateString) return 'N/A'
     const date = new Date(dateString)
     return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
@@ -120,6 +142,21 @@ const ActivityLogs = () => {
         return '📊'
       default:
         return '📝'
+    }
+  }
+
+  const getActivityColor = (entityType) => {
+    switch (entityType?.toLowerCase()) {
+      case 'job':
+        return 'bg-blue-500'
+      case 'candidate':
+        return 'bg-green-500'
+      case 'email':
+        return 'bg-purple-500'
+      case 'assessment':
+        return 'bg-orange-500'
+      default:
+        return 'bg-gray-500'
     }
   }
 
@@ -166,61 +203,64 @@ const ActivityLogs = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold">Activity Logs</h3>
+        <h3 className="text-xl font-bold">Activity</h3>
       </div>
 
       {/* Filter Section */}
-      <div className="bg-glass-100 rounded-lg p-4 space-y-4">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="bg-glass-100 rounded-lg p-4 mb-6">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm text-gray-300 font-medium">Filter by:</span>
           
           {/* Date Range Filter */}
-          <div className="relative">
+          <div className="relative" ref={dateFilterRef}>
             <button
               onClick={() => {
                 setShowDateFilter(!showDateFilter)
                 setShowTypeFilter(false)
                 setShowUserFilter(false)
               }}
-              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
                 (startDate || endDate) 
-                  ? 'bg-primary-500 hover:bg-primary-600' 
-                  : 'bg-glass-200 hover:bg-glass-300'
+                  ? 'bg-primary-500 hover:bg-primary-600 text-white' 
+                  : 'bg-glass-200 hover:bg-glass-300 text-gray-300'
               }`}
             >
-              <Filter size={16} />
               Date Range
-              {(startDate || endDate) && (
-                <X 
-                  size={14} 
-                  className="ml-1" 
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setStartDate('')
-                    setEndDate('')
-                  }}
-                />
-              )}
+              <ChevronDown size={14} className={`transition-transform ${showDateFilter ? 'rotate-180' : ''}`} />
             </button>
             {showDateFilter && (
-              <div className="absolute top-full left-0 mt-2 bg-glass-200 rounded-lg p-4 z-10 min-w-[300px] shadow-lg">
+              <div className="absolute top-full left-0 mt-2 bg-glass-200 rounded-lg p-4 z-50 min-w-[320px] shadow-xl border border-glass-300">
                 <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-300">Date Range</span>
+                    {(startDate || endDate) && (
+                      <button
+                        onClick={() => {
+                          setStartDate('')
+                          setEndDate('')
+                        }}
+                        className="text-xs text-red-400 hover:text-red-300"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                   <div>
-                    <label className="block text-sm text-gray-300 mb-1">Start Date</label>
+                    <label className="block text-xs text-gray-400 mb-1">Start Date</label>
                     <input
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white"
+                      className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-300 mb-1">End Date</label>
+                    <label className="block text-xs text-gray-400 mb-1">End Date</label>
                     <input
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white"
+                      className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -229,38 +269,31 @@ const ActivityLogs = () => {
           </div>
 
           {/* Activity Type Filter */}
-          <div className="relative">
+          <div className="relative" ref={typeFilterRef}>
             <button
               onClick={() => {
                 setShowTypeFilter(!showTypeFilter)
                 setShowDateFilter(false)
                 setShowUserFilter(false)
               }}
-              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
                 selectedType 
-                  ? 'bg-primary-500 hover:bg-primary-600' 
-                  : 'bg-glass-200 hover:bg-glass-300'
+                  ? 'bg-primary-500 hover:bg-primary-600 text-white' 
+                  : 'bg-glass-200 hover:bg-glass-300 text-gray-300'
               }`}
             >
-              <Filter size={16} />
               Activity Type
-              {selectedType && (
-                <X 
-                  size={14} 
-                  className="ml-1" 
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedType('')
-                  }}
-                />
-              )}
+              <ChevronDown size={14} className={`transition-transform ${showTypeFilter ? 'rotate-180' : ''}`} />
             </button>
             {showTypeFilter && (
-              <div className="absolute top-full left-0 mt-2 bg-glass-200 rounded-lg p-3 z-10 min-w-[200px] shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute top-full left-0 mt-2 bg-glass-200 rounded-lg p-2 z-50 min-w-[200px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto">
                 <select
                   value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value)}
-                  className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white"
+                  onChange={(e) => {
+                    setSelectedType(e.target.value)
+                    setShowTypeFilter(false)
+                  }}
+                  className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">All Types</option>
                   {activityTypes.map(type => (
@@ -272,38 +305,31 @@ const ActivityLogs = () => {
           </div>
 
           {/* User Filter */}
-          <div className="relative">
+          <div className="relative" ref={userFilterRef}>
             <button
               onClick={() => {
                 setShowUserFilter(!showUserFilter)
                 setShowDateFilter(false)
                 setShowTypeFilter(false)
               }}
-              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
                 selectedUserId 
-                  ? 'bg-primary-500 hover:bg-primary-600' 
-                  : 'bg-glass-200 hover:bg-glass-300'
+                  ? 'bg-primary-500 hover:bg-primary-600 text-white' 
+                  : 'bg-glass-200 hover:bg-glass-300 text-gray-300'
               }`}
             >
-              <Filter size={16} />
-              Who Made Changes
-              {selectedUserId && (
-                <X 
-                  size={14} 
-                  className="ml-1" 
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedUserId('')
-                  }}
-                />
-              )}
+              Who Made the Changes
+              <ChevronDown size={14} className={`transition-transform ${showUserFilter ? 'rotate-180' : ''}`} />
             </button>
             {showUserFilter && (
-              <div className="absolute top-full left-0 mt-2 bg-glass-200 rounded-lg p-3 z-10 min-w-[200px] shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute top-full left-0 mt-2 bg-glass-200 rounded-lg p-2 z-50 min-w-[220px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto">
                 <select
                   value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white"
+                  onChange={(e) => {
+                    setSelectedUserId(e.target.value)
+                    setShowUserFilter(false)
+                  }}
+                  className="w-full px-3 py-2 bg-glass-100 rounded border border-glass-300 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">All Users</option>
                   {users.map(user => (
@@ -317,7 +343,7 @@ const ActivityLogs = () => {
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm"
+              className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm text-white transition-colors"
             >
               Clear Filters
             </button>
@@ -327,7 +353,7 @@ const ActivityLogs = () => {
 
       {/* Pagination Controls */}
       {totalCount > 0 && (
-        <div className="flex items-center justify-between text-sm text-gray-400">
+        <div className="flex items-center justify-between text-sm text-gray-400 mb-4">
           <div>
             Showing {((currentPage - 1) * logsPerPage) + 1} to {Math.min(currentPage * logsPerPage, totalCount)} of {totalCount} logs
           </div>
@@ -335,7 +361,7 @@ const ActivityLogs = () => {
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
             >
               <ChevronLeft size={16} />
               Newer
@@ -356,7 +382,7 @@ const ActivityLogs = () => {
                   <button
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1 rounded ${
+                    className={`px-3 py-1 rounded transition-colors ${
                       currentPage === pageNum
                         ? 'bg-primary-500 text-white'
                         : 'bg-glass-200 hover:bg-glass-300'
@@ -371,7 +397,7 @@ const ActivityLogs = () => {
                   <span className="px-2">...</span>
                   <button
                     onClick={() => setCurrentPage(totalPages)}
-                    className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300"
+                    className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 transition-colors"
                   >
                     {totalPages}
                   </button>
@@ -381,7 +407,7 @@ const ActivityLogs = () => {
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
             >
               Older
               <ChevronRight size={16} />
@@ -390,7 +416,7 @@ const ActivityLogs = () => {
         </div>
       )}
 
-      {/* Logs Display */}
+      {/* Logs Display with Timeline */}
       {logs.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <Clock size={48} className="mx-auto mb-4 opacity-50" />
@@ -402,37 +428,60 @@ const ActivityLogs = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedLogs).map(([dateKey, dateLogs]) => (
-            <div key={dateKey}>
-              <h4 className="text-sm font-semibold text-gray-400 mb-3 pb-2 border-b border-glass-200">
+        <div className="space-y-8">
+          {Object.entries(groupedLogs).map(([dateKey, dateLogs], dateIndex) => (
+            <div key={dateKey} className="relative">
+              {/* Date Header */}
+              <h4 className="text-sm font-semibold text-gray-400 mb-4 pb-2 border-b border-glass-200">
                 {dateKey}
               </h4>
-              <div className="space-y-1">
-                {dateLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-start gap-4 py-3 border-b border-glass-200 text-sm hover:bg-glass-100/50 rounded px-2"
-                  >
-                    <div className="text-lg mt-0.5">
-                      {getActivityIcon(log.entity_type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-white">{log.description}</p>
+              
+              {/* Timeline */}
+              <div className="relative pl-8">
+                {/* Vertical line for the timeline */}
+                <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-glass-300"></div>
+                
+                {/* Log entries */}
+                <div className="space-y-0">
+                  {dateLogs.map((log, logIndex) => {
+                    const isLast = logIndex === dateLogs.length - 1 && dateIndex === Object.keys(groupedLogs).length - 1
+                    return (
+                      <div key={log.id} className="relative flex items-start gap-4 pb-6">
+                        {/* Timeline circle */}
+                        <div className="absolute left-0 flex items-center justify-center">
+                          <div className={`relative z-10 w-6 h-6 rounded-full ${getActivityColor(log.entity_type)} flex items-center justify-center`}>
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                          </div>
+                          {/* Connecting line (except for last item) */}
+                          {!isLast && (
+                            <div className="absolute left-3 top-6 w-0.5 h-full bg-glass-300"></div>
+                          )}
+                        </div>
+                        
+                        {/* Log content */}
+                        <div className="flex-1 min-w-0 ml-8">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-lg">{getActivityIcon(log.entity_type)}</span>
+                                <p className="text-white text-sm">{log.description}</p>
+                              </div>
+                              <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                                <span className="font-medium">{formatTime(log.created_at)}</span>
+                                {log.user_name && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{log.user_name}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
-                        <span>{formatDate(log.created_at)}</span>
-                        {log.user_name && (
-                          <>
-                            <span>•</span>
-                            <span>{log.user_name}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    )
+                  })}
+                </div>
               </div>
             </div>
           ))}
