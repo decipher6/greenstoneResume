@@ -26,7 +26,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
   const { title, subtitle } = getPageInfo()
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex min-h-screen h-full overflow-hidden">
       {/* Sidebar */}
       <div className="w-64 glass-card m-4 rounded-2xl p-6 flex flex-col">
         {/* Logo */}
@@ -86,10 +86,10 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Header - Hidden for Dashboard, Job Detail, and Candidate Profile pages */}
         {location.pathname !== '/' && !location.pathname.startsWith('/jobs/') && !location.pathname.startsWith('/candidates/') && (
-          <header className="glass-card m-4 mb-0 rounded-2xl p-6">
+          <header className="glass-card m-4 mb-0 rounded-2xl p-6 flex-shrink-0">
             <div>
               <h2 className="text-2xl font-bold">{title}</h2>
               <p className="text-sm text-gray-400">{subtitle}</p>
@@ -98,7 +98,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
         )}
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 min-h-0">
           {children}
         </div>
       </div>
