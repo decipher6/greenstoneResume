@@ -520,7 +520,7 @@ const ActivityLogs = () => {
         </div>
       )}
 
-      {/* Logs Display with Timeline - Card Style */}
+      {/* Logs Display */}
       {logs.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <Clock size={48} className="mx-auto mb-4 opacity-50" />
@@ -540,67 +540,47 @@ const ActivityLogs = () => {
                 {dateKey}
               </h4>
               
-              {/* Timeline with Cards */}
-              <div className="relative pl-36">
-                {/* Vertical timeline line */}
-                <div className="absolute left-24 top-0 bottom-0 w-0.5 bg-gray-700"></div>
-                
-                {/* Log entries as cards */}
-                <div className="space-y-2">
-                  {dateLogs.map((log, logIndex) => {
-                    const isLast = logIndex === dateLogs.length - 1 && dateIndex === Object.keys(groupedLogs).length - 1
-                    return (
-                      <div key={log.id} className="relative flex items-start">
-                        {/* Timestamp on the left */}
-                        <div className="absolute left-0 w-24 text-right pr-2">
-                          <span className="text-xs text-gray-500 whitespace-nowrap">
-                            {formatTime(log.created_at)}
-                          </span>
-                        </div>
-                        
-                        {/* Timeline icon */}
-                        <div className="absolute left-24 transform -translate-x-1/2 flex items-center justify-center z-10">
-                          <div className={`w-7 h-7 rounded-full ${getTimelineIconBg(log)} flex items-center justify-center border-2 border-gray-700`}>
-                            {getTimelineIcon(log)}
-                          </div>
-                          {/* Connecting line */}
-                          {!isLast && (
-                            <div className="absolute left-1/2 top-7 w-0.5 h-full bg-gray-700 transform -translate-x-1/2"></div>
-                          )}
-                        </div>
-                        
-                        {/* Card content */}
-                        <div className="ml-28 flex-1">
-                          <div className="bg-white/5 border border-gray-700 rounded-lg p-3 hover:bg-white/10 transition-colors">
-                            {/* User info and description in one row */}
-                            <div className="flex items-center gap-3">
-                              {log.user_name ? (
-                                <div className="w-7 h-7 rounded-full bg-primary-500 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
-                                  {getUserInitials(log.user_name)}
-                                </div>
-                              ) : (
-                                <div className="w-7 h-7 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
-                                  <User size={14} className="text-gray-400" />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  {log.user_name && (
-                                    <span className="text-xs font-medium text-gray-300">{log.user_name}</span>
-                                  )}
-                                  {!log.user_name && (
-                                    <span className="text-xs text-gray-400">System</span>
-                                  )}
-                                </div>
-                                <p className="text-sm text-gray-200 leading-snug">{log.description}</p>
-                              </div>
+              {/* Log entries as cards */}
+              <div className="space-y-2">
+                {dateLogs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-4">
+                    {/* Timestamp on the left */}
+                    <div className="w-24 text-right pr-2 flex-shrink-0">
+                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                        {formatTime(log.created_at)}
+                      </span>
+                    </div>
+                    
+                    {/* Card content */}
+                    <div className="flex-1">
+                      <div className="bg-white/5 border border-gray-700 rounded-lg p-3 hover:bg-white/10 transition-colors">
+                        {/* User info and description in one row */}
+                        <div className="flex items-center gap-3">
+                          {log.user_name ? (
+                            <div className="w-7 h-7 rounded-full bg-primary-500 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
+                              {getUserInitials(log.user_name)}
                             </div>
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                              <User size={14} className="text-gray-400" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              {log.user_name && (
+                                <span className="text-xs font-medium text-gray-300">{log.user_name}</span>
+                              )}
+                              {!log.user_name && (
+                                <span className="text-xs text-gray-400">System</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-200 leading-snug">{log.description}</p>
                           </div>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
