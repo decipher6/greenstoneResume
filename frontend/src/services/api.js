@@ -2,7 +2,7 @@ import axios from 'axios'
 import { getToken } from './auth'
 
 // In development, use proxy (no CORS needed). In production, use Render backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'https://greenstone-resume-xzxm-6wag3is48-decipher6s-projects.vercel.app/api')
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'https://greenstone-resume-xzxm.vercel.app/api')
 
 const api = axios.create({
   baseURL: API_BASE_URL,
