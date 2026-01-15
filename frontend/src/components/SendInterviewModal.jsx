@@ -58,7 +58,7 @@ Greenstone Talent Team`,
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="glass-card w-full max-w-2xl m-4 p-6">
+      <div className="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-2xl m-4 p-6 shadow-xl">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Mail size={24} className="text-primary-400" />
@@ -69,7 +69,7 @@ Greenstone Talent Team`,
           </button>
         </div>
 
-        <div className="mb-6 p-4 glass-card bg-glass-100 border border-primary-500/30">
+        <div className="mb-6 p-4 bg-gray-700 border border-primary-500/30 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <Mail size={16} className="text-primary-400" />
             <span className="text-primary-400 text-sm font-semibold">Email Notification</span>
@@ -127,7 +127,7 @@ Greenstone Talent Team`,
                     // This is the most reliable method for opening email clients
                     window.location.href = link.mailto_url
                   }}
-                  className="w-full p-3 glass-card bg-glass-100 border border-glass-200 rounded-lg hover:bg-glass-200 transition-colors text-left flex items-center justify-between group cursor-pointer"
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 transition-colors text-left flex items-center justify-between group cursor-pointer"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white truncate">{link.candidate_name}</div>

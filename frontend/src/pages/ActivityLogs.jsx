@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { 
-  Clock, Filter, X, ChevronLeft, ChevronRight, ChevronDown, Search, User,
+  Clock, Filter, X, ChevronLeft, ChevronRight, ChevronDown, User,
   Briefcase, UserPlus, Mail, FileText, Trash2, Upload, Download, CheckCircle,
   PlayCircle, Settings, LogIn, LogOut, FileCheck
 } from 'lucide-react'
-import { getActivityLogs, getActivityLogsCount, getActivityTypes, getActivityUsers } from '../services/api'
+import { getActivityLogs, getActivityLogsCount, getActivityTypes } from '../services/api'
 
 const ActivityLogs = () => {
   const [logs, setLogs] = useState([])
@@ -12,8 +12,6 @@ const ActivityLogs = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [activityTypes, setActivityTypes] = useState([])
-  const [users, setUsers] = useState([])
-  const [filteredUsers, setFilteredUsers] = useState([])
   
   // Filter states
   const [showDateFilter, setShowDateFilter] = useState(false)
@@ -21,50 +19,21 @@ const ActivityLogs = () => {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [selectedType, setSelectedType] = useState('')
-  const [userSearch, setUserSearch] = useState('')
-  const [selectedUserId, setSelectedUserId] = useState('')
   
   // Refs for closing dropdowns on outside click
   const dateFilterRef = useRef(null)
   const typeFilterRef = useRef(null)
-  const userSearchRef = useRef(null)
   
   const logsPerPage = 30
 
   useEffect(() => {
     fetchActivityTypes()
-    fetchActivityUsers()
   }, [])
 
   useEffect(() => {
     fetchLogs()
     fetchCount()
-  }, [currentPage, startDate, endDate, selectedType, selectedUserId])
-
-  // Filter users based on search
-  useEffect(() => {
-    const searchTerm = userSearch.trim()
-    
-    if (searchTerm === '') {
-      setFilteredUsers([])
-      return
-    }
-    
-    // Only filter if we have users loaded
-    if (!users || users.length === 0) {
-      setFilteredUsers([])
-      return
-    }
-    
-    const searchLower = searchTerm.toLowerCase()
-    const filtered = users.filter(user => {
-      if (!user) return false
-      const userName = user.name || ''
-      return userName.toLowerCase().includes(searchLower)
-    })
-    
-    setFilteredUsers(filtered)
-  }, [userSearch, users])
+  }, [currentPage, startDate, endDate, selectedType])
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -74,12 +43,6 @@ const ActivityLogs = () => {
       }
       if (typeFilterRef.current && !typeFilterRef.current.contains(event.target)) {
         setShowTypeFilter(false)
-      }
-      if (userSearchRef.current && !userSearchRef.current.contains(event.target)) {
-        // Don't close if clicking on the dropdown results
-        if (!event.target.closest('.user-search-results')) {
-          // Keep search open but clear results if clicking outside
-        }
       }
     }
 
@@ -98,17 +61,6 @@ const ActivityLogs = () => {
     }
   }
 
-  const fetchActivityUsers = async () => {
-    try {
-      const response = await getActivityUsers()
-      const usersList = response.data?.users || []
-      setUsers(usersList)
-    } catch (error) {
-      console.error('Error fetching users:', error)
-      setUsers([])
-    }
-  }
-
   const fetchLogs = async () => {
     try {
       setLoading(true)
@@ -118,8 +70,7 @@ const ActivityLogs = () => {
         skip,
         ...(startDate && { start_date: startDate }),
         ...(endDate && { end_date: endDate }),
-        ...(selectedType && { activity_type: selectedType }),
-        ...(selectedUserId && { user_id: selectedUserId })
+        ...(selectedType && { activity_type: selectedType })
       }
       const response = await getActivityLogs(params)
       setLogs(response.data || [])
@@ -135,8 +86,7 @@ const ActivityLogs = () => {
       const params = {
         ...(startDate && { start_date: startDate }),
         ...(endDate && { end_date: endDate }),
-        ...(selectedType && { activity_type: selectedType }),
-        ...(selectedUserId && { user_id: selectedUserId })
+        ...(selectedType && { activity_type: selectedType })
       }
       const response = await getActivityLogsCount(params)
       setTotalCount(response.data?.count || 0)
@@ -270,26 +220,10 @@ const ActivityLogs = () => {
     setStartDate('')
     setEndDate('')
     setSelectedType('')
-    setUserSearch('')
-    setSelectedUserId('')
     setCurrentPage(1)
   }
 
-  const handleUserSelect = (userId, userName) => {
-    setSelectedUserId(userId)
-    setUserSearch(userName)
-    setFilteredUsers([])
-    setCurrentPage(1) // Reset to first page when filter changes
-  }
-
-  const clearUserFilter = (e) => {
-    e.stopPropagation()
-    setUserSearch('')
-    setSelectedUserId('')
-    setFilteredUsers([])
-  }
-
-  const hasActiveFilters = startDate || endDate || selectedType || selectedUserId
+  const hasActiveFilters = startDate || endDate || selectedType
 
   const totalPages = Math.ceil(totalCount / logsPerPage)
 
@@ -398,63 +332,6 @@ const ActivityLogs = () => {
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
-              </div>
-            )}
-          </div>
-
-          {/* User Search Filter */}
-          <div className="relative" ref={userSearchRef}>
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="User"
-                value={userSearch}
-                onChange={(e) => {
-                  const value = e.target.value
-                  setUserSearch(value)
-                  // Clear selection if user is typing something different
-                  if (selectedUserId) {
-                    const selectedUser = users.find(u => u.id === selectedUserId)
-                    if (!selectedUser || value !== selectedUser.name) {
-                      setSelectedUserId('')
-                    }
-                  }
-                }}
-                className={`pl-10 pr-8 py-2 rounded-lg text-sm transition-colors ${
-                  selectedUserId 
-                    ? 'bg-primary-500 text-white placeholder-gray-300' 
-                    : 'bg-glass-200 text-gray-300 placeholder-gray-500'
-                } focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[150px]`}
-              />
-              {selectedUserId && (
-                <button
-                  onClick={clearUserFilter}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-            {userSearch.trim() !== '' && filteredUsers.length > 0 && (
-              <div className="absolute top-full left-0 mt-2 bg-gray-800 rounded-lg z-50 min-w-[200px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto user-search-results">
-                {filteredUsers.map(user => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleUserSelect(user.id, user.name)}
-                    className="w-full px-4 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center gap-2"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center text-xs">
-                      {getUserInitials(user.name)}
-                    </div>
-                    {user.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            {userSearch.trim() !== '' && users.length > 0 && filteredUsers.length === 0 && (
-              <div className="absolute top-full left-0 mt-2 bg-gray-800 rounded-lg z-50 min-w-[200px] shadow-xl border border-glass-300 p-3 text-sm text-gray-400">
-                No users found
               </div>
             )}
           </div>
