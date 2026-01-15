@@ -94,7 +94,8 @@ Key principles:
 3. Weight criteria according to their importance
 4. Provide specific, actionable justifications
 5. Always respond with valid JSON format
-6. Be fair and unbiased in your assessment"""
+6. Be fair and unbiased in your assessment
+7. Scores should be out of 10"""
 
     # Build detailed criteria list for the prompt
     criteria_list = "\n".join([f"{i+1}. {c['name']} (Weight: {c['weight']}%)" 
