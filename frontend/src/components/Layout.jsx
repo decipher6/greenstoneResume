@@ -43,7 +43,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
             <img 
               src="/logo.svg" 
               alt="Greenstone Logo" 
-              className="w-[72px] h-[72px] object-contain"
+              className={`object-contain ${isExpanded ? 'w-[72px] h-[72px]' : 'w-[88px] h-[88px]'}`}
             />
             {isExpanded && (
               <div className="text-center">
@@ -98,17 +98,10 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-2">
+              <div className="flex flex-col items-center">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                   <User size={18} className="text-white" />
                 </div>
-                <button
-                  onClick={logout}
-                  className="p-2 rounded-lg hover:bg-red-500/20 transition-colors"
-                  title="Logout"
-                >
-                  <LogOut size={18} className="text-red-400" />
-                </button>
               </div>
             )}
           </div>
