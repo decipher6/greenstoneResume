@@ -83,20 +83,9 @@ async def health():
     """Health check endpoint"""
     return {"status": "ok", "routes": ["/api/auth", "/api/jobs", "/api/candidates", "/api/assessments", "/api/analytics", "/api/email"]}
 
-# Export handler for Vercel
-# Vercel's @vercel/python should handle FastAPI directly, but Mangum provides better compatibility
-import os
-if os.getenv("VERCEL"):
-    try:
-        from mangum import Mangum
-        # For serverless, disable lifespan events as they don't work reliably
-        handler = Mangum(app, lifespan="off")
-    except ImportError:
-        # Fallback to app directly if mangum not available
-        handler = app
-else:
-    # Local development
-    handler = app
+# Export app for Vercel
+# Vercel's @vercel/python automatically detects FastAPI apps exported as 'app'
+# Do NOT export as 'handler' unless it's a BaseHTTPRequestHandler subclass
 
 if __name__ == "__main__":
     import uvicorn
