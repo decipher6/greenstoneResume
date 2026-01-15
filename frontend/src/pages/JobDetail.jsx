@@ -232,12 +232,20 @@ const JobDetail = () => {
 
   const handleShortlist = async (candidateId) => {
     try {
-      await shortlistCandidate(candidateId)
+      const candidate = candidates.find(c => c.id === candidateId)
+      const isShortlisted = candidate?.status === 'shortlisted'
+      const newStatus = isShortlisted ? 'analyzed' : 'shortlisted'
+      
+      await updateCandidate(candidateId, { status: newStatus })
       fetchData()
-      await showAlert('Success', 'Candidate added to shortlist.', 'success')
+      await showAlert(
+        'Success', 
+        isShortlisted ? 'Candidate removed from shortlist.' : 'Candidate added to shortlist.', 
+        'success'
+      )
     } catch (error) {
-      console.error('Error shortlisting candidate:', error)
-      await showAlert('Error', 'Failed to shortlist candidate. Please try again.', 'error')
+      console.error('Error toggling shortlist:', error)
+      await showAlert('Error', 'Failed to update shortlist status. Please try again.', 'error')
     }
   }
 
@@ -896,9 +904,12 @@ const JobDetail = () => {
                             e.stopPropagation()
                             handleShortlist(candidate.id)
                           }}
-                          className="p-2 rounded-lg hover:bg-yellow-500/20 transition-colors"
-                          title="Add to shortlist"
-                          disabled={candidate.status === 'shortlisted'}
+                          className={`p-2 rounded-lg transition-colors ${
+                            candidate.status === 'shortlisted' 
+                              ? 'hover:bg-yellow-500/20' 
+                              : 'hover:bg-yellow-500/20'
+                          }`}
+                          title={candidate.status === 'shortlisted' ? 'Remove from shortlist' : 'Add to shortlist'}
                         >
                           <Star size={18} className={candidate.status === 'shortlisted' ? 'text-yellow-400' : 'text-gray-400'} fill={candidate.status === 'shortlisted' ? 'currentColor' : 'none'} />
                         </button>
