@@ -109,12 +109,12 @@ EVALUATION CRITERIA (MUST EVALUATE EACH ONE):
 {criteria_list}
 
 CANDIDATE RESUME:
-{resume_text[:4000]}
+{resume_text}
 
 CRITICAL INSTRUCTIONS:
 1. You MUST provide a score for EVERY criterion listed above
 2. Use the EXACT criterion names as shown above (case-sensitive)
-3. Scores should vary based on actual resume content - do NOT use the same score for all criteria
+3. Scores should vary based on actual resume content
 4. Score range: 0-10 where:
    - 0-3: Poor match, significant gaps
    - 4-6: Partial match, some relevant experience
@@ -161,7 +161,6 @@ CRITICAL REQUIREMENTS FOR JUSTIFICATION:
    - Provide a clear hiring recommendation (recommend, not recommend, or conditional)
    - Summarize the key reason for your recommendation
    - DO NOT repeat detailed information from strengths/gaps sections
-   - DO NOT include numbered sub-sections or lengthy explanations
 
 4. Ensure proper categorization:
    - If something is a weakness (e.g., "lacks experience in X"), it belongs in Top Gaps / Risks, NOT Top Strengths
@@ -171,9 +170,9 @@ CRITICAL REQUIREMENTS FOR JUSTIFICATION:
 CRITICAL REQUIREMENTS FOR SCORING:
 1. You MUST return exactly {len(evaluation_criteria)} criterion scores - one for each criterion listed above
 2. Each criterion_name MUST match EXACTLY (character-for-character, including spaces and capitalization) the names from the list
-3. Scores MUST be different for different criteria - analyze the resume and assign realistic, varied scores
+3. Scores MUST be different for different criteria - analyze the resume and assign realistic scores
 4. Score range: 0-10 with realistic variation (e.g., Technical Skills: 9.2, Leadership: 7.5, Communication: 8.0)
-5. Do NOT use identical scores for multiple criteria - each should reflect actual resume content
+5. Each score should reflect actual resume content
 6. Return ONLY valid JSON - no markdown code blocks, no explanations before or after the JSON
 7. Validate your JSON before returning it"""
     
