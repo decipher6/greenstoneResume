@@ -164,45 +164,76 @@ const CandidateProfile = () => {
     const weaknesses = []
     let recommendation = ''
 
-    // Try to extract strengths (look for patterns like "Strengths:", "Top Strengths:", etc.)
-    const strengthsMatch = justification.match(/(?:strengths?|top strengths?)[:\-]?\s*(.*?)(?:\n|weaknesses?|gaps?|risks?|recommendation|$)/is)
+    // Split by sections more precisely
+    const text = justification.trim()
+    
+    // Extract Top Strengths section
+    const strengthsMatch = text.match(/(?:top\s+)?strengths?[:\-]?\s*\n?(.*?)(?:\n\s*(?:top\s+)?(?:gaps?|risks?|weaknesses?)|recommendation|$)/is)
     if (strengthsMatch) {
-      const strengthsText = strengthsMatch[1]
-      strengths.push(...strengthsText.split(/[•\-\n]/).filter(s => s.trim()).map(s => s.trim()))
+      const strengthsText = strengthsMatch[1].trim()
+      // Split by bullet points (lines starting with -, •, or numbered)
+      const strengthItems = strengthsText
+        .split(/\n/)
+        .map(line => line.replace(/^[\s\-•\d+\.\)]+/, '').trim())
+        .filter(line => line.length > 0 && !line.toLowerCase().includes('lack') && !line.toLowerCase().includes('missing') && !line.toLowerCase().includes('no experience'))
+      
+      strengths.push(...strengthItems)
     }
 
-    // Try to extract weaknesses/gaps/risks
-    const weaknessesMatch = justification.match(/(?:weaknesses?|gaps?|risks?|top gaps?)[:\-]?\s*(.*?)(?:\n|recommendation|strengths?|$)/is)
+    // Extract Top Gaps / Risks section
+    const weaknessesMatch = text.match(/(?:top\s+)?(?:gaps?|risks?|weaknesses?)[:\-]?\s*\n?(.*?)(?:\n\s*recommendation|$)/is)
     if (weaknessesMatch) {
-      const weaknessesText = weaknessesMatch[1]
-      weaknesses.push(...weaknessesText.split(/[•\-\n]/).filter(s => s.trim()).map(s => s.trim()))
+      const weaknessesText = weaknessesMatch[1].trim()
+      // Split by bullet points
+      const weaknessItems = weaknessesText
+        .split(/\n/)
+        .map(line => line.replace(/^[\s\-•\d+\.\)]+/, '').trim())
+        .filter(line => line.length > 0)
+      
+      weaknesses.push(...weaknessItems)
     }
 
-    // Try to extract recommendation
-    const recommendationMatch = justification.match(/(?:recommendation|summary|conclusion)[:\-]?\s*(.*?)$/is)
+    // Extract Recommendation section
+    const recommendationMatch = text.match(/(?:recommendation|summary|conclusion)[:\-]?\s*\n?(.*?)$/is)
     if (recommendationMatch) {
-      recommendation = recommendationMatch[1].trim()
-    } else {
-      // If no structured format, use the whole text as recommendation
-      recommendation = justification
+      recommendation = recommendationMatch[1]
+        .trim()
+        .split(/\n/)
+        .map(line => line.replace(/^[\s\-•\d+\.\)]+/, '').trim())
+        .filter(line => line.length > 0)
+        .join(' ')
+        .substring(0, 500) // Limit to reasonable length
     }
 
-    // If no structured data found, try to infer from the text
-    if (strengths.length === 0 && weaknesses.length === 0) {
-      const sentences = justification.split(/[.!?]\s+/)
-      sentences.forEach(sentence => {
-        const lower = sentence.toLowerCase()
-        if (lower.includes('strong') || lower.includes('excellent') || lower.includes('good') || lower.includes('certification') || lower.includes('experience')) {
-          strengths.push(sentence.trim())
-        } else if (lower.includes('lack') || lower.includes('missing') || lower.includes('limited') || lower.includes('gap') || lower.includes('risk')) {
-          weaknesses.push(sentence.trim())
-        }
-      })
-    }
+    // Filter out items that are clearly in the wrong section
+    const filteredStrengths = strengths.filter(item => {
+      const lower = item.toLowerCase()
+      // Remove items that are clearly weaknesses
+      return !lower.includes('lack') && 
+             !lower.includes('missing') && 
+             !lower.includes('no experience') && 
+             !lower.includes('gap') &&
+             !lower.includes('risk') &&
+             !lower.includes('not qualified') &&
+             item.length > 10 // Minimum length
+    })
+
+    const filteredWeaknesses = weaknesses.filter(item => {
+      const lower = item.toLowerCase()
+      // Keep items that are clearly weaknesses or concerns
+      return (lower.includes('lack') || 
+              lower.includes('missing') || 
+              lower.includes('no experience') || 
+              lower.includes('gap') ||
+              lower.includes('risk') ||
+              lower.includes('not') ||
+              lower.includes('limited')) &&
+             item.length > 10 // Minimum length
+    })
 
     return {
-      strengths: strengths.length > 0 ? strengths : ['No specific strengths identified'],
-      weaknesses: weaknesses.length > 0 ? weaknesses : ['No specific weaknesses identified'],
+      strengths: filteredStrengths.length > 0 ? filteredStrengths : ['No specific strengths identified'],
+      weaknesses: filteredWeaknesses.length > 0 ? filteredWeaknesses : ['No specific weaknesses identified'],
       recommendation: recommendation || 'No recommendation available'
     }
   }

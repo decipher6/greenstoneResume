@@ -127,7 +127,7 @@ CRITICAL INSTRUCTIONS:
    - Quantifiable achievements
    - Years of experience in relevant areas
 6. Calculate overall score as a weighted average of criterion scores
-7. Provide detailed justification
+7. Provide a structured justification in the following format:
 
 REQUIRED JSON FORMAT - You MUST include ALL criteria with EXACT names:
 {{
@@ -136,13 +136,39 @@ REQUIRED JSON FORMAT - You MUST include ALL criteria with EXACT names:
         {{"criterion_name": "CRITERION_NAME_1", "score": 9.0}},
         {{"criterion_name": "CRITERION_NAME_2", "score": 8.5}}
     ],
-    "justification": "Detailed explanation..."
+    "justification": "Top Strengths:\\n- [List 2-4 actual strengths: relevant experience, matching skills, qualifications that align with the job]\\n- [Only include positive attributes that make the candidate suitable]\\n\\nTop Gaps / Risks:\\n- [List 2-4 actual weaknesses: missing skills, lack of required experience, gaps in qualifications]\\n- [Only include negative aspects that are concerns for the role]\\n\\nRecommendation:\\n[Provide a concise 2-3 sentence summary with your hiring recommendation. Be brief and direct.]"
 }}
 
 IMPORTANT: Replace "CRITERION_NAME_1", "CRITERION_NAME_2" etc. with the EXACT criterion names from the list above.
 Each criterion MUST have a different score based on the actual resume content.
 
-CRITICAL REQUIREMENTS:
+CRITICAL REQUIREMENTS FOR JUSTIFICATION:
+1. Top Strengths section MUST ONLY contain actual strengths:
+   - Relevant experience that matches the job requirements
+   - Skills, qualifications, or achievements that are POSITIVE for the role
+   - DO NOT include weaknesses, gaps, or missing qualifications in this section
+   - Each strength should be a single, clear bullet point (2-4 total)
+
+2. Top Gaps / Risks section MUST ONLY contain actual weaknesses:
+   - Missing skills or experience required for the role
+   - Gaps in qualifications or background
+   - Concerns or risks for the position
+   - DO NOT include strengths or positive attributes in this section
+   - Each gap/risk should be a single, clear bullet point (2-4 total)
+
+3. Recommendation section MUST be concise:
+   - Maximum 2-3 sentences
+   - Provide a clear hiring recommendation (recommend, not recommend, or conditional)
+   - Summarize the key reason for your recommendation
+   - DO NOT repeat detailed information from strengths/gaps sections
+   - DO NOT include numbered sub-sections or lengthy explanations
+
+4. Ensure proper categorization:
+   - If something is a weakness (e.g., "lacks experience in X"), it belongs in Top Gaps / Risks, NOT Top Strengths
+   - If something is a strength (e.g., "has relevant experience in Y"), it belongs in Top Strengths, NOT Top Gaps / Risks
+   - Be precise and accurate in your categorization
+
+CRITICAL REQUIREMENTS FOR SCORING:
 1. You MUST return exactly {len(evaluation_criteria)} criterion scores - one for each criterion listed above
 2. Each criterion_name MUST match EXACTLY (character-for-character, including spaces and capitalization) the names from the list
 3. Scores MUST be different for different criteria - analyze the resume and assign realistic, varied scores
