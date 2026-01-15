@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Filter, Search, X, FileText, XCircle, Edit, Save, ArrowLeft } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Filter, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
-  runAnalysis, deleteCandidate, getTopCandidates, updateCandidate
+  runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate
 } from '../services/api'
 import api from '../services/api'
 import { useModal } from '../context/ModalContext'
@@ -31,7 +31,8 @@ const JobDetail = () => {
   const [isDragging, setIsDragging] = useState(false)
   const [pendingFiles, setPendingFiles] = useState([])
   const [isUploading, setIsUploading] = useState(false)
-  const [activeTab, setActiveTab] = useState('candidates') // 'description' or 'candidates'
+  const [activeTab, setActiveTab] = useState('candidates') // 'description', 'candidates', or 'shortlist'
+  const [shortlistedCandidates, setShortlistedCandidates] = useState([])
   
   // Use ref to always get the latest nameSearch value
   const nameSearchRef = useRef(nameSearch)
@@ -53,14 +54,18 @@ const JobDetail = () => {
       const queryString = params.toString()
       const candidatesUrl = `/candidates/job/${jobId}${queryString ? '?' + queryString : ''}`
       
-      const [jobRes, candidatesRes, topRes] = await Promise.all([
+      const [jobRes, candidatesRes, topRes, shortlistedRes] = await Promise.all([
         getJob(jobId),
         api.get(candidatesUrl),
-        getTopCandidates(jobId, topCandidatesLimit)
+        getTopCandidates(jobId, topCandidatesLimit),
+        api.get(`/candidates/job/${jobId}?sort_by=overall_score`)
       ])
       setJob(jobRes.data)
       setCandidates(candidatesRes.data)
       setTopCandidates(topRes.data)
+      // Filter shortlisted candidates
+      const shortlisted = shortlistedRes.data.filter(c => c.status === 'shortlisted')
+      setShortlistedCandidates(shortlisted)
     } catch (error) {
       console.error('Error fetching data:', error)
     }
@@ -222,6 +227,17 @@ const JobDetail = () => {
     } catch (error) {
       console.error('Error running analysis:', error)
       await showAlert('Error', 'Error running analysis. Please try again.', 'error')
+    }
+  }
+
+  const handleShortlist = async (candidateId) => {
+    try {
+      await shortlistCandidate(candidateId)
+      fetchData()
+      await showAlert('Success', 'Candidate added to shortlist.', 'success')
+    } catch (error) {
+      console.error('Error shortlisting candidate:', error)
+      await showAlert('Error', 'Failed to shortlist candidate. Please try again.', 'error')
     }
   }
 
@@ -452,6 +468,16 @@ const JobDetail = () => {
             }`}
           >
             Candidates
+          </button>
+          <button
+            onClick={() => setActiveTab('shortlist')}
+            className={`px-6 py-4 font-semibold transition-colors ${
+              activeTab === 'shortlist'
+                ? 'text-primary-400 border-b-2 border-primary-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Shortlist ({shortlistedCandidates.length})
           </button>
         </div>
       </div>
@@ -868,6 +894,17 @@ const JobDetail = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
+                            handleShortlist(candidate.id)
+                          }}
+                          className="p-2 rounded-lg hover:bg-yellow-500/20 transition-colors"
+                          title="Add to shortlist"
+                          disabled={candidate.status === 'shortlisted'}
+                        >
+                          <Star size={18} className={candidate.status === 'shortlisted' ? 'text-yellow-400' : 'text-gray-400'} fill={candidate.status === 'shortlisted' ? 'currentColor' : 'none'} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
                             handleDelete(candidate.id)
                           }}
                           className="p-2 rounded-lg hover:bg-red-500/20 transition-colors"
@@ -883,6 +920,92 @@ const JobDetail = () => {
             ))}
           </tbody>
         </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'shortlist' && (
+        <div className="space-y-6">
+          {/* Shortlisted Candidates Table */}
+          <div className="glass-card overflow-hidden">
+            <div className="p-6 border-b border-glass-200">
+              <h3 className="text-lg font-semibold">Shortlisted Candidates ({shortlistedCandidates.length})</h3>
+            </div>
+            <table className="w-full">
+              <thead className="bg-glass-100 border-b border-glass-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">Name</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">Phone</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">Score</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shortlistedCandidates.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
+                      No shortlisted candidates yet.
+                    </td>
+                  </tr>
+                ) : (
+                  shortlistedCandidates.map((candidate) => (
+                    <tr 
+                      key={candidate.id} 
+                      className="border-b border-glass-200 hover:bg-glass-100 cursor-pointer transition-colors"
+                      onClick={(e) => {
+                        if (!e.target.closest('button')) {
+                          navigate(`/candidates/${candidate.id}`)
+                        }
+                      }}
+                    >
+                      <td className="px-6 py-4">
+                        <span className="font-medium">{candidate.name}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-gray-400">
+                          {candidate.contact_info?.email || '-'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-gray-400">
+                          {candidate.contact_info?.phone || '-'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                          Shortlisted
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {candidate.score_breakdown?.resume_score ? (
+                          <span className="font-semibold">
+                            {parseFloat(candidate.score_breakdown.resume_score).toFixed(1)}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/candidates/${candidate.id}`)
+                            }}
+                            className="p-2 rounded-lg hover:bg-glass-200 transition-colors"
+                            title="View candidate"
+                          >
+                            <Eye size={18} className="text-gray-400" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle } from 'lucide-react'
-import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates } from '../services/api'
+import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star } from 'lucide-react'
+import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, shortlistCandidate } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
 import SendEmailModal from '../components/SendEmailModal'
@@ -126,6 +126,17 @@ const CandidateProfile = () => {
       console.error('Error re-analyzing candidate:', error)
       await showAlert('Error', 'Error starting re-analysis. Please try again.', 'error')
       setReAnalyzing(false)
+    }
+  }
+
+  const handleShortlist = async () => {
+    try {
+      await shortlistCandidate(candidateId)
+      await showAlert('Success', 'Candidate added to shortlist.', 'success')
+      fetchCandidate() // Refresh to update status
+    } catch (error) {
+      console.error('Error shortlisting candidate:', error)
+      await showAlert('Error', 'Failed to shortlist candidate. Please try again.', 'error')
     }
   }
 
@@ -545,6 +556,18 @@ const CandidateProfile = () => {
                     >
                       <Calendar size={16} />
                       Invite to Interview
+                    </button>
+                    <button
+                      onClick={handleShortlist}
+                      disabled={candidate?.status === 'shortlisted'}
+                      className={`glass-button-secondary w-full flex items-center justify-center gap-2 text-sm ${
+                        candidate?.status === 'shortlisted'
+                          ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 cursor-not-allowed'
+                          : 'text-yellow-400 hover:bg-yellow-500/20 border-yellow-500/30'
+                      }`}
+                    >
+                      <Star size={16} fill={candidate?.status === 'shortlisted' ? 'currentColor' : 'none'} />
+                      {candidate?.status === 'shortlisted' ? 'Shortlisted' : 'Add to Shortlist'}
                     </button>
                     <button
                       onClick={() => setShowEmailModal(true)}

@@ -192,7 +192,7 @@ async def get_candidate(candidate_id: str):
 
 @router.patch("/{candidate_id}")
 async def update_candidate(candidate_id: str, update_data: dict = Body(...), user_id: Optional[str] = Depends(get_current_user_id)):
-    """Update candidate information (name, email, phone)"""
+    """Update candidate information (name, email, phone, status)"""
     db = get_db()
     
     try:
@@ -217,6 +217,13 @@ async def update_candidate(candidate_id: str, update_data: dict = Body(...), use
             contact_info["phone"] = update_data["contact_info"]["phone"]
         update_fields["contact_info"] = contact_info
     
+    if "status" in update_data:
+        # Validate status value
+        valid_statuses = [s.value for s in CandidateStatus]
+        if update_data["status"] not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+        update_fields["status"] = update_data["status"]
+    
     if not update_fields:
         raise HTTPException(status_code=400, detail="No valid fields to update")
     
@@ -227,8 +234,15 @@ async def update_candidate(candidate_id: str, update_data: dict = Body(...), use
     )
     
     # Log activity
+    action_type = "candidate_updated"
+    if "status" in update_fields:
+        if update_fields["status"] == "shortlisted":
+            action_type = "candidate_shortlisted"
+        elif update_fields["status"] == "rejected":
+            action_type = "candidate_rejected"
+    
     await log_activity(
-        action="candidate_updated",
+        action=action_type,
         entity_type="candidate",
         description=f"Updated candidate: {update_fields.get('name', candidate.get('name', 'Unknown'))}",
         entity_id=candidate_id,
