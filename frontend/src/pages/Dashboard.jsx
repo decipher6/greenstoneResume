@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Briefcase, Users, ArrowUpRight, Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown } from 'lucide-react'
+import { Briefcase, Users, ArrowUpRight, Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown, CheckCircle, TrendingUp } from 'lucide-react'
 import { getDashboardStats, getJobs, deleteJob, updateJobStatus } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
 import { useModal } from '../context/ModalContext'
@@ -157,6 +157,19 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* New Status Cards Row */}
+      <div className="grid grid-cols-2 gap-4">
+        <StatCard
+          icon={CheckCircle}
+          label="Candidates Reviewed Today"
+          value={stats?.candidates_reviewed_today || 0}
+          color="blue"
+        />
+        <TrendingJobsCard
+          jobs={stats?.trending_jobs || []}
+        />
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-4">
         <StatCard
@@ -382,6 +395,7 @@ const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
     purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30 text-purple-400',
     pink: 'from-pink-500/20 to-pink-600/20 border-pink-500/30 text-pink-400',
     orange: 'from-orange-500/20 to-orange-600/20 border-orange-500/30 text-orange-400',
+    blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/30 text-blue-400',
   }
 
   return (
@@ -401,6 +415,45 @@ const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
         )}
       </div>
       <div className="text-sm text-gray-400">{label}</div>
+    </div>
+  )
+}
+
+const TrendingJobsCard = ({ jobs }) => {
+  const colorClasses = 'from-orange-500/20 to-orange-600/20 border-orange-500/30 text-orange-400'
+
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center gap-4 mb-3">
+        <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${colorClasses} flex items-center justify-center flex-shrink-0`}>
+          <TrendingUp size={24} />
+        </div>
+        <div className="text-sm text-gray-400">Trending Jobs</div>
+      </div>
+      <div className="space-y-2">
+        {jobs.length === 0 ? (
+          <div className="text-sm text-gray-500">No jobs with candidates yet</div>
+        ) : (
+          jobs.map((job, index) => (
+            <Link
+              key={job.id}
+              to={`/jobs/${job.id}`}
+              className="flex items-center justify-between p-2 rounded-lg hover:bg-glass-200 transition-colors group"
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-xs font-medium text-gray-400">#{index + 1}</span>
+                <span className="text-sm font-medium truncate group-hover:text-primary-400">
+                  {job.title}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-gray-400 ml-2">
+                <Users size={14} />
+                <span>{job.candidate_count || 0}</span>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
     </div>
   )
 }
