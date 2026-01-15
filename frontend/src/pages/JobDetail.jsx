@@ -1,13 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Send, Filter, Calendar, Search, X, FileText, XCircle, Edit, Save, ArrowLeft } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Filter, Search, X, FileText, XCircle, Edit, Save, ArrowLeft } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
   runAnalysis, deleteCandidate, getTopCandidates, updateCandidate
 } from '../services/api'
 import api from '../services/api'
-import SendEmailModal from '../components/SendEmailModal'
-import SendInterviewModal from '../components/SendInterviewModal'
 import { useModal } from '../context/ModalContext'
 
 const JobDetail = () => {
@@ -19,8 +17,6 @@ const JobDetail = () => {
   const [topCandidates, setTopCandidates] = useState([])
   const [topCandidatesLimit, setTopCandidatesLimit] = useState(5)
   const [selectedCandidates, setSelectedCandidates] = useState([])
-  const [showEmailModal, setShowEmailModal] = useState(false)
-  const [showInterviewModal, setShowInterviewModal] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [nameSearch, setNameSearch] = useState('')
   const [filters, setFilters] = useState({
@@ -246,6 +242,32 @@ const JobDetail = () => {
       } catch (error) {
         console.error('Error deleting candidate:', error)
         await showAlert('Error', 'Failed to delete candidate. Please try again.', 'error')
+      }
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedCandidates.length === 0) return
+    
+    const confirmed = await showConfirm({
+      title: 'Delete Selected Candidates',
+      message: `Are you sure you want to delete ${selectedCandidates.length} candidate(s)? This action cannot be undone.`,
+      type: 'confirm',
+      confirmText: 'Delete All',
+      cancelText: 'Cancel'
+    })
+    
+    if (confirmed) {
+      try {
+        // Delete all candidates in parallel
+        await Promise.all(selectedCandidates.map(id => deleteCandidate(id)))
+        setSelectedCandidates([])
+        fetchData()
+        await showAlert('Success', `Successfully deleted ${selectedCandidates.length} candidate(s).`, 'success')
+      } catch (error) {
+        console.error('Error deleting candidates:', error)
+        await showAlert('Error', 'Failed to delete some candidates. Please try again.', 'error')
+        fetchData() // Refresh to show current state
       }
     }
   }
@@ -573,64 +595,6 @@ const JobDetail = () => {
             </div>
           )}
 
-          {/* Top Candidate Scores */}
-          {topCandidates.length > 0 ? (
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Top Candidate Scores</h3>
-                  <p className="text-sm text-gray-400">Ranked by resume score (1-10 scale)</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-400">Show top:</label>
-                  <select
-                    value={topCandidatesLimit}
-                    onChange={(e) => {
-                      const newLimit = parseInt(e.target.value)
-                      setTopCandidatesLimit(newLimit)
-                      fetchData()
-                    }}
-                    className="glass-input text-sm w-20"
-                  >
-                    <option value={3}>3</option>
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={15}>15</option>
-                    <option value={20}>20</option>
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                {topCandidates.map((candidate) => (
-                  <div key={candidate.id} className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <Link
-                          to={`/candidates/${candidate.id}`}
-                          className="text-sm font-medium hover:text-primary-400 transition-colors cursor-pointer"
-                        >
-                          {candidate.name}
-                        </Link>
-                        <span className="text-sm font-semibold">{parseFloat(candidate.score).toFixed(1)}/10</span>
-                      </div>
-                      <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
-                          style={{ width: `${Math.min((parseFloat(candidate.score) / 10) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-semibold mb-4">Top Candidate Scores</h3>
-              <p className="text-sm text-gray-400">No candidates analyzed yet</p>
-            </div>
-          )}
-
           {/* Candidates Table */}
           <div className="glass-card overflow-hidden">
             <div className="p-6 border-b border-glass-200">
@@ -682,24 +646,7 @@ const JobDetail = () => {
                 <span className="text-sm text-gray-400">{selectedCandidates.length} candidates selected</span>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setShowInterviewModal(true)}
-                    className="glass-button flex items-center gap-2"
-                  >
-                    <Calendar size={16} />
-                    Invite to Interview ({selectedCandidates.length})
-                  </button>
-                  <button
-                    onClick={() => setShowEmailModal(true)}
-                    className="glass-button-secondary flex items-center gap-2"
-                  >
-                    <Send size={16} />
-                    Send Rejection ({selectedCandidates.length})
-                  </button>
-                  <button
-                    onClick={() => {
-                      selectedCandidates.forEach(id => handleDelete(id))
-                      setSelectedCandidates([])
-                    }}
+                    onClick={handleBulkDelete}
                     className="glass-button-secondary flex items-center gap-2 text-red-400 hover:bg-red-500/20"
                   >
                     <Trash2 size={16} />
@@ -940,29 +887,6 @@ const JobDetail = () => {
         </div>
       )}
 
-      {showEmailModal && (
-        <SendEmailModal
-          jobId={jobId}
-          candidateIds={selectedCandidates}
-          onClose={() => {
-            setShowEmailModal(false)
-            setSelectedCandidates([])
-            fetchData()
-          }}
-        />
-      )}
-
-      {showInterviewModal && (
-        <SendInterviewModal
-          jobId={jobId}
-          candidateIds={selectedCandidates}
-          onClose={() => {
-            setShowInterviewModal(false)
-            setSelectedCandidates([])
-            fetchData()
-          }}
-        />
-      )}
     </div>
   )
 }
