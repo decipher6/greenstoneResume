@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import Dict, List
-from datetime import datetime, timedelta
 from database import get_db
 from bson import ObjectId
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -14,6 +14,16 @@ async def get_dashboard_stats():
     total_candidates = await db.candidates.count_documents({})
     analyzed_candidates = await db.candidates.count_documents({"status": "analyzed"})
     active_jobs = await db.jobs.count_documents({"status": "active"})
+    
+    # Calculate candidates reviewed today
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    candidates_reviewed_today = await db.candidates.count_documents({
+        "analyzed_at": {
+            "$gte": today_start,
+            "$lt": today_end
+        }
+    })
     
     # Calculate average score
     pipeline = [
@@ -27,32 +37,12 @@ async def get_dashboard_stats():
     avg_result = await db.candidates.aggregate(pipeline).to_list(1)
     avg_score = avg_result[0]["avg_score"] if avg_result else 0.0
     
-    # Count candidates reviewed today (analyzed_at is today)
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
-    candidates_reviewed_today = await db.candidates.count_documents({
-        "analyzed_at": {
-            "$gte": today_start,
-            "$lt": today_end
-        }
-    })
-    
-    # Get trending jobs (jobs with most candidates, limit to top 3)
-    trending_jobs = []
-    async for job in db.jobs.find().sort("candidate_count", -1).limit(3):
-        trending_jobs.append({
-            "id": str(job["_id"]),
-            "title": job.get("title", "Unknown"),
-            "candidate_count": job.get("candidate_count", 0)
-        })
-    
     return {
         "total_candidates": total_candidates,
         "analyzed": analyzed_candidates,
         "avg_score": round(avg_score, 1),
         "active_jobs": active_jobs,
-        "candidates_reviewed_today": candidates_reviewed_today,
-        "trending_jobs": trending_jobs
+        "candidates_reviewed_today": candidates_reviewed_today
     }
 
 @router.get("/score-distribution")
