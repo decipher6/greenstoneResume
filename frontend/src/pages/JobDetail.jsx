@@ -238,11 +238,6 @@ const JobDetail = () => {
       
       await updateCandidate(candidateId, { status: newStatus })
       fetchData()
-      await showAlert(
-        'Success', 
-        isShortlisted ? 'Candidate removed from shortlist.' : 'Candidate added to shortlist.', 
-        'success'
-      )
     } catch (error) {
       console.error('Error toggling shortlist:', error)
       await showAlert('Error', 'Failed to update shortlist status. Please try again.', 'error')

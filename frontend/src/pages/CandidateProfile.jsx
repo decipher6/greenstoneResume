@@ -135,11 +135,6 @@ const CandidateProfile = () => {
       const newStatus = isShortlisted ? 'analyzed' : 'shortlisted'
       
       await updateCandidate(candidateId, { status: newStatus })
-      await showAlert(
-        'Success', 
-        isShortlisted ? 'Candidate removed from shortlist.' : 'Candidate added to shortlist.', 
-        'success'
-      )
       fetchCandidate() // Refresh to update status
     } catch (error) {
       console.error('Error toggling shortlist:', error)

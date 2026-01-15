@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { createJob } from '../services/api'
 import { useModal } from '../context/ModalContext'
 
 const CreateJobModal = ({ onClose }) => {
   const { showAlert } = useModal()
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     title: '',
     department: '',
@@ -33,8 +35,11 @@ const CreateJobModal = ({ onClose }) => {
     }
 
     try {
-      await createJob(formData)
+      const response = await createJob(formData)
+      const jobId = response.data.id
       onClose()
+      // Navigate to the newly created job detail page
+      navigate(`/jobs/${jobId}`)
     } catch (error) {
       console.error('Error creating job:', error)
       const errorMessage = error.response?.data?.detail || 'Error creating job. Please try again.'
