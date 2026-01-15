@@ -68,11 +68,11 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
         <div className="mt-auto pt-4 border-t border-glass-200">
           <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-glass-100">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
-              <User size={12} className="text-white" />
+              <User size={20} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">{user?.name || 'User'}</p>
-              <p className="text-xs text-gray-400 truncate">{user?.email || 'admin@gsequity.com'}</p>
+              <p className="text-xs text-gray-400">{user?.email || 'admin@gsequity.com'}</p>
             </div>
             <button
               onClick={logout}
