@@ -18,8 +18,15 @@ from routes.auth import get_current_user_id
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Use /tmp on serverless (Vercel) as it's writable, otherwise use uploads
+UPLOAD_DIR = "/tmp" if os.getenv("VERCEL") else "uploads"
+
+# Only create directory if not on Vercel (where /tmp already exists)
+# Create it lazily when needed, not at import time
+def ensure_upload_dir():
+    """Ensure upload directory exists (only for non-serverless)"""
+    if not os.getenv("VERCEL") and not os.path.exists(UPLOAD_DIR):
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/upload-bulk")
 async def upload_candidates_bulk(
@@ -66,6 +73,8 @@ async def upload_candidates_bulk(
             contact_info_dict = await extract_contact_info(resume_text)
             name = await extract_name(resume_text)
             
+            # Ensure upload directory exists (only for non-serverless)
+            ensure_upload_dir()
             file_path = os.path.join(UPLOAD_DIR, f"{job_id}_{datetime.now().timestamp()}_{file.filename}")
             async with aiofiles.open(file_path, 'wb') as f:
                 await f.write(file_content)
@@ -278,9 +287,15 @@ async def delete_candidate(candidate_id: str, user_id: Optional[str] = Depends(g
     job = await db.jobs.find_one({"_id": ObjectId(job_id)}) if job_id else None
     job_title = job.get("title") if job else None
     
-    # Delete file if exists
-    if candidate.get("resume_file_path") and os.path.exists(candidate["resume_file_path"]):
-        os.remove(candidate["resume_file_path"])
+    # Delete file if exists (may not exist on serverless after function execution)
+    if candidate.get("resume_file_path"):
+        try:
+            if os.path.exists(candidate["resume_file_path"]):
+                os.remove(candidate["resume_file_path"])
+        except Exception as e:
+            # File may have been cleaned up already (common on serverless)
+            if DEBUG:
+                print(f"Could not delete file {candidate.get('resume_file_path')}: {e}")
     
     await db.candidates.delete_one({"_id": ObjectId(candidate_id)})
     
