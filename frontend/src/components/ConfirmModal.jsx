@@ -50,7 +50,7 @@ const ConfirmModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-md p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+      <div className="bg-[#0a0a0f] border border-purple-500/30 rounded-2xl w-full max-w-md p-6 shadow-xl animate-in fade-in zoom-in duration-200" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%)' }}>
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0 mt-1">
             {getIcon()}

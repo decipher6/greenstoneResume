@@ -69,7 +69,7 @@ const CreateJobModal = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-2xl m-4 p-6 max-h-[90vh] overflow-y-auto shadow-xl">
+      <div className="bg-[#0a0a0f] border border-purple-500/30 rounded-2xl w-full max-w-2xl m-4 p-6 max-h-[90vh] overflow-y-auto shadow-xl" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%)' }}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Create New Job Post</h2>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-glass-200 transition-colors">
