@@ -51,10 +51,18 @@ db = None
 
 async def init_db():
     global client, db
+    # Skip if already initialized
+    if client is not None and db is not None:
+        try:
+            await client.admin.command('ping')
+            return  # Already connected
+        except:
+            pass  # Connection lost, reinitialize
+    
     try:
-        client = AsyncIOMotorClient(MONGODB_URI)
+        client = AsyncIOMotorClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
         db = client[DATABASE_NAME]
-        # Test connection
+        # Test connection with timeout
         await client.admin.command('ping')
         print("✅ Connected to MongoDB")
         
@@ -72,7 +80,12 @@ async def init_db():
         
     except Exception as e:
         print(f"❌ MongoDB connection error: {e}")
-        raise
+        # In serverless, don't raise - let it fail on first request
+        # This allows the app to start even if DB is temporarily unavailable
+        if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+            print("⚠️  Running on serverless - database connection will be retried on first request")
+        else:
+            raise
 
 def get_db():
     return db

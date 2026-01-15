@@ -10,16 +10,47 @@ from routes import jobs, candidates, assessments, analytics, email, auth, activi
 
 load_dotenv()
 
+# For serverless (Vercel), use lazy database initialization
+# Initialize DB on first request instead of at startup
+_db_initialized = False
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    # Try to initialize DB, but don't fail if it doesn't work in serverless
+    global _db_initialized
+    try:
+        await init_db()
+        _db_initialized = True
+    except Exception as e:
+        print(f"⚠️  Database initialization deferred (serverless): {e}")
+        # In serverless, we'll initialize on first request
+        _db_initialized = False
     yield
+    # Cleanup if needed
+    try:
+        from database import client
+        if client:
+            client.close()
+    except:
+        pass
 
 app = FastAPI(
     title="Greenstone Talent AI",
     description="Intelligent candidate screening platform",
     lifespan=lifespan
 )
+
+# Middleware to ensure DB is initialized on first request (for serverless)
+@app.middleware("http")
+async def ensure_db_initialized(request, call_next):
+    global _db_initialized
+    if not _db_initialized:
+        try:
+            await init_db()
+            _db_initialized = True
+        except Exception as e:
+            print(f"⚠️  Database initialization failed: {e}")
+    return await call_next(request)
 
 # CORS configuration - use environment variable in production
 # Default includes localhost for development and Vercel frontend for production
@@ -51,6 +82,21 @@ async def root():
 async def health():
     """Health check endpoint"""
     return {"status": "ok", "routes": ["/api/auth", "/api/jobs", "/api/candidates", "/api/assessments", "/api/analytics", "/api/email"]}
+
+# Export handler for Vercel
+# Vercel's @vercel/python should handle FastAPI directly, but Mangum provides better compatibility
+import os
+if os.getenv("VERCEL"):
+    try:
+        from mangum import Mangum
+        # For serverless, disable lifespan events as they don't work reliably
+        handler = Mangum(app, lifespan="off")
+    except ImportError:
+        # Fallback to app directly if mangum not available
+        handler = app
+else:
+    # Local development
+    handler = app
 
 if __name__ == "__main__":
     import uvicorn
