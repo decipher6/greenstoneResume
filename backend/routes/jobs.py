@@ -53,7 +53,9 @@ async def create_job(job: JobCreate, user_id: Optional[str] = Depends(get_curren
         )
     
     job_dict = job.dict()
-    job_dict["created_at"] = datetime.now()
+    now = datetime.now()
+    job_dict["created_at"] = now
+    job_dict["last_run"] = now  # Set last_run to creation time
     job_dict["status"] = "active"
     job_dict["candidate_count"] = 0
     
