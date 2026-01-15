@@ -176,12 +176,15 @@ async def get_activity_types():
 
 @router.get("/users")
 async def get_activity_users():
-    """Get list of all users who have activity logs"""
+    """Get list of all users who have activity logs (excluding system jobs)"""
     db = get_db()
-    user_ids = await db.activity_logs.distinct("user_id")
+    # Only get user_ids from logs that have a user_id (exclude system jobs)
+    user_ids = await db.activity_logs.distinct("user_id", {"user_id": {"$ne": None}})
     users = []
+    seen_ids = set()  # Avoid duplicates
     for user_id in user_ids:
-        if user_id:
+        if user_id and user_id not in seen_ids:
+            seen_ids.add(user_id)
             try:
                 user = await db.users.find_one({"_id": ObjectId(user_id)})
                 if user:
@@ -189,7 +192,8 @@ async def get_activity_users():
                         "id": str(user["_id"]),
                         "name": user.get("name", "Unknown User")
                     })
-            except:
+            except Exception as e:
+                print(f"Error fetching user {user_id}: {e}")
                 pass
     return {"users": users}
 

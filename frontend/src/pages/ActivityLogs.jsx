@@ -43,14 +43,27 @@ const ActivityLogs = () => {
 
   // Filter users based on search
   useEffect(() => {
-    if (userSearch.trim() === '') {
+    const searchTerm = userSearch.trim()
+    
+    if (searchTerm === '') {
       setFilteredUsers([])
-    } else {
-      const filtered = users.filter(user => 
-        user.name.toLowerCase().includes(userSearch.toLowerCase())
-      )
-      setFilteredUsers(filtered)
+      return
     }
+    
+    // Only filter if we have users loaded
+    if (!users || users.length === 0) {
+      setFilteredUsers([])
+      return
+    }
+    
+    const searchLower = searchTerm.toLowerCase()
+    const filtered = users.filter(user => {
+      if (!user) return false
+      const userName = user.name || ''
+      return userName.toLowerCase().includes(searchLower)
+    })
+    
+    setFilteredUsers(filtered)
   }, [userSearch, users])
 
   // Close dropdowns on outside click
@@ -88,9 +101,11 @@ const ActivityLogs = () => {
   const fetchActivityUsers = async () => {
     try {
       const response = await getActivityUsers()
-      setUsers(response.data?.users || [])
+      const usersList = response.data?.users || []
+      setUsers(usersList)
     } catch (error) {
       console.error('Error fetching users:', error)
+      setUsers([])
     }
   }
 
@@ -290,9 +305,6 @@ const ActivityLogs = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold">Activity</h3>
-      </div>
 
       {/* Filter Section */}
       <div className="bg-glass-100 rounded-lg p-4 mb-6">
@@ -424,7 +436,7 @@ const ActivityLogs = () => {
                 </button>
               )}
             </div>
-            {filteredUsers.length > 0 && (
+            {userSearch.trim() !== '' && filteredUsers.length > 0 && (
               <div className="absolute top-full left-0 mt-2 bg-gray-800 rounded-lg z-50 min-w-[200px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto user-search-results">
                 {filteredUsers.map(user => (
                   <button
@@ -438,6 +450,11 @@ const ActivityLogs = () => {
                     {user.name}
                   </button>
                 ))}
+              </div>
+            )}
+            {userSearch.trim() !== '' && users.length > 0 && filteredUsers.length === 0 && (
+              <div className="absolute top-full left-0 mt-2 bg-gray-800 rounded-lg z-50 min-w-[200px] shadow-xl border border-glass-300 p-3 text-sm text-gray-400">
+                No users found
               </div>
             )}
           </div>
