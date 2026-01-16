@@ -554,7 +554,7 @@ const CandidateProfile = () => {
                   <div className="space-y-2">
                     <button
                       onClick={() => setShowInterviewModal(true)}
-                      className="glass-button w-full flex items-center justify-center gap-2 text-sm bg-green-400/40 hover:bg-green-400/50 border-green-400/60"
+                      className="glass-button w-full flex items-center justify-center gap-2 text-sm bg-gradient-to-r from-green-300 to-green-400 hover:from-green-400 hover:to-green-500 border-green-300/60"
                     >
                       <Calendar size={16} />
                       Invite to Interview
