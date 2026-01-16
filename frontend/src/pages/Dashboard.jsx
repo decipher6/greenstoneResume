@@ -340,7 +340,7 @@ const Dashboard = () => {
                     onChange={(e) => handleStatusChange(job.id, e.target.value)}
                     className={`glass-input text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer ${
                       (job.status || 'active') === 'active'
-                        ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                        ? 'bg-green-400/40 text-green-300 border-green-400/60'
                         : (job.status || 'active') === 'on-hold'
                         ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
                         : (job.status || 'active') === 'filled'
@@ -395,7 +395,7 @@ const Dashboard = () => {
 
 const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
   const colorClasses = {
-    green: 'from-green-500/20 to-green-600/20 border-green-500/30 text-green-400',
+    green: 'from-green-400/40 to-green-500/40 border-green-400/60 text-green-300',
     purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30 text-purple-400',
     pink: 'from-pink-500/20 to-pink-600/20 border-pink-500/30 text-pink-400',
     orange: 'from-orange-500/20 to-orange-600/20 border-orange-500/30 text-orange-400',
@@ -412,7 +412,7 @@ const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
           <div className="text-3xl font-bold">{value}</div>
         </div>
         {trend && (
-          <div className={`flex items-center gap-1 text-xs ${trendUp ? 'text-green-400' : 'text-red-400'}`}>
+          <div className={`flex items-center gap-1 text-xs ${trendUp ? 'text-green-300' : 'text-red-400'}`}>
             <ArrowUpRight size={14} />
             <span>{trend}</span>
           </div>

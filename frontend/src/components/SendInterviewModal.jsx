@@ -107,7 +107,7 @@ Greenstone Talent Team`,
             <button 
               type="submit" 
               disabled={isGenerating}
-              className="glass-button bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="glass-button bg-gradient-to-r from-green-400 to-green-500 hover:from-green-500 hover:to-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGenerating ? 'Generating...' : `Generate ${candidateIds.length} Link${candidateIds.length !== 1 ? 's' : ''}`}
             </button>

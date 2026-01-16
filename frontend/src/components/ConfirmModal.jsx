@@ -16,7 +16,7 @@ const ConfirmModal = ({
   const getIcon = () => {
     switch (type) {
       case 'success':
-        return <CheckCircle size={24} className="text-green-400" />
+        return <CheckCircle size={24} className="text-green-300" />
       case 'error':
         return <AlertCircle size={24} className="text-red-400" />
       case 'info':
@@ -31,7 +31,7 @@ const ConfirmModal = ({
   const getButtonColor = () => {
     switch (type) {
       case 'success':
-        return 'bg-green-500 hover:bg-green-600'
+        return 'bg-green-400 hover:bg-green-500'
       case 'error':
         return 'bg-red-500 hover:bg-red-600'
       case 'info':

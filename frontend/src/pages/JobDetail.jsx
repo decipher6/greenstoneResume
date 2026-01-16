@@ -443,7 +443,7 @@ const JobDetail = () => {
           {averageScore !== null && (
             <div className="flex flex-col items-end">
               <span className="text-sm text-gray-300">Average Resume Score</span>
-              <span className="text-2xl font-bold text-green-300">{averageScore}/10</span>
+              <span className="text-2xl font-bold text-green-200">{averageScore}/10</span>
             </div>
           )}
         </div>
@@ -843,7 +843,7 @@ const JobDetail = () => {
                 <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     candidate.status === 'analyzed' 
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                      ? 'bg-green-400/40 text-green-300 border border-green-400/60'
                       : candidate.status === 'analyzing'
                       ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                       : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
@@ -869,10 +869,10 @@ const JobDetail = () => {
                             e.stopPropagation()
                             handleRowSave(candidate.id)
                           }}
-                          className="p-2 rounded-lg hover:bg-green-500/20 transition-colors"
+                          className="p-2 rounded-lg hover:bg-green-400/40 transition-colors"
                           title="Save changes"
                         >
-                          <Save size={18} className="text-green-400" />
+                          <Save size={18} className="text-green-300" />
                         </button>
                         <button
                           onClick={(e) => {

@@ -372,7 +372,7 @@ const CandidateProfile = () => {
             <div className="flex items-center gap-3 mb-2">
               <h2 className="text-3xl font-bold">{candidate.name || 'Unknown Candidate'}</h2>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                candidate.status === 'shortlisted' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                candidate.status === 'shortlisted' ? 'bg-green-400/40 text-green-300 border border-green-400/60' :
                 candidate.status === 'rejected' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
                 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
               }`}>
@@ -397,7 +397,7 @@ const CandidateProfile = () => {
                   key={index}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${
                     req.isMet
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                      ? 'bg-green-400/40 text-green-300 border border-green-400/60'
                       : 'bg-red-500/20 text-red-400 border border-red-500/30'
                   }`}
                 >
@@ -448,7 +448,7 @@ const CandidateProfile = () => {
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-gray-300">Software Core</span>
-                      <span className="text-2xl font-bold text-green-300">{overallScore.toFixed(1)}/10</span>
+                      <span className="text-2xl font-bold text-green-200">{overallScore.toFixed(1)}/10</span>
                     </div>
                     <div className="flex items-center gap-2 mb-4">
                       <span className="text-xs text-gray-300">Medium confidence</span>
@@ -481,7 +481,7 @@ const CandidateProfile = () => {
                     <div className="mb-6 pt-6 border-t border-glass-200">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-300">Percentile Ranking</span>
-                        <span className="text-xl font-bold text-green-300">{percentile}th</span>
+                        <span className="text-xl font-bold text-green-200">{percentile}th</span>
                       </div>
                       <p className="text-xs text-gray-300 mt-1">
                         This candidate ranks in the {percentile}th percentile among all applicants for this position.
@@ -499,7 +499,7 @@ const CandidateProfile = () => {
                       <ul className="space-y-1">
                         {aiSummary.strengths.map((strength, index) => (
                           <li key={index} className="flex items-start gap-2 text-sm text-gray-300">
-                            <CheckCircle size={16} className="text-green-300 flex-shrink-0 mt-0.5" />
+                            <CheckCircle size={16} className="text-green-200 flex-shrink-0 mt-0.5" />
                             <span>{strength}</span>
                           </li>
                         ))}
@@ -523,7 +523,7 @@ const CandidateProfile = () => {
                     <div>
                       <h5 className="text-sm font-medium text-gray-300 mb-2">Recommendation</h5>
                       <p className="text-sm text-gray-300 flex items-start gap-2">
-                        <CheckCircle size={16} className="text-green-300 flex-shrink-0 mt-0.5" />
+                        <CheckCircle size={16} className="text-green-200 flex-shrink-0 mt-0.5" />
                         <span>{aiSummary.recommendation}</span>
                       </p>
                     </div>
@@ -554,7 +554,7 @@ const CandidateProfile = () => {
                   <div className="space-y-2">
                     <button
                       onClick={() => setShowInterviewModal(true)}
-                      className="glass-button w-full flex items-center justify-center gap-2 text-sm bg-green-500/20 hover:bg-green-500/30 border-green-500/30"
+                      className="glass-button w-full flex items-center justify-center gap-2 text-sm bg-green-400/40 hover:bg-green-400/50 border-green-400/60"
                     >
                       <Calendar size={16} />
                       Invite to Interview

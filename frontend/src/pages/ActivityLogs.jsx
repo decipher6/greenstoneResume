@@ -126,10 +126,10 @@ const ActivityLogs = () => {
       return <Trash2 size={16} className="text-red-400" />
     }
     if (description.includes('uploaded') || description.includes('upload')) {
-      return <Upload size={16} className="text-green-400" />
+      return <Upload size={16} className="text-green-300" />
     }
     if (description.includes('completed') || description.includes('complete')) {
-      return <CheckCircle size={16} className="text-green-400" />
+      return <CheckCircle size={16} className="text-green-300" />
     }
     if (description.includes('started') || description.includes('start')) {
       return <PlayCircle size={16} className="text-blue-400" />
@@ -143,7 +143,7 @@ const ActivityLogs = () => {
       case 'job':
         return <Briefcase size={16} className="text-blue-400" />
       case 'candidate':
-        return <UserPlus size={16} className="text-green-400" />
+        return <UserPlus size={16} className="text-green-300" />
       case 'email':
         return <Mail size={16} className="text-purple-400" />
       case 'assessment':
@@ -164,10 +164,10 @@ const ActivityLogs = () => {
       return 'bg-red-500/20'
     }
     if (description.includes('uploaded') || description.includes('upload')) {
-      return 'bg-green-500/20'
+      return 'bg-green-400/40'
     }
     if (description.includes('completed') || description.includes('complete')) {
-      return 'bg-green-500/20'
+      return 'bg-green-400/40'
     }
     if (description.includes('started') || description.includes('start')) {
       return 'bg-blue-500/20'
@@ -180,7 +180,7 @@ const ActivityLogs = () => {
       case 'job':
         return 'bg-blue-500/20'
       case 'candidate':
-        return 'bg-green-500/20'
+        return 'bg-green-400/40'
       case 'email':
         return 'bg-purple-500/20'
       case 'assessment':

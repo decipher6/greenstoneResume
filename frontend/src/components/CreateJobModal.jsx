@@ -143,7 +143,7 @@ const CreateJobModal = ({ onClose }) => {
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="block text-sm font-medium">Evaluation Criteria</label>
-              <div className={`text-sm font-medium ${Math.abs(totalWeight - 100) <= 5 ? 'text-green-400' : 'text-red-400'}`}>
+              <div className={`text-sm font-medium ${Math.abs(totalWeight - 100) <= 5 ? 'text-green-300' : 'text-red-400'}`}>
                 Total: {totalWeight.toFixed(1)}% {Math.abs(totalWeight - 100) <= 5 ? '✓' : '(Must be 100%)'}
               </div>
             </div>
