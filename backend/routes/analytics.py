@@ -14,16 +14,8 @@ async def get_dashboard_stats():
     total_candidates = await db.candidates.count_documents({})
     analyzed_candidates = await db.candidates.count_documents({"status": "analyzed"})
     active_jobs = await db.jobs.count_documents({"status": "active"})
-    
-    # Calculate candidates reviewed today
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
-    candidates_reviewed_today = await db.candidates.count_documents({
-        "analyzed_at": {
-            "$gte": today_start,
-            "$lt": today_end
-        }
-    })
+    jobs_on_hold = await db.jobs.count_documents({"status": "on-hold"})
+    jobs_filled = await db.jobs.count_documents({"status": "filled"})
     
     # Calculate average score
     pipeline = [
@@ -42,7 +34,8 @@ async def get_dashboard_stats():
         "analyzed": analyzed_candidates,
         "avg_score": round(avg_score, 1),
         "active_jobs": active_jobs,
-        "candidates_reviewed_today": candidates_reviewed_today
+        "jobs_on_hold": jobs_on_hold,
+        "jobs_filled": jobs_filled
     }
 
 @router.get("/score-distribution")

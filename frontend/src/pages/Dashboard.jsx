@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Briefcase, Users, ArrowUpRight, Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown, CheckCircle } from 'lucide-react'
+import { Briefcase, Users, ArrowUpRight, Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown, PauseCircle, CheckCircle2 } from 'lucide-react'
 import { getDashboardStats, getJobs, deleteJob, updateJobStatus } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
 import { useModal } from '../context/ModalContext'
@@ -156,7 +156,7 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <StatCard
           icon={Briefcase}
           label="Active Jobs"
@@ -170,10 +170,16 @@ const Dashboard = () => {
           color="purple"
         />
         <StatCard
-          icon={CheckCircle}
-          label="Reviewed Today"
-          value={stats?.candidates_reviewed_today || 0}
+          icon={PauseCircle}
+          label="Jobs On Hold"
+          value={stats?.jobs_on_hold || 0}
           color="orange"
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label="Jobs Filled"
+          value={stats?.jobs_filled || 0}
+          color="blue"
         />
       </div>
 
@@ -393,6 +399,7 @@ const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
     purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30 text-purple-400',
     pink: 'from-pink-500/20 to-pink-600/20 border-pink-500/30 text-pink-400',
     orange: 'from-orange-500/20 to-orange-600/20 border-orange-500/30 text-orange-400',
+    blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/30 text-blue-400',
   }
 
   return (
