@@ -1,6 +1,5 @@
 import os
 from typing import Dict, List, Optional
-import numpy as np
 from dotenv import load_dotenv
 import asyncio
 from google import genai
@@ -17,68 +16,14 @@ if not GEMINI_API_KEY:
 
 # Initialize Gemini client
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-model = None
-_sentence_transformer_available = False
-
-try:
-    from sentence_transformers import SentenceTransformer
-    _sentence_transformer_available = True
-except ImportError:
-    if DEBUG:
-        print("Warning: sentence-transformers not available. Semantic similarity will use fallback.")
-
-def get_embedding_model():
-    """Lazy load the embedding model"""
-    global model
-    if not _sentence_transformer_available:
-        return None
-    if model is None:
-        try:
-            if DEBUG:
-                print("Loading sentence transformer model...")
-            model = SentenceTransformer('all-mpnet-base-v2')
-        except Exception as e:
-            if DEBUG:
-                print(f"Warning: Could not load sentence transformer: {e}")
-            return None
-    return model
-
-async def calculate_semantic_similarity(resume_text: str, job_description: str) -> float:
-    """Calculate semantic similarity between resume and job description"""
-    embedding_model = get_embedding_model()
-    
-    if embedding_model is None:
-        # Fallback: simple keyword-based similarity
-        resume_words = set(resume_text.lower().split())
-        job_words = set(job_description.lower().split())
-        if len(job_words) == 0:
-            return 5.0
-        overlap = len(resume_words & job_words) / len(job_words)
-        return float(overlap * 10)
-    
-    # Generate embeddings
-    resume_embedding = embedding_model.encode(resume_text, convert_to_numpy=True)
-    job_embedding = embedding_model.encode(job_description, convert_to_numpy=True)
-    
-    # Calculate cosine similarity
-    similarity = np.dot(resume_embedding, job_embedding) / (
-        np.linalg.norm(resume_embedding) * np.linalg.norm(job_embedding)
-    )
-    
-    # Scale to 0-10
-    return float(similarity * 10)
 
 async def score_resume_with_llm(resume_text: str, job_description: str, 
                                 evaluation_criteria: List[Dict]) -> Dict:
     """
-    Comprehensive resume scoring combining:
-    1. NLP-based semantic similarity
-    2. LLM-based evaluation with job description and preferences
-    3. Returns base Resume Score (0-10)
+    Comprehensive resume scoring using:
+    1. LLM-based evaluation with job description and preferences
+    2. Returns base Resume Score (0-10) as weighted average of criterion scores
     """
-    
-    # Step 1: Calculate semantic similarity
-    semantic_score = await calculate_semantic_similarity(resume_text, job_description)
     
     # Step 2: Prepare evaluation criteria with weights
     criteria_text = "\n".join([f"- {c['name']}: Weight {c['weight']}%" 
@@ -267,9 +212,9 @@ CRITICAL REQUIREMENTS FOR SCORING:
                 if score_match:
                     llm_score = float(score_match.group(1))
                 else:
-                    llm_score = semantic_score  # Use semantic score as fallback
+                    llm_score = 5.0  # Default fallback score
                     if DEBUG:
-                        print(f"WARNING: Could not extract overall_score, using semantic_score: {semantic_score}")
+                        print(f"WARNING: Could not extract overall_score, using default: {llm_score}")
             
             # Try to extract criterion scores using regex
             criterion_scores = []
@@ -320,10 +265,8 @@ CRITICAL REQUIREMENTS FOR SCORING:
                     "score": round(score, 1)
                 })
         
-        # Combine semantic similarity (30%) with LLM score (70%) for final resume score
-        # This ensures both semantic matching and intelligent evaluation are considered
-        final_resume_score = (semantic_score * 0.3) + (llm_score * 0.7)
-        final_resume_score = max(0, min(10, round(final_resume_score, 2)))
+        # Use LLM score directly as the final resume score (weighted average of criterion scores)
+        final_resume_score = max(0, min(10, round(llm_score, 2)))
         
         if DEBUG:
             print(f"DEBUG: Returning {len(criterion_scores)} criterion scores")
@@ -332,10 +275,8 @@ CRITICAL REQUIREMENTS FOR SCORING:
         
         return {
             "overall_score": final_resume_score,
-            "semantic_score": round(semantic_score, 2),
-            "llm_score": round(llm_score, 2),
             "criterion_scores": criterion_scores,
-            "justification": scoring_result.get("justification", "Score based on resume analysis combining semantic similarity and LLM evaluation.")
+            "justification": scoring_result.get("justification", "Score based on resume analysis using weighted average of criterion scores.")
         }
         
     except Exception as e:
@@ -354,13 +295,11 @@ CRITICAL REQUIREMENTS FOR SCORING:
         elif "timeout" in error_msg.lower():
             justification = "LLM evaluation failed: Request timeout. Please try again."
         else:
-            justification = f"LLM evaluation unavailable: {error_msg}. Using semantic similarity as fallback."
+            justification = f"LLM evaluation unavailable: {error_msg}. Please try again."
         
-        # Fallback to semantic similarity only
+        # Fallback when LLM evaluation fails
         return {
-            "overall_score": round(semantic_score, 2),
-            "semantic_score": round(semantic_score, 2),
-            "llm_score": 0.0,
+            "overall_score": 0.0,
             "criterion_scores": [],
             "justification": justification
         }
