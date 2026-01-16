@@ -31,7 +31,7 @@ const ConfirmModal = ({
   const getButtonColor = () => {
     switch (type) {
       case 'success':
-        return 'bg-green-400 hover:bg-green-500'
+        return 'bg-green-500 hover:bg-green-600'
       case 'error':
         return 'bg-red-500 hover:bg-red-600'
       case 'info':
