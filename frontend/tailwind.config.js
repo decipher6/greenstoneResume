@@ -8,9 +8,9 @@ export default {
     extend: {
       colors: {
         'glass': {
-          50: 'rgba(255, 255, 255, 0.05)',
-          100: 'rgba(255, 255, 255, 0.1)',
-          200: 'rgba(255, 255, 255, 0.2)',
+          50: 'rgba(44, 44, 63, 0.8)', // Lighter purple boxes (#2C2C3F with opacity)
+          100: 'rgba(44, 44, 63, 0.9)',
+          200: 'rgba(60, 60, 80, 0.5)', // Border color
         },
         'primary': {
           50: '#e6f0eb',
@@ -37,11 +37,11 @@ export default {
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'glass': 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+        'glass': 'linear-gradient(135deg, rgba(44, 44, 63, 0.9) 0%, rgba(40, 40, 58, 0.85) 100%)',
       },
       boxShadow: {
-        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
-        'glass-inset': 'inset 0 2px 4px 0 rgba(255, 255, 255, 0.1)',
+        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+        'glass-inset': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.2)',
       },
     },
   },
