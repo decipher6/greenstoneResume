@@ -456,7 +456,7 @@ const JobDetail = () => {
             onClick={() => setActiveTab('description')}
             className={`px-6 py-4 font-semibold transition-colors ${
               activeTab === 'description'
-                ? 'text-primary-400 border-b-2 border-primary-400'
+                ? 'text-green-300 border-b-2 border-green-300'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -466,7 +466,7 @@ const JobDetail = () => {
             onClick={() => setActiveTab('candidates')}
             className={`px-6 py-4 font-semibold transition-colors ${
               activeTab === 'candidates'
-                ? 'text-primary-400 border-b-2 border-primary-400'
+                ? 'text-green-300 border-b-2 border-green-300'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -476,7 +476,7 @@ const JobDetail = () => {
             onClick={() => setActiveTab('shortlist')}
             className={`px-6 py-4 font-semibold transition-colors ${
               activeTab === 'shortlist'
-                ? 'text-primary-400 border-b-2 border-primary-400'
+                ? 'text-green-300 border-b-2 border-green-300'
                 : 'text-gray-400 hover:text-white'
             }`}
           >

@@ -64,7 +64,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
                   to={item.path}
                   className={`flex items-center ${isExpanded ? 'gap-3 px-4' : 'justify-center px-2'} py-3 rounded-lg transition-all duration-200 ${
                     isActive
-                      ? 'bg-gradient-to-r from-primary-500/40 to-primary-600/40 border border-primary-500/50 text-primary-300'
+                      ? 'bg-gradient-to-r from-green-300/50 to-green-400/50 border border-green-300/60 text-green-200'
                       : 'text-gray-400 hover:text-white hover:bg-glass-100'
                   }`}
                   title={!isExpanded ? item.label : ''}
