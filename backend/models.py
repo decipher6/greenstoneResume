@@ -25,8 +25,9 @@ class EvaluationCriterion(BaseModel):
 
 class JobStatus(str, Enum):
     active = "active"
-    paused = "paused"
-    closed = "closed"
+    on_hold = "on-hold"
+    filled = "filled"
+    cancelled = "cancelled"
 
 class JobCreate(BaseModel):
     title: str

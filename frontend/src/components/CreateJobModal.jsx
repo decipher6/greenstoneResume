@@ -72,6 +72,16 @@ const CreateJobModal = ({ onClose }) => {
     setFormData({ ...formData, evaluation_criteria: updated })
   }
 
+  // Auto-resize textarea helper
+  const autoResizeTextarea = (textarea) => {
+    if (!textarea) return
+    textarea.style.height = 'auto'
+    const lineHeight = 24 // Approximate line height in pixels
+    const maxHeight = lineHeight * 4 // Max 4 lines
+    const newHeight = Math.min(textarea.scrollHeight, maxHeight)
+    textarea.style.height = `${newHeight}px`
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-[#0a0a0f] border border-purple-500/30 rounded-2xl w-full max-w-2xl m-4 p-6 max-h-[90vh] overflow-y-auto shadow-xl" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%)' }}>
@@ -123,18 +133,29 @@ const CreateJobModal = ({ onClose }) => {
             <div className="flex items-center justify-between mb-3">
               <label className="block text-sm font-medium">Evaluation Criteria</label>
               <div className={`text-sm font-medium ${Math.abs(totalWeight - 100) <= 5 ? 'text-green-400' : 'text-red-400'}`}>
-                Total: {totalWeight.toFixed(1)}% {Math.abs(totalWeight - 100) <= 5 ? '✓' : '(Must be ~100%)'}
+                Total: {totalWeight.toFixed(1)}% {Math.abs(totalWeight - 100) <= 5 ? '✓' : '(Must be 100%)'}
               </div>
             </div>
             <div className="space-y-3">
               {formData.evaluation_criteria.map((criterion, index) => (
-                <div key={index} className="flex items-center gap-3">
-                  <input
-                    type="text"
+                <div key={index} className="flex items-start gap-3">
+                  <textarea
                     placeholder="Criterion name"
-                    className="glass-input flex-1"
+                    className="glass-input flex-1 resize-none overflow-hidden"
                     value={criterion.name}
-                    onChange={(e) => updateCriterion(index, 'name', e.target.value)}
+                    onChange={(e) => {
+                      updateCriterion(index, 'name', e.target.value)
+                      autoResizeTextarea(e.target)
+                    }}
+                    onInput={(e) => autoResizeTextarea(e.target)}
+                    ref={(textarea) => {
+                      if (textarea) {
+                        // Resize on mount if there's existing text
+                        setTimeout(() => autoResizeTextarea(textarea), 0)
+                      }
+                    }}
+                    rows={1}
+                    style={{ minHeight: '40px', maxHeight: '96px' }}
                   />
                   <input
                     type="number"
@@ -146,11 +167,11 @@ const CreateJobModal = ({ onClose }) => {
                     value={criterion.weight === 0 ? '' : criterion.weight}
                     onChange={(e) => updateCriterion(index, 'weight', e.target.value)}
                   />
-                  <span className="text-gray-400">%</span>
+                  <span className="text-gray-400 pt-2">%</span>
                   <button
                     type="button"
                     onClick={() => removeCriterion(index)}
-                    className="p-2 rounded-lg hover:bg-red-500/20 transition-colors"
+                    className="p-2 rounded-lg hover:bg-red-500/20 transition-colors mt-0.5"
                     disabled={formData.evaluation_criteria.length === 1}
                   >
                     <X size={18} className="text-red-400" />
@@ -172,7 +193,7 @@ const CreateJobModal = ({ onClose }) => {
               Cancel
             </button>
             <button type="submit" className="glass-button">
-              Create Job Post
+              Next
             </button>
           </div>
         </form>

@@ -156,8 +156,8 @@ async def update_job_status(job_id: str, status: str = Body(..., embed=True), us
     db = get_db()
     
     # Validate status
-    if status not in ["active", "paused", "closed"]:
-        raise HTTPException(status_code=400, detail="Invalid status. Must be 'active', 'paused', or 'closed'")
+    if status not in ["active", "on-hold", "filled", "cancelled"]:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be 'active', 'on-hold', 'filled', or 'cancelled'")
     
     try:
         job = await db.jobs.find_one({"_id": ObjectId(job_id)})

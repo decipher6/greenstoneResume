@@ -447,24 +447,24 @@ const CandidateProfile = () => {
                   {/* Overall Score */}
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-400">Software Core</span>
-                      <span className="text-2xl font-bold text-primary-400">{overallScore.toFixed(1)}/10</span>
+                      <span className="text-sm text-gray-300">Software Core</span>
+                      <span className="text-2xl font-bold text-green-300">{overallScore.toFixed(1)}/10</span>
                     </div>
                     <div className="flex items-center gap-2 mb-4">
-                      <span className="text-xs text-gray-400">Medium confidence</span>
+                      <span className="text-xs text-gray-300">Medium confidence</span>
                     </div>
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-400">Resume</span>
-                        <span className="font-medium">{resumeScore.toFixed(1)}</span>
+                        <span className="text-gray-300">Resume</span>
+                        <span className="font-medium text-gray-200">{resumeScore.toFixed(1)}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-400">Assessment</span>
-                        <span className="font-medium">{ccatScore ? ccatScore.toFixed(1) : 'Not uploaded yet'}</span>
+                        <span className="text-gray-300">Assessment</span>
+                        <span className="font-medium text-gray-200">{ccatScore ? ccatScore.toFixed(1) : 'Not uploaded yet'}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-400">Culture Fit</span>
-                        <span className="font-medium">{personalityScore ? personalityScore.toFixed(1) : 'Not uploaded yet'}</span>
+                        <span className="text-gray-300">Culture Fit</span>
+                        <span className="font-medium text-gray-200">{personalityScore ? personalityScore.toFixed(1) : 'Not uploaded yet'}</span>
                       </div>
                     </div>
                     {(!ccatScore || !personalityScore) && (
@@ -480,10 +480,10 @@ const CandidateProfile = () => {
                   {percentile !== null && (
                     <div className="mb-6 pt-6 border-t border-glass-200">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-400">Percentile Ranking</span>
-                        <span className="text-xl font-bold text-primary-400">{percentile}th</span>
+                        <span className="text-sm text-gray-300">Percentile Ranking</span>
+                        <span className="text-xl font-bold text-green-300">{percentile}th</span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-300 mt-1">
                         This candidate ranks in the {percentile}th percentile among all applicants for this position.
                       </p>
                     </div>
@@ -499,7 +499,7 @@ const CandidateProfile = () => {
                       <ul className="space-y-1">
                         {aiSummary.strengths.map((strength, index) => (
                           <li key={index} className="flex items-start gap-2 text-sm text-gray-300">
-                            <CheckCircle size={16} className="text-green-400 flex-shrink-0 mt-0.5" />
+                            <CheckCircle size={16} className="text-green-300 flex-shrink-0 mt-0.5" />
                             <span>{strength}</span>
                           </li>
                         ))}
@@ -523,7 +523,7 @@ const CandidateProfile = () => {
                     <div>
                       <h5 className="text-sm font-medium text-gray-300 mb-2">Recommendation</h5>
                       <p className="text-sm text-gray-300 flex items-start gap-2">
-                        <CheckCircle size={16} className="text-green-400 flex-shrink-0 mt-0.5" />
+                        <CheckCircle size={16} className="text-green-300 flex-shrink-0 mt-0.5" />
                         <span>{aiSummary.recommendation}</span>
                       </p>
                     </div>

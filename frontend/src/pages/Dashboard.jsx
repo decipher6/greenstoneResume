@@ -130,13 +130,11 @@ const Dashboard = () => {
     }
   }
 
-  const handleStatusToggle = async (jobId, currentStatus) => {
-    const newStatus = currentStatus === 'active' ? 'closed' : 'active'
+  const handleStatusChange = async (jobId, newStatus) => {
     try {
       await updateJobStatus(jobId, newStatus)
       fetchJobs()
       fetchData() // Refresh stats
-      await showAlert('Success', `Job status updated to ${newStatus}.`, 'success')
     } catch (error) {
       console.error('Error updating job status:', error)
       await showAlert('Error', 'Failed to update job status. Please try again.', 'error')
@@ -196,7 +194,7 @@ const Dashboard = () => {
               <Search size={18} className="text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by title, department, or #candidates"
+                placeholder="Search Job Posts"
                 className="bg-transparent border-0 outline-0 w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -331,17 +329,24 @@ const Dashboard = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <button
-                    onClick={() => handleStatusToggle(job.id, job.status || 'active')}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  <select
+                    value={job.status || 'active'}
+                    onChange={(e) => handleStatusChange(job.id, e.target.value)}
+                    className={`glass-input text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer ${
                       (job.status || 'active') === 'active'
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
-                        : 'bg-gray-500/20 text-gray-400 border border-gray-500/30 hover:bg-gray-500/30'
+                        ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                        : (job.status || 'active') === 'on-hold'
+                        ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                        : (job.status || 'active') === 'filled'
+                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                        : 'bg-red-500/20 text-red-400 border-red-500/30'
                     }`}
-                    title={`Click to ${(job.status || 'active') === 'active' ? 'close' : 'activate'} job`}
                   >
-                    {(job.status || 'active') === 'active' ? 'Active' : 'Closed'}
-                  </button>
+                    <option value="active">Active</option>
+                    <option value="on-hold">On-Hold</option>
+                    <option value="filled">Filled</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">

@@ -442,8 +442,8 @@ const JobDetail = () => {
           </div>
           {averageScore !== null && (
             <div className="flex flex-col items-end">
-              <span className="text-sm text-gray-400">Average Resume Score</span>
-              <span className="text-2xl font-bold text-primary-400">{averageScore}/10</span>
+              <span className="text-sm text-gray-300">Average Resume Score</span>
+              <span className="text-2xl font-bold text-green-300">{averageScore}/10</span>
             </div>
           )}
         </div>
@@ -636,7 +636,7 @@ const JobDetail = () => {
                     <Search size={18} className="text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search candidates by name..."
+                      placeholder="Search Candidates"
                       className="bg-transparent border-0 outline-0 w-full"
                       value={nameSearch}
                       onChange={(e) => {
