@@ -72,14 +72,25 @@ const CreateJobModal = ({ onClose }) => {
     setFormData({ ...formData, evaluation_criteria: updated })
   }
 
-  // Auto-resize textarea helper
+  // Auto-resize textarea helper - caps at 4 lines, enables scrolling beyond
   const autoResizeTextarea = (textarea) => {
     if (!textarea) return
-    textarea.style.height = 'auto'
     const lineHeight = 24 // Approximate line height in pixels
-    const maxHeight = lineHeight * 4 // Max 4 lines
+    const maxHeight = lineHeight * 4 // Max 4 lines (96px)
+    
+    // Reset height to calculate scrollHeight
+    textarea.style.height = 'auto'
+    
+    // Set height to min of scrollHeight and maxHeight
     const newHeight = Math.min(textarea.scrollHeight, maxHeight)
     textarea.style.height = `${newHeight}px`
+    
+    // Ensure maxHeight is enforced
+    if (textarea.scrollHeight > maxHeight) {
+      textarea.style.overflowY = 'auto'
+    } else {
+      textarea.style.overflowY = 'hidden'
+    }
   }
 
   return (
@@ -141,7 +152,7 @@ const CreateJobModal = ({ onClose }) => {
                 <div key={index} className="flex items-start gap-3">
                   <textarea
                     placeholder="Criterion name"
-                    className="glass-input flex-1 resize-none overflow-hidden"
+                    className="glass-input flex-1 resize-none"
                     value={criterion.name}
                     onChange={(e) => {
                       updateCriterion(index, 'name', e.target.value)
@@ -155,7 +166,7 @@ const CreateJobModal = ({ onClose }) => {
                       }
                     }}
                     rows={1}
-                    style={{ minHeight: '40px', maxHeight: '96px' }}
+                    style={{ minHeight: '40px', maxHeight: '96px', overflowY: 'auto' }}
                   />
                   <input
                     type="number"
