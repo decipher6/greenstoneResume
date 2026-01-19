@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown } from 'lucide-react'
-import { getJobs, deleteJob, updateJobStatus } from '../services/api'
+import { Briefcase, Users, ArrowUpRight, Plus, Eye, Calendar, LucideTrash, Search, Filter, X, ArrowUpDown, PauseCircle, CheckCircle2 } from 'lucide-react'
+import { getDashboardStats, getJobs, deleteJob, updateJobStatus } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
 import { useModal } from '../context/ModalContext'
 
 const Dashboard = () => {
+  const [stats, setStats] = useState(null)
   const [jobs, setJobs] = useState([])
   const [filteredJobs, setFilteredJobs] = useState([])
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -22,8 +23,18 @@ const Dashboard = () => {
   const { showConfirm, showAlert } = useModal()
 
   useEffect(() => {
+    fetchData()
     fetchJobs()
   }, [])
+
+  const fetchData = async () => {
+    try {
+      const statsRes = await getDashboardStats()
+      setStats(statsRes.data)
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+    }
+  }
 
   const fetchJobs = async () => {
     try {
@@ -119,10 +130,7 @@ const Dashboard = () => {
       try {
         await deleteJob(jobId)
         fetchJobs()
-        // Refresh stats in Layout
-        if (window.refreshDashboardStats) {
-          window.refreshDashboardStats()
-        }
+        fetchData() // Refresh stats
         await showAlert('Success', 'Job post deleted successfully.', 'success')
       } catch (error) {
         console.error('Error deleting job:', error)
@@ -135,10 +143,7 @@ const Dashboard = () => {
     try {
       await updateJobStatus(jobId, newStatus)
       fetchJobs()
-      // Refresh stats in Layout
-      if (window.refreshDashboardStats) {
-        window.refreshDashboardStats()
-      }
+      fetchData() // Refresh stats
     } catch (error) {
       console.error('Error updating job status:', error)
       await showAlert('Error', 'Failed to update job status. Please try again.', 'error')
@@ -159,6 +164,34 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <StatCard
+          icon={Briefcase}
+          label="Active Jobs"
+          value={stats?.active_jobs || 0}
+          color="green"
+        />
+        <StatCard
+          icon={Users}
+          label="Total Candidates"
+          value={stats?.total_candidates || 0}
+          color="purple"
+        />
+        <StatCard
+          icon={PauseCircle}
+          label="Jobs On Hold"
+          value={stats?.jobs_on_hold || 0}
+          color="orange"
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label="Jobs Filled"
+          value={stats?.jobs_filled || 0}
+          color="blue"
+        />
+      </div>
+
       {/* Combined Search, Filters, Add Job Button, and Table */}
       <div className="glass-card overflow-hidden">
         {/* Search and Filters with Add Job Button */}
@@ -382,6 +415,36 @@ const Dashboard = () => {
           }}
         />
       )}
+    </div>
+  )
+}
+
+const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
+  const colorClasses = {
+    green: 'from-green-400/40 to-green-500/40 border-green-400/60 text-green-300',
+    purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30 text-purple-400',
+    pink: 'from-pink-500/20 to-pink-600/20 border-pink-500/30 text-pink-400',
+    orange: 'from-orange-500/20 to-orange-600/20 border-orange-500/30 text-orange-400',
+    blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/30 text-blue-400',
+  }
+
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${colorClasses[color]} flex items-center justify-center flex-shrink-0`}>
+            <Icon size={24} />
+          </div>
+          <div className="text-3xl font-bold">{value}</div>
+        </div>
+        {trend && (
+          <div className={`flex items-center gap-1 text-xs ${trendUp ? 'text-green-300' : 'text-red-400'}`}>
+            <ArrowUpRight size={14} />
+            <span>{trend}</span>
+          </div>
+        )}
+      </div>
+      <div className="text-sm text-gray-400">{label}</div>
     </div>
   )
 }
