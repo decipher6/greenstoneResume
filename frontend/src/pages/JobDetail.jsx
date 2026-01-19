@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Filter, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw, ArrowUpDown } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw, ArrowUpDown } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
   runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate, reAnalyzeCandidate
@@ -18,7 +18,6 @@ const JobDetail = () => {
   const [topCandidatesLimit, setTopCandidatesLimit] = useState(5)
   const [selectedCandidates, setSelectedCandidates] = useState([])
   const [nameSearch, setNameSearch] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
     status: [], // Multi-select: analyzed, shortlisted, interview, rejected
     rating: [], // Multi-select: 1-5 stars
@@ -1056,17 +1055,6 @@ const JobDetail = () => {
                       onChange={(e) => setNameSearch(e.target.value)}
                     />
                   </div>
-                  <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
-                      showFilters 
-                        ? 'bg-glass-200 text-primary-400' 
-                        : 'hover:bg-glass-200 text-gray-400'
-                    }`}
-                    title="Toggle Filters"
-                  >
-                    <Filter size={18} />
-                  </button>
                   {(filters.status.length > 0 || filters.rating.length > 0 || nameSearch || nameSort || ratingSort || scoreSort) && (
                     <button
                       onClick={clearFilters}
