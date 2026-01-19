@@ -276,7 +276,7 @@ const Dashboard = () => {
                         type="number"
                         min="0"
                         placeholder="Min"
-                        className="glass-input w-full text-xs py-1.5 px-2"
+                        className="glass-input w-16 text-xs py-1.5 px-2"
                         value={filters.minCandidates}
                         onChange={(e) => setFilters({...filters, minCandidates: e.target.value})}
                         onClick={(e) => e.stopPropagation()}
@@ -286,7 +286,7 @@ const Dashboard = () => {
                         type="number"
                         min="0"
                         placeholder="Max"
-                        className="glass-input w-full text-xs py-1.5 px-2"
+                        className="glass-input w-16 text-xs py-1.5 px-2"
                         value={filters.maxCandidates}
                         onChange={(e) => setFilters({...filters, maxCandidates: e.target.value})}
                         onClick={(e) => e.stopPropagation()}

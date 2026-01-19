@@ -133,9 +133,18 @@ const CandidateProfile = () => {
     try {
       // If clicking the same rating, clear it
       const newRating = candidate?.rating === rating ? null : rating
-      await updateCandidate(candidateId, { rating: newRating })
+      
+      // Prepare update data
+      const updateData = { rating: newRating }
+      
+      // Auto-shortlist if highly rated (4 or 5 stars)
+      if (newRating >= 4) {
+        updateData.status = 'shortlisted'
+      }
+      
+      await updateCandidate(candidateId, updateData)
       // Update local state immediately without refetching
-      setCandidate(prev => prev ? { ...prev, rating: newRating } : prev)
+      setCandidate(prev => prev ? { ...prev, ...updateData } : prev)
     } catch (error) {
       console.error('Error updating rating:', error)
       await showAlert('Error', 'Failed to update rating. Please try again.', 'error')

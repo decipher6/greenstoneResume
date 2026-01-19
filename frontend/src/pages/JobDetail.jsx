@@ -233,7 +233,16 @@ const JobDetail = () => {
       const candidate = candidates.find(c => c.id === candidateId)
       // If clicking the same rating, clear it
       const newRating = candidate?.rating === rating ? null : rating
-      await updateCandidate(candidateId, { rating: newRating })
+      
+      // Prepare update data
+      const updateData = { rating: newRating }
+      
+      // Auto-shortlist if highly rated (4 or 5 stars)
+      if (newRating >= 4) {
+        updateData.status = 'shortlisted'
+      }
+      
+      await updateCandidate(candidateId, updateData)
       fetchData()
     } catch (error) {
       console.error('Error updating rating:', error)
