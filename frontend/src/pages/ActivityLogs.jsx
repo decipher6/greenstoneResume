@@ -1,21 +1,18 @@
 import { useEffect, useState, useRef } from 'react'
 import { 
-  Clock, Filter, X, ChevronDown, User,
+  Clock, Filter, X, ChevronLeft, ChevronRight, ChevronDown, User,
   Briefcase, UserPlus, Mail, FileText, Trash2, Upload, Download, CheckCircle,
-  PlayCircle, Settings, LogIn, LogOut, FileCheck, Search
+  PlayCircle, Settings, LogIn, LogOut, FileCheck
 } from 'lucide-react'
 import { getActivityLogs, getActivityLogsCount, getActivityTypes, getActivityUsers } from '../services/api'
 
 const ActivityLogs = () => {
   const [logs, setLogs] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [initialLoading, setInitialLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
   const [activityTypes, setActivityTypes] = useState([])
   const [users, setUsers] = useState([])
-  const [hasMore, setHasMore] = useState(true)
-  const [skip, setSkip] = useState(0)
   
   // Filter states
   const [showDateFilter, setShowDateFilter] = useState(false)
@@ -25,13 +22,11 @@ const ActivityLogs = () => {
   const [endDate, setEndDate] = useState('')
   const [selectedType, setSelectedType] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
   
-  // Refs
+  // Refs for closing dropdowns on outside click
   const dateFilterRef = useRef(null)
   const typeFilterRef = useRef(null)
   const userFilterRef = useRef(null)
-  const observerTarget = useRef(null)
   
   const logsPerPage = 30
 
@@ -40,78 +35,70 @@ const ActivityLogs = () => {
     fetchActivityUsers()
   }, [])
 
-  // Initial fetch and filter changes
   useEffect(() => {
-    setSkip(0)
-    setLogs([])
-    setHasMore(true)
-    fetchLogs(0, true)
-  }, [startDate, endDate, selectedType, selectedUserId, searchQuery])
+    fetchLogs()
+    fetchCount()
+  }, [currentPage, startDate, endDate, selectedType, selectedUserId])
 
-  // Infinite scroll observer
+  // Close dropdowns on outside click
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
-          const nextSkip = skip + logsPerPage
-          setSkip(nextSkip)
-          fetchLogs(nextSkip, false)
-        }
-      },
-      { threshold: 1.0 }
-    )
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current)
+    const handleClickOutside = (event) => {
+      if (dateFilterRef.current && !dateFilterRef.current.contains(event.target)) {
+        setShowDateFilter(false)
+      }
+      if (typeFilterRef.current && !typeFilterRef.current.contains(event.target)) {
+        setShowTypeFilter(false)
+      }
+      if (userFilterRef.current && !userFilterRef.current.contains(event.target)) {
+        setShowUserFilter(false)
+      }
     }
 
+    document.addEventListener('mousedown', handleClickOutside)
     return () => {
-      if (observerTarget.current) {
-        observer.unobserve(observerTarget.current)
-      }
+      document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [hasMore, loading, loadingMore, skip])
+  }, [])
 
-  const fetchLogs = async (currentSkip, isInitial = false) => {
+  const fetchActivityTypes = async () => {
     try {
-      if (isInitial) {
-        setInitialLoading(true)
-      } else {
-        setLoadingMore(true)
-      }
-      
-      const params = {
-        limit: logsPerPage,
-        skip: currentSkip,
-        ...(startDate && { start_date: startDate }),
-        ...(endDate && { end_date: endDate }),
-        ...(selectedType && { activity_type: selectedType }),
-        ...(selectedUserId && { user_id: selectedUserId }),
-        ...(searchQuery && { search: searchQuery })
-      }
-      
-      const response = await getActivityLogs(params)
-      const newLogs = response.data || []
-      
-      if (isInitial) {
-        setLogs(newLogs)
-      } else {
-        setLogs(prev => [...prev, ...newLogs])
-      }
-      
-      setHasMore(newLogs.length === logsPerPage)
+      const response = await getActivityTypes()
+      setActivityTypes(response.data?.types || [])
     } catch (error) {
-      console.error('Error fetching activity logs:', error)
-    } finally {
-      setInitialLoading(false)
-      setLoadingMore(false)
+      console.error('Error fetching activity types:', error)
     }
   }
 
-  // We don't need a separate fetchCount for infinite scroll but we'll keep it for info
-  useEffect(() => {
-    fetchCount()
-  }, [startDate, endDate, selectedType, selectedUserId, searchQuery])
+  const fetchActivityUsers = async () => {
+    try {
+      const response = await getActivityUsers()
+      // Backend returns { users: [...] } where each user has id, name, email
+      setUsers(response.data?.users || [])
+    } catch (error) {
+      console.error('Error fetching activity users:', error)
+    }
+  }
+
+  const fetchLogs = async () => {
+    try {
+      setLoading(true)
+      const skip = (currentPage - 1) * logsPerPage
+      const params = {
+        limit: logsPerPage,
+        skip,
+        ...(startDate && { start_date: startDate }),
+        ...(endDate && { end_date: endDate }),
+        ...(selectedType && { activity_type: selectedType }),
+        ...(selectedUserId && { user_id: selectedUserId })
+      }
+      const response = await getActivityLogs(params)
+      setLogs(response.data || [])
+    } catch (error) {
+      console.error('Error fetching activity logs:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const fetchCount = async () => {
     try {
@@ -119,8 +106,7 @@ const ActivityLogs = () => {
         ...(startDate && { start_date: startDate }),
         ...(endDate && { end_date: endDate }),
         ...(selectedType && { activity_type: selectedType }),
-        ...(selectedUserId && { user_id: selectedUserId }),
-        ...(searchQuery && { search: searchQuery })
+        ...(selectedUserId && { user_id: selectedUserId })
       }
       const response = await getActivityLogsCount(params)
       setTotalCount(response.data?.count || 0)
@@ -269,19 +255,17 @@ const ActivityLogs = () => {
     setEndDate('')
     setSelectedType('')
     setSelectedUserId('')
-    setSearchQuery('')
-    setSkip(0)
+    setCurrentPage(1)
   }
 
-  const hasActiveFilters = startDate || endDate || selectedType || selectedUserId || searchQuery
+  const hasActiveFilters = startDate || endDate || selectedType || selectedUserId
 
-  if (initialLoading && logs.length === 0) {
+  const totalPages = Math.ceil(totalCount / logsPerPage)
+
+  if (loading && logs.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-          <p className="text-gray-400">Loading activity logs...</p>
-        </div>
+        <p className="text-gray-400">Loading activity logs...</p>
       </div>
     )
   }
@@ -294,18 +278,7 @@ const ActivityLogs = () => {
       {/* Filter Section */}
       <div className="bg-glass-100 rounded-lg p-4 mb-6">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder="Filter by name or description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-glass-200 border border-glass-300 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
-            />
-          </div>
-
-          <span className="text-sm text-gray-300 font-medium ml-2">Filters:</span>
+          <span className="text-sm text-gray-300 font-medium">Filter by:</span>
           
           {/* Date Range Filter */}
           <div className="relative" ref={dateFilterRef}>
@@ -446,6 +419,71 @@ const ActivityLogs = () => {
         </div>
       </div>
 
+      {/* Pagination Controls */}
+      {totalCount > 0 && (
+        <div className="flex items-center justify-between text-sm text-gray-400 mb-4">
+          <div>
+            Showing {((currentPage - 1) * logsPerPage) + 1} to {Math.min(currentPage * logsPerPage, totalCount)} of {totalCount} logs
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
+            >
+              <ChevronLeft size={16} />
+              Newer
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum
+                if (totalPages <= 5) {
+                  pageNum = i + 1
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i
+                } else {
+                  pageNum = currentPage - 2 + i
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-glass-200 hover:bg-glass-300'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                )
+              })}
+              {totalPages > 5 && currentPage < totalPages - 2 && (
+                <>
+                  <span className="px-2">...</span>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 transition-colors"
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
+            >
+              Older
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Logs Display */}
       {logs.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
@@ -510,19 +548,6 @@ const ActivityLogs = () => {
               </div>
             </div>
           ))}
-
-          {/* Infinite Scroll Load More / Sentinel */}
-          <div ref={observerTarget} className="py-8 flex justify-center">
-            {loadingMore && (
-              <div className="flex items-center gap-2 text-primary-400">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500"></div>
-                <span className="text-sm">Loading more logs...</span>
-              </div>
-            )}
-            {!hasMore && logs.length > 0 && (
-              <p className="text-sm text-gray-500">No more logs to load</p>
-            )}
-          </div>
         </div>
       )}
     </div>

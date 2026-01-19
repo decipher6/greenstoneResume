@@ -53,8 +53,7 @@ async def get_activity_logs(
     start_date: Optional[str] = Query(None, description="Start date filter (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date filter (YYYY-MM-DD)"),
     activity_type: Optional[str] = Query(None, description="Filter by activity type (entity_type)"),
-    user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    search: Optional[str] = Query(None, description="Search in description or action")
+    user_id: Optional[str] = Query(None, description="Filter by user ID")
 ):
     """Get activity logs with filtering and pagination (30 logs per page)"""
     # Run cleanup before fetching logs
@@ -65,25 +64,15 @@ async def get_activity_logs(
     # Build query filter
     query = {}
     
-    # User filter
+    # Exclude system jobs (activities without user_id) and apply user filter if provided
     if user_id:
-        # Match as either string or ObjectId to be safe, though usually stored as string
-        user_id_matches = [user_id]
         try:
-            user_id_matches.append(ObjectId(user_id))
+            query["user_id"] = ObjectId(user_id)
         except:
-            pass
-        query["user_id"] = {"$in": user_id_matches}
+            query["user_id"] = user_id
     else:
         # Only show logs with user_id (exclude system jobs)
         query["user_id"] = {"$ne": None}
-    
-    # Search filter (description or action)
-    if search:
-        query["$or"] = [
-            {"description": {"$regex": search, "$options": "i"}},
-            {"action": {"$regex": search, "$options": "i"}}
-        ]
     
     # Date range filter
     if start_date or end_date:
@@ -136,8 +125,7 @@ async def get_activity_logs_count(
     start_date: Optional[str] = Query(None, description="Start date filter (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date filter (YYYY-MM-DD)"),
     activity_type: Optional[str] = Query(None, description="Filter by activity type (entity_type)"),
-    user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    search: Optional[str] = Query(None, description="Search in description or action")
+    user_id: Optional[str] = Query(None, description="Filter by user ID")
 ):
     """Get total count of activity logs matching filters"""
     db = get_db()
@@ -145,24 +133,15 @@ async def get_activity_logs_count(
     # Build query filter (same as get_activity_logs)
     query = {}
     
-    # User filter
+    # Exclude system jobs (activities without user_id) and apply user filter if provided
     if user_id:
-        user_id_matches = [user_id]
         try:
-            user_id_matches.append(ObjectId(user_id))
+            query["user_id"] = ObjectId(user_id)
         except:
-            pass
-        query["user_id"] = {"$in": user_id_matches}
+            query["user_id"] = user_id
     else:
         # Only show logs with user_id (exclude system jobs)
         query["user_id"] = {"$ne": None}
-    
-    # Search filter
-    if search:
-        query["$or"] = [
-            {"description": {"$regex": search, "$options": "i"}},
-            {"action": {"$regex": search, "$options": "i"}}
-        ]
     
     if start_date or end_date:
         date_filter = {}
