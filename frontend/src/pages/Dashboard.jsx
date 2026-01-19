@@ -356,19 +356,21 @@ const Dashboard = () => {
                 <div className="space-y-2">
                   <div>Department</div>
                   {showFilters && (
-                    <div className="space-y-1 max-h-32 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <select
+                      multiple
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.department}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value)
+                        setFilters({...filters, department: selected})
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      size={Math.min(departments.length, 5)}
+                    >
                       {departments.map(dept => (
-                        <label key={dept} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-glass-100 p-1 rounded">
-                          <input
-                            type="checkbox"
-                            checked={filters.department.includes(dept)}
-                            onChange={() => toggleDepartmentFilter(dept)}
-                            className="rounded"
-                          />
-                          <span>{dept}</span>
-                        </label>
+                        <option key={dept} value={dept}>{dept}</option>
                       ))}
-                    </div>
+                    </select>
                   )}
                 </div>
               </th>
@@ -425,19 +427,22 @@ const Dashboard = () => {
                 <div className="space-y-2">
                   <div>Status</div>
                   {showFilters && (
-                    <div className="space-y-1 max-h-32 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                      {['active', 'on-hold', 'filled', 'cancelled'].map(status => (
-                        <label key={status} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-glass-100 p-1 rounded">
-                          <input
-                            type="checkbox"
-                            checked={filters.status.includes(status)}
-                            onChange={() => toggleStatusFilter(status)}
-                            className="rounded"
-                          />
-                          <span className="capitalize">{status === 'on-hold' ? 'On-Hold' : status}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <select
+                      multiple
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.status}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value)
+                        setFilters({...filters, status: selected})
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      size={4}
+                    >
+                      <option value="active">Active</option>
+                      <option value="on-hold">On-Hold</option>
+                      <option value="filled">Filled</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
                   )}
                 </div>
               </th>

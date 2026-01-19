@@ -1129,19 +1129,22 @@ const JobDetail = () => {
                 <div className="space-y-2">
                   <div>Status</div>
                   {showFilters && (
-                    <div className="space-y-1 max-h-32 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                      {['analyzed', 'shortlisted', 'interview', 'rejected'].map(status => (
-                        <label key={status} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-glass-100 p-1 rounded">
-                          <input
-                            type="checkbox"
-                            checked={filters.status.includes(status)}
-                            onChange={() => toggleStatusFilter(status)}
-                            className="rounded"
-                          />
-                          <span className="capitalize">{status}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <select
+                      multiple
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.status}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value)
+                        setFilters({...filters, status: selected})
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      size={4}
+                    >
+                      <option value="analyzed">Analyzed</option>
+                      <option value="shortlisted">Shortlisted</option>
+                      <option value="interview">Interview</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
                   )}
                 </div>
               </th>
@@ -1157,19 +1160,23 @@ const JobDetail = () => {
                     {ratingSort === 'desc' && <span className="text-xs text-gray-400">(High-Low)</span>}
                   </div>
                   {showFilters && (
-                    <div className="space-y-1 max-h-32 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                      {[5, 4, 3, 2, 1].map(rating => (
-                        <label key={rating} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-glass-100 p-1 rounded">
-                          <input
-                            type="checkbox"
-                            checked={filters.rating.includes(rating.toString())}
-                            onChange={() => toggleRatingFilter(rating.toString())}
-                            className="rounded"
-                          />
-                          <span>{rating} Star{rating !== 1 ? 's' : ''}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <select
+                      multiple
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.rating}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value)
+                        setFilters({...filters, rating: selected})
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      size={5}
+                    >
+                      <option value="5">5 Stars</option>
+                      <option value="4">4 Stars</option>
+                      <option value="3">3 Stars</option>
+                      <option value="2">2 Stars</option>
+                      <option value="1">1 Star</option>
+                    </select>
                   )}
                 </div>
               </th>
