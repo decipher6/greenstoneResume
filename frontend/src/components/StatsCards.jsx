@@ -28,44 +28,65 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
 
 const StatsCards = () => {
   const [stats, setStats] = useState(null)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
+    let isMounted = true
+    
+    const fetchStats = async () => {
+      try {
+        const statsRes = await getDashboardStats()
+        if (isMounted) {
+          setStats(statsRes.data)
+          setError(false)
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error)
+        if (isMounted) {
+          setError(true)
+          // Set default values on error to prevent crash
+          setStats({
+            active_jobs: 0,
+            total_candidates: 0,
+            jobs_on_hold: 0,
+            jobs_filled: 0
+          })
+        }
+      }
+    }
+    
     fetchStats()
+    
+    return () => {
+      isMounted = false
+    }
   }, [])
 
-  const fetchStats = async () => {
-    try {
-      const statsRes = await getDashboardStats()
-      setStats(statsRes.data)
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error)
-    }
-  }
-
+  // Always render, even if stats are null or error occurred
   return (
     <div className="grid grid-cols-4 gap-4 mb-6">
       <StatCard
         icon={Briefcase}
         label="Active Jobs"
-        value={stats?.active_jobs || 0}
+        value={stats?.active_jobs ?? 0}
         color="green"
       />
       <StatCard
         icon={Users}
         label="Total Candidates"
-        value={stats?.total_candidates || 0}
+        value={stats?.total_candidates ?? 0}
         color="purple"
       />
       <StatCard
         icon={PauseCircle}
         label="Jobs On Hold"
-        value={stats?.jobs_on_hold || 0}
+        value={stats?.jobs_on_hold ?? 0}
         color="orange"
       />
       <StatCard
         icon={CheckCircle2}
         label="Jobs Filled"
-        value={stats?.jobs_filled || 0}
+        value={stats?.jobs_filled ?? 0}
         color="blue"
       />
     </div>
