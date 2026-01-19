@@ -12,10 +12,7 @@ const Dashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState({
-    title: '',
     department: [], // Changed to array for multi-select
-    minCandidates: '',
-    maxCandidates: '',
     status: [] // Changed to array for multi-select
   })
   const [titleSort, setTitleSort] = useState(null) // null, 'asc', 'desc'
@@ -65,13 +62,6 @@ const Dashboard = () => {
       )
     }
 
-    // Title filter
-    if (filters.title) {
-      const query = filters.title.toLowerCase()
-      filtered = filtered.filter(job => 
-        job.title?.toLowerCase().includes(query)
-      )
-    }
 
     // Department filter (multi-select)
     if (filters.department && filters.department.length > 0) {
@@ -80,16 +70,6 @@ const Dashboard = () => {
       )
     }
 
-    // Candidate count filters
-    if (filters.minCandidates) {
-      const min = parseInt(filters.minCandidates)
-      filtered = filtered.filter(job => (job.candidate_count || 0) >= min)
-    }
-
-    if (filters.maxCandidates) {
-      const max = parseInt(filters.maxCandidates)
-      filtered = filtered.filter(job => (job.candidate_count || 0) <= max)
-    }
 
     // Status filter (multi-select)
     if (filters.status && filters.status.length > 0) {
@@ -149,10 +129,7 @@ const Dashboard = () => {
     setSearchQuery('')
     setKeywordSearch('')
     setFilters({
-      title: '',
       department: [],
-      minCandidates: '',
-      maxCandidates: '',
       status: []
     })
     setTitleSort(null)
@@ -333,21 +310,11 @@ const Dashboard = () => {
                 className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
                 onClick={toggleTitleSort}
               >
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span>Title</span>
-                    <ArrowUpDown size={14} className="text-gray-400" />
-                    {titleSort === 'asc' && <span className="text-xs text-gray-400">(A-Z)</span>}
-                    {titleSort === 'desc' && <span className="text-xs text-gray-400">(Z-A)</span>}
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Filter title..."
-                    className="glass-input w-full text-xs py-1.5 px-2 mt-2"
-                    value={filters.title}
-                    onChange={(e) => setFilters({...filters, title: e.target.value})}
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                <div className="flex items-center gap-2">
+                  <span>Title</span>
+                  <ArrowUpDown size={14} className="text-gray-400" />
+                  {titleSort === 'asc' && <span className="text-xs text-gray-400">(A-Z)</span>}
+                  {titleSort === 'desc' && <span className="text-xs text-gray-400">(Z-A)</span>}
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold relative">
@@ -389,32 +356,11 @@ const Dashboard = () => {
                 className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
                 onClick={toggleCandidatesSort}
               >
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span># Candidates</span>
-                    <ArrowUpDown size={14} className="text-gray-400" />
-                    {candidatesSort === 'asc' && <span className="text-xs text-gray-400">(Low-High)</span>}
-                    {candidatesSort === 'desc' && <span className="text-xs text-gray-400">(High-Low)</span>}
-                  </div>
-                  <div className="flex items-center gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Min"
-                      className="glass-input w-16 text-xs py-1.5 px-2"
-                      value={filters.minCandidates}
-                      onChange={(e) => setFilters({...filters, minCandidates: e.target.value})}
-                    />
-                    <span className="text-gray-400 text-xs">-</span>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Max"
-                      className="glass-input w-16 text-xs py-1.5 px-2"
-                      value={filters.maxCandidates}
-                      onChange={(e) => setFilters({...filters, maxCandidates: e.target.value})}
-                    />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span># Candidates</span>
+                  <ArrowUpDown size={14} className="text-gray-400" />
+                  {candidatesSort === 'asc' && <span className="text-xs text-gray-400">(Low-High)</span>}
+                  {candidatesSort === 'desc' && <span className="text-xs text-gray-400">(High-Low)</span>}
                 </div>
               </th>
               <th 
