@@ -196,6 +196,76 @@ async def get_interview_mailto_links(
         "links": mailto_links
     }
 
+@router.post("/rejection-links")
+async def get_rejection_mailto_links(
+    request: InterviewLinksRequest,
+    user_id: Optional[str] = Depends(get_current_user_id)
+):
+    """Generate mailto links for rejection emails"""
+    db = get_db()
+    
+    # Verify job exists
+    job = await db.jobs.find_one({"_id": ObjectId(request.job_id)})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    job_title = job.get("title", "Position")
+    mailto_links = []
+    
+    for candidate_id in request.candidate_ids:
+        candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+        if not candidate:
+            continue
+        
+        candidate_email = candidate.get("contact_info", {}).get("email")
+        if not candidate_email:
+            continue
+        
+        candidate_name = candidate.get("name", "Candidate")
+        
+        # Replace placeholders in template
+        subject = request.template.subject.replace("[Job Title]", job_title)
+        body = request.template.body.replace("[Candidate Name]", candidate_name)
+        body = body.replace("[Job Title]", job_title)
+        
+        # Build mailto URL with proper encoding
+        mailto_url = "mailto:" + candidate_email
+        params = []
+        if subject:
+            params.append(f"subject={urllib.parse.quote(subject, safe='')}")
+        if body:
+            body_encoded = urllib.parse.quote(body, safe='')
+            params.append(f"body={body_encoded}")
+        
+        if params:
+            mailto_url += "?" + "&".join(params)
+        
+        mailto_links.append({
+            "candidate_id": candidate_id,
+            "candidate_name": candidate_name,
+            "email": candidate_email,
+            "mailto_url": mailto_url
+        })
+    
+    # Log activity
+    await log_activity(
+        action="rejection_links_generated",
+        entity_type="email",
+        description=f"Generated rejection mailto links for {len(mailto_links)} candidate(s) for job: {job.get('title', 'Unknown')}",
+        entity_id=request.job_id,
+        user_id=user_id,
+        metadata={
+            "candidate_count": len(mailto_links),
+            "template_type": "rejection",
+            "candidate_ids": request.candidate_ids
+        }
+    )
+    
+    return {
+        "message": f"Generated {len(mailto_links)} mailto link(s)",
+        "links": mailto_links
+    }
+
 @router.post("/test")
 async def test_email():
     """Test Resend email configuration by sending a test email"""

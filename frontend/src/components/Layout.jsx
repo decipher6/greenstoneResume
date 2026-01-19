@@ -47,7 +47,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
             />
             {isExpanded && (
               <div className="text-center">
-                <p className="text-sm text-gray-400">ResumAI</p>
+                <p className="text-sm text-gray-400">AI Resume Checker</p>
               </div>
             )}
           </div>
