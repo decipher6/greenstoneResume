@@ -30,20 +30,37 @@ def ensure_upload_dir():
     if not os.getenv("VERCEL") and not os.path.exists(UPLOAD_DIR):
         os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-async def process_single_file(file: UploadFile, job_id: str, file_index: int):
+async def process_single_file(file_content: bytes, filename: str, job_id: str, file_index: int):
     """Process a single file and return candidate dict or error"""
     try:
-        file_content = await file.read()
-        resume_text = await parse_resume(file_content, file.filename)
+        if not file_content or len(file_content) == 0:
+            return {"success": False, "error": "File is empty", "filename": filename}
         
-        contact_info_dict = await extract_contact_info(resume_text)
-        name = await extract_name(resume_text)
+        # Parse resume
+        try:
+            resume_text = await parse_resume(file_content, filename)
+            if not resume_text or len(resume_text.strip()) == 0:
+                return {"success": False, "error": "Could not extract text from file", "filename": filename}
+        except Exception as parse_error:
+            return {"success": False, "error": f"Failed to parse file: {str(parse_error)}", "filename": filename}
+        
+        # Extract contact info and name
+        try:
+            contact_info_dict = await extract_contact_info(resume_text)
+            name = await extract_name(resume_text)
+        except Exception as extract_error:
+            # Continue even if extraction fails, use defaults
+            contact_info_dict = {}
+            name = filename.split('.')[0]  # Use filename as fallback
+            print(f"Warning: Extraction failed for {filename}: {extract_error}")
         
         # Ensure upload directory exists (only for non-serverless)
         ensure_upload_dir()
         # Use unique timestamp with file index to avoid collisions
         timestamp = datetime.now().timestamp()
-        file_path = os.path.join(UPLOAD_DIR, f"{job_id}_{timestamp}_{file_index}_{file.filename}")
+        file_path = os.path.join(UPLOAD_DIR, f"{job_id}_{timestamp}_{file_index}_{filename}")
+        
+        # Write file to disk
         async with aiofiles.open(file_path, 'wb') as f:
             await f.write(file_content)
         
@@ -57,10 +74,13 @@ async def process_single_file(file: UploadFile, job_id: str, file_index: int):
             "created_at": datetime.now()
         }
         
-        return {"success": True, "data": candidate_dict, "filename": file.filename}
+        return {"success": True, "data": candidate_dict, "filename": filename}
     except Exception as e:
-        print(f"Error processing {file.filename}: {e}")
-        return {"success": False, "error": str(e), "filename": file.filename}
+        error_msg = str(e)
+        print(f"Error processing {filename}: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": error_msg, "filename": filename}
 
 @router.post("/upload-bulk")
 async def upload_candidates_bulk(
@@ -98,12 +118,37 @@ async def upload_candidates_bulk(
     uploaded_candidates = []
     failed_files = []
     
+    # Read all file contents first (to avoid issues with parallel file reading)
+    file_data = []
+    for file in files:
+        try:
+            await file.seek(0)  # Reset to beginning
+            content = await file.read()
+            filename = file.filename or "unknown"
+            file_data.append({"content": content, "filename": filename})
+        except Exception as e:
+            failed_files.append({"filename": file.filename or "unknown", "error": f"Failed to read file: {str(e)}"})
+            file_data.append(None)
+    
     # Process files in batches
-    for batch_start in range(0, len(files), BATCH_SIZE):
-        batch = files[batch_start:batch_start + BATCH_SIZE]
+    for batch_start in range(0, len(file_data), BATCH_SIZE):
+        batch = file_data[batch_start:batch_start + BATCH_SIZE]
         
         # Process batch in parallel with unique file indices
-        tasks = [process_single_file(file, job_id, batch_start + idx) for idx, file in enumerate(batch)]
+        tasks = []
+        for idx, file_info in enumerate(batch):
+            if file_info is None:
+                continue  # Skip files that failed to read
+            tasks.append(process_single_file(
+                file_info["content"], 
+                file_info["filename"], 
+                job_id, 
+                batch_start + idx
+            ))
+        
+        if not tasks:
+            continue
+            
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # Collect successful candidates and errors

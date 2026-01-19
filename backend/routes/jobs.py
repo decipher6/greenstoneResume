@@ -140,12 +140,35 @@ async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force:
         metadata={"candidates_count": len(candidates), "force": force}
     )
     
-    # Process candidates in background
-    for candidate in candidates:
-        background_tasks.add_task(process_candidate_analysis, job_id, str(candidate["_id"]))
+    # Process candidates in parallel batches for better performance
+    import asyncio
+    
+    async def run_parallel_analysis():
+        """Run candidate analysis in parallel batches"""
+        # Limit concurrent analyses to avoid overwhelming the API
+        semaphore = asyncio.Semaphore(10)  # Process 10 candidates in parallel
+        
+        async def analyze_with_semaphore(candidate_id: str):
+            async with semaphore:
+                try:
+                    await process_candidate_analysis(job_id, candidate_id)
+                except Exception as e:
+                    print(f"Error analyzing candidate {candidate_id}: {e}")
+                    import traceback
+                    traceback.print_exc()
+        
+        # Create tasks for all candidates
+        tasks = [analyze_with_semaphore(str(candidate["_id"])) for candidate in candidates]
+        
+        # Run all tasks in parallel
+        await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Start parallel analysis in background
+    # FastAPI BackgroundTasks can handle async functions
+    background_tasks.add_task(run_parallel_analysis)
     
     return {
-        "message": f"Analysis started for {len(candidates)} candidates",
+        "message": f"Analysis started for {len(candidates)} candidates (processing in parallel)",
         "candidates_queued": len(candidates),
         "force": force
     }
