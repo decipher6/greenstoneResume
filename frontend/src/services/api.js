@@ -43,6 +43,7 @@ export const uploadCandidatesBulk = (jobId, files) => {
   formData.append('job_id', jobId)
   return api.post('/candidates/upload-bulk', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 300000, // 5 minutes timeout for large uploads
   })
 }
 export const deleteCandidate = (candidateId) => api.delete(`/candidates/${candidateId}`)

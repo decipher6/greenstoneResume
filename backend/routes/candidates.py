@@ -4,6 +4,8 @@ from datetime import datetime
 from bson import ObjectId
 import aiofiles
 import os
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from database import get_db
 
@@ -28,13 +30,45 @@ def ensure_upload_dir():
     if not os.getenv("VERCEL") and not os.path.exists(UPLOAD_DIR):
         os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+async def process_single_file(file: UploadFile, job_id: str, file_index: int):
+    """Process a single file and return candidate dict or error"""
+    try:
+        file_content = await file.read()
+        resume_text = await parse_resume(file_content, file.filename)
+        
+        contact_info_dict = await extract_contact_info(resume_text)
+        name = await extract_name(resume_text)
+        
+        # Ensure upload directory exists (only for non-serverless)
+        ensure_upload_dir()
+        # Use unique timestamp with file index to avoid collisions
+        timestamp = datetime.now().timestamp()
+        file_path = os.path.join(UPLOAD_DIR, f"{job_id}_{timestamp}_{file_index}_{file.filename}")
+        async with aiofiles.open(file_path, 'wb') as f:
+            await f.write(file_content)
+        
+        candidate_dict = {
+            "job_id": job_id,
+            "name": name,
+            "contact_info": contact_info_dict,
+            "resume_text": resume_text,
+            "resume_file_path": file_path,
+            "status": CandidateStatus.uploaded.value,
+            "created_at": datetime.now()
+        }
+        
+        return {"success": True, "data": candidate_dict, "filename": file.filename}
+    except Exception as e:
+        print(f"Error processing {file.filename}: {e}")
+        return {"success": False, "error": str(e), "filename": file.filename}
+
 @router.post("/upload-bulk")
 async def upload_candidates_bulk(
     job_id: str = Form(...),
     files: List[UploadFile] = File(...),
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
-    """Upload multiple candidate CVs (max 50 files)"""
+    """Upload multiple candidate CVs (processes in parallel batches for performance)"""
     db = get_db()
     
     # Verify job exists
@@ -42,11 +76,12 @@ async def upload_candidates_bulk(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    # Validate file limit (50 CVs max)
-    if len(files) > 50:
+    # Increased file limit to 200 (can be adjusted)
+    MAX_FILES = 200
+    if len(files) > MAX_FILES:
         raise HTTPException(
             status_code=400, 
-            detail=f"Maximum 50 files allowed. You uploaded {len(files)} files."
+            detail=f"Maximum {MAX_FILES} files allowed. You uploaded {len(files)} files."
         )
     
     # Validate file formats
@@ -63,45 +98,55 @@ async def upload_candidates_bulk(
             detail=f"Invalid file format(s): {', '.join(invalid_files)}. Supported formats: .pdf, .docx, .doc"
         )
     
+    # Process files in parallel batches (10 at a time to avoid overwhelming the system)
+    BATCH_SIZE = 10
     uploaded_candidates = []
+    failed_files = []
     
-    for file in files:
-        try:
-            file_content = await file.read()
-            resume_text = await parse_resume(file_content, file.filename)
-            
-            contact_info_dict = await extract_contact_info(resume_text)
-            name = await extract_name(resume_text)
-            
-            # Ensure upload directory exists (only for non-serverless)
-            ensure_upload_dir()
-            file_path = os.path.join(UPLOAD_DIR, f"{job_id}_{datetime.now().timestamp()}_{file.filename}")
-            async with aiofiles.open(file_path, 'wb') as f:
-                await f.write(file_content)
-            
-            candidate_dict = {
-                "job_id": job_id,
-                "name": name,
-                "contact_info": contact_info_dict,
-                "resume_text": resume_text,
-                "resume_file_path": file_path,
-                "status": CandidateStatus.uploaded.value,
-                "created_at": datetime.now()
-            }
-            
-            result = await db.candidates.insert_one(candidate_dict)
-            candidate_dict["id"] = str(result.inserted_id)
-            uploaded_candidates.append(Candidate(**candidate_dict))
-            
-        except Exception as e:
-            print(f"Error uploading {file.filename}: {e}")
-            continue
+    # Process files in batches
+    for batch_start in range(0, len(files), BATCH_SIZE):
+        batch = files[batch_start:batch_start + BATCH_SIZE]
+        
+        # Process batch in parallel with unique file indices
+        tasks = [process_single_file(file, job_id, batch_start + idx) for idx, file in enumerate(batch)]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Collect successful candidates and errors
+        batch_candidates = []
+        for result in results:
+            if isinstance(result, Exception):
+                failed_files.append({"filename": "unknown", "error": str(result)})
+            elif result.get("success"):
+                batch_candidates.append(result["data"])
+            else:
+                failed_files.append({"filename": result.get("filename", "unknown"), "error": result.get("error", "Unknown error")})
+        
+        # Bulk insert candidates for this batch
+        if batch_candidates:
+            try:
+                insert_results = await db.candidates.insert_many(batch_candidates)
+                # Add IDs to candidate dicts
+                for idx, candidate_dict in enumerate(batch_candidates):
+                    candidate_dict["id"] = str(insert_results.inserted_ids[idx])
+                    uploaded_candidates.append(Candidate(**candidate_dict))
+            except Exception as e:
+                print(f"Error bulk inserting candidates: {e}")
+                # Fallback to individual inserts if bulk insert fails
+                for candidate_dict in batch_candidates:
+                    try:
+                        result = await db.candidates.insert_one(candidate_dict)
+                        candidate_dict["id"] = str(result.inserted_id)
+                        uploaded_candidates.append(Candidate(**candidate_dict))
+                    except Exception as e2:
+                        print(f"Error inserting candidate {candidate_dict.get('name', 'unknown')}: {e2}")
+                        failed_files.append({"filename": candidate_dict.get('resume_file_path', 'unknown'), "error": str(e2)})
     
     # Update job candidate count
-    await db.jobs.update_one(
-        {"_id": ObjectId(job_id)},
-        {"$inc": {"candidate_count": len(uploaded_candidates)}}
-    )
+    if uploaded_candidates:
+        await db.jobs.update_one(
+            {"_id": ObjectId(job_id)},
+            {"$inc": {"candidate_count": len(uploaded_candidates)}}
+        )
     
     # Log activity
     job = await db.jobs.find_one({"_id": ObjectId(job_id)})
@@ -111,10 +156,19 @@ async def upload_candidates_bulk(
         description=f"Uploaded {len(uploaded_candidates)} candidate(s) for job: {job.get('title', 'Unknown') if job else 'Unknown'}",
         entity_id=job_id,
         user_id=user_id,
-        metadata={"count": len(uploaded_candidates), "job_id": job_id}
+        metadata={"count": len(uploaded_candidates), "job_id": job_id, "failed": len(failed_files)}
     )
     
-    return {"uploaded": len(uploaded_candidates), "candidates": uploaded_candidates}
+    response = {
+        "uploaded": len(uploaded_candidates),
+        "failed": len(failed_files),
+        "candidates": uploaded_candidates
+    }
+    
+    if failed_files:
+        response["failed_files"] = failed_files[:10]  # Limit to first 10 errors to avoid huge response
+    
+    return response
 
 @router.get("/job/{job_id}", response_model=List[Candidate])
 async def get_candidates_by_job(

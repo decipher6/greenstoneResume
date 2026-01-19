@@ -86,11 +86,12 @@ const JobDetail = () => {
   const validateFiles = (files) => {
     const fileArray = Array.from(files)
     
-    // Validate file limit (50 CVs max)
-    if (fileArray.length > 50) {
+    // Validate file limit (200 CVs max - increased for better performance)
+    const MAX_FILES = 200
+    if (fileArray.length > MAX_FILES) {
       return {
         valid: false,
-        error: `Maximum 50 files allowed. You selected ${fileArray.length} files. Please select fewer files.`,
+        error: `Maximum ${MAX_FILES} files allowed. You selected ${fileArray.length} files. Please select fewer files.`,
         errorTitle: 'File Limit Exceeded'
       }
     }
@@ -140,13 +141,28 @@ const JobDetail = () => {
 
     setIsUploading(true)
     try {
-      await uploadCandidatesBulk(jobId, pendingFiles)
-      await showAlert('Success', `Successfully uploaded ${pendingFiles.length} file(s)!`, 'success')
+      const response = await uploadCandidatesBulk(jobId, pendingFiles)
+      const data = response.data || {}
+      const uploaded = data.uploaded || 0
+      const failed = data.failed || 0
+      
+      let message = `Successfully uploaded ${uploaded} file(s)!`
+      if (failed > 0) {
+        message += `\n\n${failed} file(s) failed to upload.`
+        if (data.failed_files && data.failed_files.length > 0) {
+          const failedNames = data.failed_files.slice(0, 5).map(f => f.filename || 'Unknown').join(', ')
+          message += `\n\nFailed files: ${failedNames}${data.failed_files.length > 5 ? '...' : ''}`
+        }
+        await showAlert('Partial Success', message, 'warning')
+      } else {
+        await showAlert('Success', message, 'success')
+      }
+      
       setPendingFiles([])
       fetchData()
       
       // Auto-analyze if setting is enabled
-      if (autoAnalyze) {
+      if (autoAnalyze && uploaded > 0) {
         setTimeout(async () => {
           try {
             await runAnalysis(jobId, false) // false = only analyze new candidates
@@ -163,7 +179,16 @@ const JobDetail = () => {
       }
     } catch (error) {
       console.error('Error uploading files:', error)
-      await showAlert('Error', 'Error uploading files. Please try again.', 'error')
+      let errorMessage = 'Error uploading files. Please try again.'
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = 'Upload timed out. The files may still be processing. Please check back in a moment.'
+      }
+      await showAlert('Error', errorMessage, 'error')
     } finally {
       setIsUploading(false)
     }
