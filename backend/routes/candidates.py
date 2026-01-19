@@ -59,10 +59,12 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
         # Extract contact info and name
         try:
             contact_info_dict = await extract_contact_info(resume_text)
-            name = await extract_name(resume_text)
+            # Pass contact_info to extract_name so it can use email as fallback
+            name = await extract_name(resume_text, contact_info_dict)
         except Exception as extract_error:
             # Continue even if extraction fails, use defaults
             contact_info_dict = {}
+            # Try to extract email from filename or use filename as fallback
             name = filename.split('.')[0]  # Use filename as fallback
             print(f"Warning: Extraction failed for {filename}: {extract_error}")
         

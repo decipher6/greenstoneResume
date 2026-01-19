@@ -26,8 +26,15 @@ async def extract_contact_info(text: str) -> Dict[str, Optional[str]]:
         "phone": cleaned_phones[0] if cleaned_phones else None
     }
 
-async def extract_name(text: str) -> str:
-    """Extract candidate name from resume (simplified - first 2-3 words of first line)"""
+async def extract_name(text: str, contact_info: Optional[Dict[str, Optional[str]]] = None) -> str:
+    """Extract candidate name from resume (simplified - first 2-3 words of first line)
+    
+    If name extraction fails, falls back to:
+    1. Email username (part before @) if email is available
+    2. First 2 words of text
+    3. First word of text
+    4. "Unknown Candidate"
+    """
     lines = text.split('\n')
     for line in lines[:5]:  # Check first 5 lines
         line = line.strip()
@@ -36,7 +43,19 @@ async def extract_name(text: str) -> str:
             if line.replace(' ', '').isalpha() or (line.replace(' ', '').isalnum() and len(line) < 50):
                 return line
     
-    # If no name found, return first 2 words of the text
+    # If no name found, try email username as fallback
+    if contact_info and contact_info.get("email"):
+        email = contact_info["email"]
+        email_username = email.split('@')[0]
+        # Clean up common email patterns (e.g., firstname.lastname -> Firstname Lastname)
+        # Replace dots and underscores with spaces, then capitalize
+        name_from_email = email_username.replace('.', ' ').replace('_', ' ').replace('-', ' ')
+        # Capitalize first letter of each word
+        name_from_email = ' '.join(word.capitalize() for word in name_from_email.split() if word)
+        if name_from_email and len(name_from_email) > 1:
+            return name_from_email
+    
+    # If no email or email extraction didn't work, return first 2 words of the text
     words = text.split()
     if len(words) >= 2:
         return ' '.join(words[:2])

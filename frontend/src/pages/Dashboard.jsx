@@ -272,7 +272,7 @@ const Dashboard = () => {
               onClick={() => setShowCreateModal(true)}
               className="glass-button flex items-center gap-2 whitespace-nowrap"
             >
-              <Plus size={20} />
+              <Plus size={32} />
               Create New Job
             </button>
             <div className="flex-1"></div>
