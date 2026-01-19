@@ -17,9 +17,13 @@ const JobDetail = () => {
   const [topCandidates, setTopCandidates] = useState([])
   const [topCandidatesLimit, setTopCandidatesLimit] = useState(5)
   const [selectedCandidates, setSelectedCandidates] = useState([])
-  const [showFilters, setShowFilters] = useState(false)
   const [nameSearch, setNameSearch] = useState('')
   const [filters, setFilters] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    status: '',
+    rating: '',
     min_resume_score: '',
     min_ccat_score: '',
     min_overall_score: '',
@@ -46,7 +50,7 @@ const JobDetail = () => {
       if (filters.min_resume_score) params.append('min_resume_score', filters.min_resume_score)
       if (filters.min_ccat_score) params.append('min_ccat_score', filters.min_ccat_score)
       if (filters.min_overall_score) params.append('min_overall_score', filters.min_overall_score)
-      // Always use the latest nameSearch value from ref
+      // Always use the latest nameSearch value from ref (for backward compatibility)
       if (nameSearchRef.current.trim()) params.append('name', nameSearchRef.current.trim())
       // Default to sorting by overall_score descending if no sort_by specified
       params.append('sort_by', filters.sort_by || 'overall_score')
@@ -71,21 +75,12 @@ const JobDetail = () => {
     } catch (error) {
       console.error('Error fetching data:', error)
     }
-  }, [jobId, topCandidatesLimit, filters])
+  }, [jobId, topCandidatesLimit, filters.min_resume_score, filters.min_ccat_score, filters.min_overall_score, filters.sort_by])
 
-  // Debounce name search to avoid excessive API calls
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchData()
-    }, 300)
-    
-    return () => clearTimeout(timeoutId)
-  }, [nameSearch, fetchData])
-
-  // Fetch data when other filters change (immediate)
+  // Fetch data when API filters change (score filters trigger API calls)
   useEffect(() => {
     fetchData()
-  }, [jobId, topCandidatesLimit, filters, fetchData])
+  }, [jobId, topCandidatesLimit, filters.min_resume_score, filters.min_ccat_score, filters.min_overall_score, filters.sort_by, fetchData])
 
   const validateFiles = (files) => {
     const fileArray = Array.from(files)
@@ -298,6 +293,11 @@ const JobDetail = () => {
 
   const clearFilters = () => {
     const clearedFilters = {
+      name: '',
+      email: '',
+      phone: '',
+      status: '',
+      rating: '',
       min_resume_score: '',
       min_ccat_score: '',
       min_overall_score: '',
@@ -312,6 +312,49 @@ const JobDetail = () => {
       const candidatesUrl = `/candidates/job/${jobId}?${params.toString()}`
       api.get(candidatesUrl).then(res => setCandidates(res.data))
     }, 100)
+  }
+
+  // Client-side filtering for name, email, phone, status, rating
+  const getFilteredCandidates = () => {
+    let filtered = [...candidates]
+
+    // Also apply nameSearch for backward compatibility
+    const searchQuery = filters.name || nameSearch
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(c => 
+        c.name?.toLowerCase().includes(query)
+      )
+    }
+
+    if (filters.email) {
+      const query = filters.email.toLowerCase()
+      filtered = filtered.filter(c => 
+        c.contact_info?.email?.toLowerCase().includes(query)
+      )
+    }
+
+    if (filters.phone) {
+      const query = filters.phone.toLowerCase()
+      filtered = filtered.filter(c => 
+        c.contact_info?.phone?.toLowerCase().includes(query)
+      )
+    }
+
+    if (filters.status) {
+      filtered = filtered.filter(c => 
+        (c.status || 'analyzed') === filters.status
+      )
+    }
+
+    if (filters.rating) {
+      const ratingNum = parseInt(filters.rating)
+      filtered = filtered.filter(c => 
+        c.rating === ratingNum
+      )
+    }
+
+    return filtered
   }
 
   const toggleCandidateSelection = (candidateId) => {
@@ -631,42 +674,16 @@ const JobDetail = () => {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Candidates</h3>
                 
-                {/* Name Search and Filter */}
-                <div className="flex items-center gap-3">
-                  <div className="glass-input flex items-center gap-2 w-64">
-                    <Search size={18} className="text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search Candidates"
-                      className="bg-transparent border-0 outline-0 w-full"
-                      value={nameSearch}
-                      onChange={(e) => {
-                        setNameSearch(e.target.value)
-                      }}
-                    />
-                    {nameSearch && (
-                      <button
-                        onClick={() => {
-                          setNameSearch('')
-                        }}
-                        className="p-1 rounded hover:bg-glass-200 transition-colors"
-                      >
-                        <X size={16} className="text-gray-400" />
-                      </button>
-                    )}
-                  </div>
+                {/* Clear Filters Button */}
+                {(Object.values(filters).some(f => f) || nameSearch) && (
                   <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
-                      showFilters 
-                        ? 'bg-glass-200 text-primary-400' 
-                        : 'hover:bg-glass-200 text-gray-400'
-                    }`}
-                    title={showFilters ? 'Hide Filters' : 'Show Filters'}
+                    onClick={clearFilters}
+                    className="glass-button-secondary flex items-center gap-2 text-sm"
                   >
-                    <Filter size={18} />
+                    <X size={16} />
+                    Clear Filters
                   </button>
-                </div>
+                )}
               </div>
             </div>
 
@@ -685,78 +702,10 @@ const JobDetail = () => {
                 </div>
               </div>
             )}
-
-            {/* Filters */}
-            {showFilters && (
-              <div className="p-6 border-b border-glass-200 bg-glass-100">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Min Resume Score</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="0.1"
-                      className="glass-input w-full"
-                      placeholder="0-10"
-                      value={filters.min_resume_score}
-                      onChange={(e) => setFilters({...filters, min_resume_score: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Min CCAT Score</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="0.1"
-                      className="glass-input w-full"
-                      placeholder="0-10"
-                      value={filters.min_ccat_score}
-                      onChange={(e) => setFilters({...filters, min_ccat_score: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Min Overall Score</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="0.1"
-                      className="glass-input w-full"
-                      placeholder="0-10"
-                      value={filters.min_overall_score}
-                      onChange={(e) => setFilters({...filters, min_overall_score: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Sort By</label>
-                    <select
-                      className="glass-input w-full"
-                      value={filters.sort_by}
-                      onChange={(e) => setFilters({...filters, sort_by: e.target.value})}
-                    >
-                      <option value="overall_score">Overall Score</option>
-                      <option value="resume_score">Resume Score</option>
-                      <option value="ccat_score">CCAT Score</option>
-                      <option value="created_at">Date Added</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={applyFilters} className="glass-button">
-                    Apply Filters
-                  </button>
-                  <button onClick={clearFilters} className="glass-button-secondary">
-                    Clear Filters
-                  </button>
-                </div>
-              </div>
-            )}
             <table className="w-full">
           <thead className="bg-glass-100 border-b border-glass-200">
             <tr>
-              <th className="px-6 py-4 text-left">
+              <th className="px-6 py-3 text-left">
                 <input
                   type="checkbox"
                   checked={selectedCandidates.length === candidates.length && candidates.length > 0}
@@ -769,17 +718,109 @@ const JobDetail = () => {
                   }}
                 />
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Name</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Phone</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Rating</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Score</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div>Name</div>
+                  <input
+                    type="text"
+                    placeholder="Filter name..."
+                    className="glass-input w-full text-xs py-1.5 px-2"
+                    value={filters.name}
+                    onChange={(e) => setFilters({...filters, name: e.target.value})}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div>Email</div>
+                  <input
+                    type="text"
+                    placeholder="Filter email..."
+                    className="glass-input w-full text-xs py-1.5 px-2"
+                    value={filters.email}
+                    onChange={(e) => setFilters({...filters, email: e.target.value})}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div>Phone</div>
+                  <input
+                    type="text"
+                    placeholder="Filter phone..."
+                    className="glass-input w-full text-xs py-1.5 px-2"
+                    value={filters.phone}
+                    onChange={(e) => setFilters({...filters, phone: e.target.value})}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div>Status</div>
+                  <select
+                    className="glass-input w-full text-xs py-1.5 px-2"
+                    value={filters.status}
+                    onChange={(e) => setFilters({...filters, status: e.target.value})}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <option value="">All</option>
+                    <option value="uploaded">Uploaded</option>
+                    <option value="analyzing">Analyzing</option>
+                    <option value="analyzed">Analyzed</option>
+                    <option value="shortlisted">Shortlisted</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div>Rating</div>
+                  <select
+                    className="glass-input w-full text-xs py-1.5 px-2"
+                    value={filters.rating}
+                    onChange={(e) => setFilters({...filters, rating: e.target.value})}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <option value="">All</option>
+                    <option value="5">5 Stars</option>
+                    <option value="4">4 Stars</option>
+                    <option value="3">3 Stars</option>
+                    <option value="2">2 Stars</option>
+                    <option value="1">1 Star</option>
+                  </select>
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div>Score</div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    placeholder="Min score"
+                    className="glass-input w-full text-xs py-1.5 px-2"
+                    value={filters.min_resume_score}
+                    onChange={(e) => setFilters({...filters, min_resume_score: e.target.value})}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {candidates.map((candidate) => (
+            {getFilteredCandidates().length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
+                  No candidates found matching your filters.
+                </td>
+              </tr>
+            ) : (
+              getFilteredCandidates().map((candidate) => (
               <tr 
                 key={candidate.id} 
                 className={`border-b border-glass-200 transition-colors ${
@@ -935,7 +976,8 @@ const JobDetail = () => {
                   </div>
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
           </div>

@@ -11,11 +11,12 @@ const Dashboard = () => {
   const [filteredJobs, setFilteredJobs] = useState([])
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
+    title: '',
     department: '',
     minCandidates: '',
-    maxCandidates: ''
+    maxCandidates: '',
+    status: ''
   })
   const [lastRunSort, setLastRunSort] = useState('latest') // 'latest' or 'oldest'
   const { showConfirm, showAlert } = useModal()
@@ -51,13 +52,11 @@ const Dashboard = () => {
   const applyFilters = () => {
     let filtered = [...jobs]
 
-    // Search filter (searches in title, department)
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
+    // Title filter
+    if (filters.title) {
+      const query = filters.title.toLowerCase()
       filtered = filtered.filter(job => 
-        job.title?.toLowerCase().includes(query) ||
-        job.department?.toLowerCase().includes(query) ||
-        String(job.candidate_count || 0).includes(query)
+        job.title?.toLowerCase().includes(query)
       )
     }
 
@@ -77,6 +76,13 @@ const Dashboard = () => {
     if (filters.maxCandidates) {
       const max = parseInt(filters.maxCandidates)
       filtered = filtered.filter(job => (job.candidate_count || 0) <= max)
+    }
+
+    // Status filter
+    if (filters.status) {
+      filtered = filtered.filter(job => 
+        (job.status || 'active') === filters.status
+      )
     }
 
     // Sort by last_run
@@ -101,9 +107,11 @@ const Dashboard = () => {
   const clearFilters = () => {
     setSearchQuery('')
     setFilters({
+      title: '',
       department: '',
       minCandidates: '',
-      maxCandidates: ''
+      maxCandidates: '',
+      status: ''
     })
     setLastRunSort('latest')
   }
@@ -196,86 +204,16 @@ const Dashboard = () => {
               Create New Job
             </button>
             <div className="flex-1"></div>
-            <div className="glass-input flex items-center gap-2 w-80">
-              <Search size={18} className="text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search Job Posts"
-                className="bg-transparent border-0 outline-0 w-full"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="p-1 rounded hover:bg-glass-200 transition-colors"
-                >
-                  <X size={16} className="text-gray-400" />
-                </button>
-              )}
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
-                showFilters 
-                  ? 'bg-glass-200 text-primary-400' 
-                  : 'hover:bg-glass-200 text-gray-400'
-              }`}
-              title="Filters"
-            >
-              <Filter size={18} />
-            </button>
-            {(searchQuery || Object.values(filters).some(f => f)) && (
+            {(Object.values(filters).some(f => f)) && (
               <button
                 onClick={clearFilters}
                 className="glass-button-secondary flex items-center gap-2 text-sm"
               >
                 <X size={16} />
-                Clear
+                Clear Filters
               </button>
             )}
           </div>
-
-          {/* Filter Options */}
-          {showFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-glass-200">
-              <div>
-                <label className="block text-sm font-medium mb-2">Department</label>
-                <select
-                  className="glass-input w-full"
-                  value={filters.department}
-                  onChange={(e) => setFilters({...filters, department: e.target.value})}
-                >
-                  <option value="">All Departments</option>
-                  {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Min Candidates</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="glass-input w-full"
-                  placeholder="0"
-                  value={filters.minCandidates}
-                  onChange={(e) => setFilters({...filters, minCandidates: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Max Candidates</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="glass-input w-full"
-                  placeholder="Any"
-                  value={filters.maxCandidates}
-                  onChange={(e) => setFilters({...filters, maxCandidates: e.target.value})}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Table */}
@@ -284,11 +222,63 @@ const Dashboard = () => {
           <table className="w-full">
           <thead className="bg-glass-100 border-b border-glass-200">
             <tr>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Title</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Department</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold"># Candidates</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div>Title</div>
+                  <input
+                    type="text"
+                    placeholder="Filter title..."
+                    className="glass-input w-full text-xs py-1.5 px-2"
+                    value={filters.title}
+                    onChange={(e) => setFilters({...filters, title: e.target.value})}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div>Department</div>
+                  <select
+                    className="glass-input w-full text-xs py-1.5 px-2"
+                    value={filters.department}
+                    onChange={(e) => setFilters({...filters, department: e.target.value})}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <option value="">All</option>
+                    {departments.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div># Candidates</div>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Min"
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.minCandidates}
+                      onChange={(e) => setFilters({...filters, minCandidates: e.target.value})}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <span className="text-gray-400 text-xs">-</span>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Max"
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.maxCandidates}
+                      onChange={(e) => setFilters({...filters, maxCandidates: e.target.value})}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                </div>
+              </th>
               <th 
-                className="px-6 py-4 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
                 onClick={toggleLastRunSort}
               >
                 <div className="flex items-center gap-2">
@@ -302,7 +292,23 @@ const Dashboard = () => {
                   )}
                 </div>
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                <div className="space-y-2">
+                  <div>Status</div>
+                  <select
+                    className="glass-input w-full text-xs py-1.5 px-2"
+                    value={filters.status}
+                    onChange={(e) => setFilters({...filters, status: e.target.value})}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <option value="">All</option>
+                    <option value="active">Active</option>
+                    <option value="on-hold">On-Hold</option>
+                    <option value="filled">Filled</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
             </tr>
           </thead>
