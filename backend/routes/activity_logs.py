@@ -67,9 +67,14 @@ async def get_activity_logs(
     # Exclude system jobs (activities without user_id) and apply user filter if provided
     if user_id:
         try:
-            query["user_id"] = ObjectId(user_id)
-        except:
-            query["user_id"] = user_id
+            # Try to convert to ObjectId first (most common case)
+            # MongoDB can match ObjectId fields with both ObjectId and string representations
+            obj_id = ObjectId(user_id)
+            # Use $in to match both ObjectId and string formats (in case data is inconsistent)
+            query["user_id"] = {"$in": [obj_id, str(obj_id), user_id]}
+        except (ValueError, TypeError):
+            # If conversion fails, try as string (in case it's stored as string)
+            query["user_id"] = str(user_id)
     else:
         # Only show logs with user_id (exclude system jobs)
         query["user_id"] = {"$ne": None}
@@ -136,9 +141,14 @@ async def get_activity_logs_count(
     # Exclude system jobs (activities without user_id) and apply user filter if provided
     if user_id:
         try:
-            query["user_id"] = ObjectId(user_id)
-        except:
-            query["user_id"] = user_id
+            # Try to convert to ObjectId first (most common case)
+            # MongoDB can match ObjectId fields with both ObjectId and string representations
+            obj_id = ObjectId(user_id)
+            # Use $in to match both ObjectId and string formats (in case data is inconsistent)
+            query["user_id"] = {"$in": [obj_id, str(obj_id), user_id]}
+        except (ValueError, TypeError):
+            # If conversion fails, try as string (in case it's stored as string)
+            query["user_id"] = str(user_id)
     else:
         # Only show logs with user_id (exclude system jobs)
         query["user_id"] = {"$ne": None}
@@ -186,13 +196,17 @@ async def get_activity_users():
         if user_id and user_id not in seen_ids:
             seen_ids.add(user_id)
             try:
-                user = await db.users.find_one({"_id": ObjectId(user_id)})
+                # Handle both ObjectId and string formats
+                if isinstance(user_id, ObjectId):
+                    user = await db.users.find_one({"_id": user_id})
+                else:
+                    user = await db.users.find_one({"_id": ObjectId(user_id)})
                 if user:
                     users.append({
                         "id": str(user["_id"]),
                         "name": user.get("name", "Unknown User")
                     })
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 print(f"Error fetching user {user_id}: {e}")
                 pass
     return {"users": users}
