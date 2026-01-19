@@ -773,6 +773,7 @@ const JobDetail = () => {
               <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Phone</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold">Rating</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Score</th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
             </tr>
@@ -853,6 +854,30 @@ const JobDetail = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRating(candidate.id, star)
+                        }}
+                        className="transition-all hover:scale-110 p-0.5"
+                        title={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+                      >
+                        <Star 
+                          size={14} 
+                          className={`${
+                            candidate?.rating >= star 
+                              ? 'text-yellow-400 fill-yellow-400' 
+                              : 'text-gray-500 fill-none'
+                          } transition-colors`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   {candidate.score_breakdown?.resume_score ? (
                     <span className="font-semibold">
                       {parseFloat(candidate.score_breakdown.resume_score).toFixed(1)}
@@ -895,28 +920,6 @@ const JobDetail = () => {
                         >
                           <Edit size={18} className="text-gray-400" />
                         </button>
-                        <div className="flex items-center gap-0.5">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleRating(candidate.id, star)
-                              }}
-                              className="transition-all hover:scale-110 p-0.5"
-                              title={`Rate ${star} star${star !== 1 ? 's' : ''}`}
-                            >
-                              <Star 
-                                size={14} 
-                                className={`${
-                                  candidate?.rating >= star 
-                                    ? 'text-yellow-400 fill-yellow-400' 
-                                    : 'text-gray-500 fill-none'
-                                } transition-colors`}
-                              />
-                            </button>
-                          ))}
-                        </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation()

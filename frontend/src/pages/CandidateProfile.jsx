@@ -134,7 +134,8 @@ const CandidateProfile = () => {
       // If clicking the same rating, clear it
       const newRating = candidate?.rating === rating ? null : rating
       await updateCandidate(candidateId, { rating: newRating })
-      fetchCandidate() // Refresh to update rating
+      // Update local state immediately without refetching
+      setCandidate(prev => prev ? { ...prev, rating: newRating } : prev)
     } catch (error) {
       console.error('Error updating rating:', error)
       await showAlert('Error', 'Failed to update rating. Please try again.', 'error')
