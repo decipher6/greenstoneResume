@@ -36,6 +36,7 @@ const JobDetail = () => {
   const [isDragging, setIsDragging] = useState(false)
   const [pendingFiles, setPendingFiles] = useState([])
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
   const [activeTab, setActiveTab] = useState('candidates') // 'description', 'candidates', or 'shortlist'
   const [shortlistedCandidates, setShortlistedCandidates] = useState([])
   
@@ -86,13 +87,13 @@ const JobDetail = () => {
   const validateFiles = (files) => {
     const fileArray = Array.from(files)
     
-    // Validate file limit (200 CVs max - increased for better performance)
-    const MAX_FILES = 200
-    if (fileArray.length > MAX_FILES) {
+    // No hard limit - files will be uploaded in chunks if needed
+    // Warn user if selecting a very large number
+    if (fileArray.length > 500) {
       return {
         valid: false,
-        error: `Maximum ${MAX_FILES} files allowed. You selected ${fileArray.length} files. Please select fewer files.`,
-        errorTitle: 'File Limit Exceeded'
+        error: `You selected ${fileArray.length} files. For best performance, please upload in batches of 200-300 files at a time.`,
+        errorTitle: 'Large Batch Warning'
       }
     }
 
@@ -141,17 +142,53 @@ const JobDetail = () => {
 
     setIsUploading(true)
     try {
-      const response = await uploadCandidatesBulk(jobId, pendingFiles)
-      const data = response.data || {}
-      const uploaded = data.uploaded || 0
-      const failed = data.failed || 0
-      
-      let message = `Successfully uploaded ${uploaded} file(s)!`
-      if (failed > 0) {
-        message += `\n\n${failed} file(s) failed to upload.`
-        if (data.failed_files && data.failed_files.length > 0) {
-          const failedNames = data.failed_files.slice(0, 5).map(f => f.filename || 'Unknown').join(', ')
-          message += `\n\nFailed files: ${failedNames}${data.failed_files.length > 5 ? '...' : ''}`
+      // Upload files in chunks to avoid browser/HTTP limits
+      const CHUNK_SIZE = 100 // Upload 100 files at a time
+      const chunks = []
+      for (let i = 0; i < pendingFiles.length; i += CHUNK_SIZE) {
+        chunks.push(pendingFiles.slice(i, i + CHUNK_SIZE))
+      }
+
+      let totalUploaded = 0
+      let totalFailed = 0
+      const allFailedFiles = []
+
+      // Upload chunks sequentially to avoid overwhelming the server
+      setUploadProgress({ current: 0, total: chunks.length })
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex]
+        try {
+          setUploadProgress({ current: chunkIndex + 1, total: chunks.length })
+          const response = await uploadCandidatesBulk(jobId, chunk)
+          const data = response.data || {}
+          const uploaded = data.uploaded || 0
+          const failed = data.failed || 0
+          
+          totalUploaded += uploaded
+          totalFailed += failed
+          
+          if (data.failed_files && data.failed_files.length > 0) {
+            allFailedFiles.push(...data.failed_files)
+          }
+        } catch (error) {
+          console.error(`Error uploading chunk ${chunkIndex + 1}:`, error)
+          totalFailed += chunk.length
+          // Continue with next chunk even if one fails
+          chunk.forEach(file => {
+            allFailedFiles.push({
+              filename: file.name || 'Unknown',
+              error: error.response?.data?.detail || error.message || 'Upload failed'
+            })
+          })
+        }
+      }
+
+      let message = `Successfully uploaded ${totalUploaded} file(s)!`
+      if (totalFailed > 0) {
+        message += `\n\n${totalFailed} file(s) failed to upload.`
+        if (allFailedFiles.length > 0) {
+          const failedNames = allFailedFiles.slice(0, 5).map(f => f.filename || 'Unknown').join(', ')
+          message += `\n\nFailed files: ${failedNames}${allFailedFiles.length > 5 ? '...' : ''}`
         }
         await showAlert('Partial Success', message, 'warning')
       } else {
@@ -162,7 +199,7 @@ const JobDetail = () => {
       fetchData()
       
       // Auto-analyze if setting is enabled
-      if (autoAnalyze && uploaded > 0) {
+      if (autoAnalyze && totalUploaded > 0) {
         setTimeout(async () => {
           try {
             await runAnalysis(jobId, false) // false = only analyze new candidates
@@ -191,6 +228,7 @@ const JobDetail = () => {
       await showAlert('Error', errorMessage, 'error')
     } finally {
       setIsUploading(false)
+      setUploadProgress({ current: 0, total: 0 })
     }
   }
 
@@ -711,7 +749,11 @@ const JobDetail = () => {
                   {isUploading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Uploading...
+                      {uploadProgress.total > 1 ? (
+                        <span>Uploading... ({uploadProgress.current}/{uploadProgress.total} chunks)</span>
+                      ) : (
+                        <span>Uploading...</span>
+                      )}
                     </>
                   ) : (
                     <>

@@ -76,13 +76,8 @@ async def upload_candidates_bulk(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    # Increased file limit to 200 (can be adjusted)
-    MAX_FILES = 200
-    if len(files) > MAX_FILES:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Maximum {MAX_FILES} files allowed. You uploaded {len(files)} files."
-        )
+    # Removed hard limit - process any number of files (chunked on frontend if needed)
+    # Large batches are handled efficiently with parallel processing
     
     # Validate file formats
     allowed_extensions = ['.pdf', '.docx', '.doc']
