@@ -82,6 +82,7 @@ class Candidate(BaseModel):
     resume_file_path: Optional[str] = None
     linkedin_url: Optional[str] = None
     status: CandidateStatus = CandidateStatus.uploaded
+    rating: Optional[int] = None  # 1-5 star rating
     score_breakdown: Optional[ScoreBreakdown] = None
     criterion_scores: Optional[List[CriterionScore]] = None
     personality_profile: Optional[PersonalityTraits] = None

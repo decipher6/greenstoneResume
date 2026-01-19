@@ -63,8 +63,10 @@ const JobDetail = () => {
       setJob(jobRes.data)
       setCandidates(candidatesRes.data)
       setTopCandidates(topRes.data)
-      // Filter shortlisted candidates
-      const shortlisted = shortlistedRes.data.filter(c => c.status === 'shortlisted')
+      // Filter candidates with ratings (3+ stars)
+      const shortlisted = shortlistedRes.data.filter(c => 
+        c.rating && c.rating >= 3
+      )
       setShortlistedCandidates(shortlisted)
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -230,17 +232,16 @@ const JobDetail = () => {
     }
   }
 
-  const handleShortlist = async (candidateId) => {
+  const handleRating = async (candidateId, rating) => {
     try {
       const candidate = candidates.find(c => c.id === candidateId)
-      const isShortlisted = candidate?.status === 'shortlisted'
-      const newStatus = isShortlisted ? 'analyzed' : 'shortlisted'
-      
-      await updateCandidate(candidateId, { status: newStatus })
+      // If clicking the same rating, clear it
+      const newRating = candidate?.rating === rating ? null : rating
+      await updateCandidate(candidateId, { rating: newRating })
       fetchData()
     } catch (error) {
-      console.error('Error toggling shortlist:', error)
-      await showAlert('Error', 'Failed to update shortlist status. Please try again.', 'error')
+      console.error('Error updating rating:', error)
+      await showAlert('Error', 'Failed to update rating. Please try again.', 'error')
     }
   }
 
@@ -480,7 +481,7 @@ const JobDetail = () => {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            Shortlist ({shortlistedCandidates.length})
+            Rated ({shortlistedCandidates.length})
           </button>
         </div>
       </div>
@@ -894,20 +895,28 @@ const JobDetail = () => {
                         >
                           <Edit size={18} className="text-gray-400" />
                         </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleShortlist(candidate.id)
-                          }}
-                          className={`p-2 rounded-lg transition-colors ${
-                            candidate.status === 'shortlisted' 
-                              ? 'hover:bg-yellow-500/20' 
-                              : 'hover:bg-yellow-500/20'
-                          }`}
-                          title={candidate.status === 'shortlisted' ? 'Remove from shortlist' : 'Add to shortlist'}
-                        >
-                          <Star size={18} className={candidate.status === 'shortlisted' ? 'text-yellow-400' : 'text-gray-400'} fill={candidate.status === 'shortlisted' ? 'currentColor' : 'none'} />
-                        </button>
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRating(candidate.id, star)
+                              }}
+                              className="transition-all hover:scale-110 p-0.5"
+                              title={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+                            >
+                              <Star 
+                                size={14} 
+                                className={`${
+                                  candidate?.rating >= star 
+                                    ? 'text-yellow-400 fill-yellow-400' 
+                                    : 'text-gray-500 fill-none'
+                                } transition-colors`}
+                              />
+                            </button>
+                          ))}
+                        </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -935,7 +944,7 @@ const JobDetail = () => {
           {/* Shortlisted Candidates Table */}
           <div className="glass-card overflow-hidden">
             <div className="p-6 border-b border-glass-200">
-              <h3 className="text-lg font-semibold">Shortlisted Candidates ({shortlistedCandidates.length})</h3>
+              <h3 className="text-lg font-semibold">Rated Candidates ({shortlistedCandidates.length})</h3>
             </div>
             <table className="w-full">
               <thead className="bg-glass-100 border-b border-glass-200">
@@ -943,7 +952,7 @@ const JobDetail = () => {
                   <th className="px-6 py-4 text-left text-sm font-semibold">Name</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Phone</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">Rating</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Score</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
                 </tr>
@@ -952,7 +961,7 @@ const JobDetail = () => {
                 {shortlistedCandidates.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                      No shortlisted candidates yet.
+                      No rated candidates yet. Rate candidates with 3+ stars to see them here.
                     </td>
                   </tr>
                 ) : (
@@ -979,10 +988,29 @@ const JobDetail = () => {
                           {candidate.contact_info?.phone || '-'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                          Shortlisted
-                        </span>
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRating(candidate.id, star)
+                              }}
+                              className="transition-all hover:scale-110 p-0.5"
+                              title={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+                            >
+                              <Star 
+                                size={14} 
+                                className={`${
+                                  candidate?.rating >= star 
+                                    ? 'text-yellow-400 fill-yellow-400' 
+                                    : 'text-gray-500 fill-none'
+                                } transition-colors`}
+                              />
+                            </button>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         {candidate.score_breakdown?.resume_score ? (

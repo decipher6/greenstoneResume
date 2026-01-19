@@ -129,16 +129,15 @@ const CandidateProfile = () => {
     }
   }
 
-  const handleShortlist = async () => {
+  const handleRating = async (rating) => {
     try {
-      const isShortlisted = candidate?.status === 'shortlisted'
-      const newStatus = isShortlisted ? 'analyzed' : 'shortlisted'
-      
-      await updateCandidate(candidateId, { status: newStatus })
-      fetchCandidate() // Refresh to update status
+      // If clicking the same rating, clear it
+      const newRating = candidate?.rating === rating ? null : rating
+      await updateCandidate(candidateId, { rating: newRating })
+      fetchCandidate() // Refresh to update rating
     } catch (error) {
-      console.error('Error toggling shortlist:', error)
-      await showAlert('Error', 'Failed to update shortlist status. Please try again.', 'error')
+      console.error('Error updating rating:', error)
+      await showAlert('Error', 'Failed to update rating. Please try again.', 'error')
     }
   }
 
@@ -559,17 +558,33 @@ const CandidateProfile = () => {
                       <Calendar size={16} />
                       Invite to Interview
                     </button>
-                    <button
-                      onClick={handleShortlist}
-                      className={`glass-button-secondary w-full flex items-center justify-center gap-2 text-sm ${
-                        candidate?.status === 'shortlisted'
-                          ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/30'
-                          : 'text-yellow-400 hover:bg-yellow-500/20 border-yellow-500/30'
-                      }`}
-                    >
-                      <Star size={16} fill={candidate?.status === 'shortlisted' ? 'currentColor' : 'none'} />
-                      {candidate?.status === 'shortlisted' ? 'Remove from Shortlist' : 'Add to Shortlist'}
-                    </button>
+                    <div className="glass-button-secondary w-full p-3">
+                      <div className="text-xs text-gray-400 mb-2 text-center">Rating</div>
+                      <div className="flex items-center justify-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            onClick={() => handleRating(star)}
+                            className="transition-all hover:scale-110"
+                            title={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+                          >
+                            <Star 
+                              size={20} 
+                              className={`${
+                                candidate?.rating >= star 
+                                  ? 'text-yellow-400 fill-yellow-400' 
+                                  : 'text-gray-500 fill-none'
+                              } transition-colors`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                      {candidate?.rating && (
+                        <div className="text-xs text-gray-400 mt-1 text-center">
+                          {candidate.rating} star{candidate.rating !== 1 ? 's' : ''}
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => setShowEmailModal(true)}
                       className="glass-button-secondary w-full flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 border-red-500/30"
