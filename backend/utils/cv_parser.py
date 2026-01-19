@@ -3,6 +3,9 @@ import mammoth
 import re
 from io import BytesIO
 from typing import Optional
+import subprocess
+import tempfile
+import os
 
 async def parse_pdf(file_content: bytes) -> str:
     """Extract text from PDF file - handles both text-based and image-based PDFs"""
@@ -121,26 +124,252 @@ async def parse_docx(file_content: bytes) -> str:
         # For other errors, return placeholder
         return f"DOCX file - extraction had issues: {error_msg}. File accepted for processing."
 
+def clean_doc_text(text: str) -> str:
+    """Clean extracted text from .doc files to remove artifacts and binary data"""
+    if not text:
+        return ""
+    
+    # Remove common binary artifacts and control characters
+    # Remove null bytes and other non-printable control characters (except newlines, tabs, carriage returns)
+    text = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]', '', text)
+    
+    # Remove artifacts that look like binary data (sequences of non-printable or weird characters)
+    text = re.sub(r'[^\x20-\x7E\n\r\t]{2,}', ' ', text)  # Remove sequences of 2+ non-printable chars
+    
+    # Remove common Word document metadata patterns at the start
+    text = re.sub(r'^(?:\s*[^\w\s]*\s*)*(?:Microsoft|MS|Word|Document|Version|Created|Modified|Author|Subject|Title)[^\n]*\n?', '', text, flags=re.IGNORECASE | re.MULTILINE)
+    
+    # Remove email-like artifacts that are clearly not real emails (too many special chars)
+    text = re.sub(r'\S*[^\w\s@.-]{3,}\S*', ' ', text)
+    
+    # Split into lines for processing
+    lines = text.split('\n')
+    cleaned_lines = []
+    
+    # First pass: remove obviously bad lines
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Skip lines that are mostly non-alphabetic (likely artifacts)
+        alpha_count = sum(1 for c in line if c.isalpha())
+        alpha_ratio = alpha_count / len(line) if line else 0
+        
+        # Skip lines with very low alphabetic content
+        if alpha_ratio < 0.15 and len(line) > 5:
+            continue
+        
+        # Skip lines that are just repeated characters or patterns
+        if len(set(line.replace(' ', ''))) <= 2 and len(line) > 3:
+            continue
+        
+        # Skip lines that are mostly numbers and special chars (likely binary artifacts)
+        if alpha_count < 3 and len(line) > 10:
+            continue
+        
+        cleaned_lines.append(line)
+    
+    if not cleaned_lines:
+        return ""
+    
+    text = '\n'.join(cleaned_lines)
+    
+    # Aggressively remove artifacts from the beginning
+    # Find the first line that looks like real text (has multiple words, proper capitalization, etc.)
+    lines = text.split('\n')
+    start_idx = 0
+    for i, line in enumerate(lines):
+        line = line.strip()
+        if not line:
+            continue
+        # Check if this looks like real text
+        words = line.split()
+        if len(words) >= 2:  # At least 2 words
+            # Check if it has proper words (not just symbols)
+            word_count = sum(1 for w in words if any(c.isalpha() for c in w))
+            if word_count >= 2:
+                start_idx = i
+                break
+    
+    # Aggressively remove artifacts from the end
+    # Find the last line that looks like real text
+    end_idx = len(lines)
+    for i in range(len(lines) - 1, -1, -1):
+        line = lines[i].strip()
+        if not line:
+            continue
+        words = line.split()
+        if len(words) >= 2:
+            word_count = sum(1 for w in words if any(c.isalpha() for c in w))
+            if word_count >= 2:
+                end_idx = i + 1
+                break
+    
+    # Extract the cleaned portion
+    if start_idx < end_idx:
+        text = '\n'.join(lines[start_idx:end_idx])
+    else:
+        # Fallback: use all lines if we couldn't find good boundaries
+        text = '\n'.join(lines)
+    
+    # Remove leading/trailing garbage characters
+    # Remove non-alphabetic characters from the very start
+    while text and len(text) > 0:
+        first_char = text[0]
+        if first_char.isalnum() or first_char in ['\n', '\t']:
+            break
+        text = text[1:]
+    
+    # Remove non-alphabetic characters from the very end
+    while text and len(text) > 0:
+        last_char = text[-1]
+        if last_char.isalnum() or last_char in ['\n', '\t', '.', '!', '?', ',', ';', ':']:
+            break
+        text = text[:-1]
+    
+    # Clean up excessive whitespace
+    text = re.sub(r'[ \t]+', ' ', text)  # Multiple spaces/tabs to single space
+    text = re.sub(r'\n{3,}', '\n\n', text)  # Multiple newlines to double newline
+    
+    # Final cleanup: remove any remaining weird patterns at start/end
+    # Remove lines at start that don't look like text
+    lines = text.split('\n')
+    while lines and len(lines) > 0:
+        first_line = lines[0].strip()
+        if not first_line:
+            lines.pop(0)
+            continue
+        words = first_line.split()
+        if len(words) >= 2 and sum(1 for w in words if any(c.isalpha() for c in w)) >= 2:
+            break
+        lines.pop(0)
+    
+    # Remove lines at end that don't look like text
+    while lines and len(lines) > 0:
+        last_line = lines[-1].strip()
+        if not last_line:
+            lines.pop()
+            continue
+        words = last_line.split()
+        if len(words) >= 2 and sum(1 for w in words if any(c.isalpha() for c in w)) >= 2:
+            break
+        lines.pop()
+    
+    text = '\n'.join(lines)
+    
+    return text.strip()
+
 async def parse_doc(file_content: bytes) -> str:
-    """Extract text from DOC file (basic implementation) - accepts whatever is available"""
-    # DOC files are more complex, for now we'll try to extract raw text
+    """Extract text from DOC file using multiple strategies for best results"""
+    text = None
+    
+    # Strategy 1: Try textract (requires antiword to be installed on system)
     try:
-        # This is a simplified approach - for production, consider using antiword or LibreOffice
-        text = file_content.decode('utf-8', errors='ignore')
-        # Remove binary characters but keep readable text
-        text = ''.join(char for char in text if ord(char) < 128 and (char.isprintable() or char.isspace()))
-        # Clean up excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
-        text = text.strip()
+        import textract
+        # Write to temp file since textract works with file paths
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp_file:
+            tmp_file.write(file_content)
+            tmp_path = tmp_file.name
         
-        if text and len(text) > 10:  # Only return if we got meaningful text
-            return text
+        try:
+            extracted = textract.process(tmp_path, encoding='utf-8')
+            if extracted:
+                text = extracted.decode('utf-8', errors='ignore')
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
         
-        # If minimal text, return placeholder
-        return "DOC file - text extraction limited. File accepted for processing."
+        if text and len(text.strip()) > 50:  # Got meaningful text
+            cleaned = clean_doc_text(text)
+            if cleaned and len(cleaned.strip()) > 50:
+                return cleaned
+    except ImportError:
+        # textract not installed, skip
+        pass
     except Exception as e:
-        # Even on error, return placeholder to accept the file
-        return f"DOC file - extraction had issues: {str(e)}. File accepted for processing."
+        # textract failed, try next method
+        pass
+    
+    # Strategy 2: Try antiword directly via subprocess (if available) - most reliable
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp_file:
+            tmp_file.write(file_content)
+            tmp_path = tmp_file.name
+        
+        try:
+            result = subprocess.run(
+                ['antiword', tmp_path],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                errors='ignore'
+            )
+            if result.returncode == 0 and result.stdout:
+                text = result.stdout
+                if text and len(text.strip()) > 50:
+                    cleaned = clean_doc_text(text)
+                    if cleaned and len(cleaned.strip()) > 50:
+                        return cleaned
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+            # antiword not available or failed
+            pass
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+    except Exception as e:
+        pass
+    
+    # Strategy 3: Try improved binary parsing with better cleaning (fallback)
+    try:
+        # Try multiple encodings
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        for encoding in encodings:
+            try:
+                decoded = file_content.decode(encoding, errors='ignore')
+                # Extract readable text more carefully
+                # Look for sequences of words (more than just random characters)
+                words = re.findall(r'\b[A-Za-z]{2,}\b', decoded)
+                if len(words) > 10:  # Found meaningful words
+                    # Reconstruct text around word positions
+                    text_parts = []
+                    last_pos = 0
+                    for word in words[:100]:  # Limit to first 100 words to avoid too much noise
+                        pos = decoded.find(word, last_pos)
+                        if pos != -1:
+                            # Extract context around the word
+                            start = max(0, pos - 50)
+                            end = min(len(decoded), pos + len(word) + 50)
+                            text_parts.append(decoded[start:end])
+                            last_pos = pos + len(word)
+                    
+                    if text_parts:
+                        text = ' '.join(text_parts)
+                        # Extract only readable portions
+                        text = ''.join(char for char in text if char.isprintable() or char.isspace())
+                        text = re.sub(r'\s+', ' ', text)
+                        if text and len(text.strip()) > 50:
+                            cleaned = clean_doc_text(text)
+                            if cleaned and len(cleaned.strip()) > 50:
+                                return cleaned
+                    break
+            except:
+                continue
+    except Exception as e:
+        pass
+    
+    # If all strategies failed, return a placeholder
+    if text and len(text.strip()) > 10:
+        cleaned = clean_doc_text(text)
+        if cleaned and len(cleaned.strip()) > 10:
+            return cleaned
+    
+    return "DOC file - text extraction limited. File accepted for processing."
 
 async def parse_resume(file_content: bytes, filename: str) -> str:
     """Parse resume based on file extension"""

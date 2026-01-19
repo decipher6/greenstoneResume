@@ -18,6 +18,8 @@ email-validator==2.1.0
 aiosmtplib==3.0.1
 resend>=2.0.0
 huggingface-hub>=0.20.0
+textract>=1.6.5
+oletools>=0.60.1
 # Note: Semantic similarity scoring has been removed. Resume scoring now uses only
 # criterion scores and their weighted average as the overall score.
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, User, LogOut, Clock } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import StatsCards from './StatsCards'
 
 const Layout = ({ children, pageTitle, pageSubtitle }) => {
   const location = useLocation()
@@ -122,6 +123,8 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
 
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto p-4 min-h-0">
+          {/* Stats Cards - Show on all pages except Activity Logs */}
+          {location.pathname !== '/activity-logs' && <StatsCards />}
           {children}
         </div>
       </div>
