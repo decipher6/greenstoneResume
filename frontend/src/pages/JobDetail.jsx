@@ -426,25 +426,68 @@ const JobDetail = () => {
   }
 
   const handleRating = async (candidateId, rating) => {
-    try {
-      const candidate = candidates.find(c => c.id === candidateId)
-      // If clicking the same rating, clear it
-      const newRating = candidate?.rating === rating ? null : rating
-      
-      // Prepare update data
-      const updateData = { rating: newRating }
-      
-      // Auto-shortlist if highly rated (4 or 5 stars), otherwise revert to analyzed
-      if (newRating >= 4) {
-        updateData.status = 'shortlisted'
+    // Optimistic update - update UI immediately
+    const candidate = candidates.find(c => c.id === candidateId)
+    if (!candidate) return
+    
+    const previousCandidates = [...candidates]
+    const newRating = candidate?.rating === rating ? null : rating
+    
+    // Prepare update data
+    const updateData = { rating: newRating }
+    
+    // Auto-shortlist if highly rated (4 or 5 stars), otherwise revert to analyzed
+    if (newRating >= 4) {
+      updateData.status = 'shortlisted'
+    } else {
+      updateData.status = 'analyzed'
+    }
+    
+    // Update UI immediately (optimistic update)
+    setCandidates(prevCandidates => 
+      prevCandidates.map(c => 
+        c.id === candidateId 
+          ? { ...c, ...updateData }
+          : c
+      )
+    )
+    
+    // Also update topCandidates if the candidate is in there
+    setTopCandidates(prevTop => 
+      prevTop.map(c => 
+        c.id === candidateId 
+          ? { ...c, ...updateData }
+          : c
+      )
+    )
+    
+    // Also update shortlistedCandidates if needed
+    setShortlistedCandidates(prevShort => {
+      if (newRating >= 3) {
+        // Add or update in shortlisted
+        const exists = prevShort.find(c => c.id === candidateId)
+        if (exists) {
+          return prevShort.map(c => 
+            c.id === candidateId ? { ...c, ...updateData } : c
+          )
+        } else {
+          return [...prevShort, { ...candidate, ...updateData }]
+        }
       } else {
-        updateData.status = 'analyzed'
+        // Remove from shortlisted if rating < 3
+        return prevShort.filter(c => c.id !== candidateId)
       }
-      
+    })
+    
+    // Then update in background
+    try {
       await updateCandidate(candidateId, updateData)
-      fetchData()
+      // Optionally refresh data in background (non-blocking)
+      fetchData().catch(err => console.error('Background refresh failed:', err))
     } catch (error) {
       console.error('Error updating rating:', error)
+      // Revert on error
+      setCandidates(previousCandidates)
       await showAlert('Error', 'Failed to update rating. Please try again.', 'error')
     }
   }

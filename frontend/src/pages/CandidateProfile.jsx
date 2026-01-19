@@ -130,25 +130,30 @@ const CandidateProfile = () => {
   }
 
   const handleRating = async (rating) => {
+    // Optimistic update - update UI immediately
+    const previousCandidate = candidate
+    const newRating = candidate?.rating === rating ? null : rating
+    
+    // Prepare update data
+    const updateData = { rating: newRating }
+    
+    // Auto-shortlist if highly rated (4 or 5 stars), otherwise revert to analyzed
+    if (newRating >= 4) {
+      updateData.status = 'shortlisted'
+    } else {
+      updateData.status = 'analyzed'
+    }
+    
+    // Update UI immediately (optimistic update)
+    setCandidate(prev => prev ? { ...prev, ...updateData } : prev)
+    
+    // Then update in background
     try {
-      // If clicking the same rating, clear it
-      const newRating = candidate?.rating === rating ? null : rating
-      
-      // Prepare update data
-      const updateData = { rating: newRating }
-      
-      // Auto-shortlist if highly rated (4 or 5 stars), otherwise revert to analyzed
-      if (newRating >= 4) {
-        updateData.status = 'shortlisted'
-      } else {
-        updateData.status = 'analyzed'
-      }
-      
       await updateCandidate(candidateId, updateData)
-      // Update local state immediately without refetching
-      setCandidate(prev => prev ? { ...prev, ...updateData } : prev)
     } catch (error) {
       console.error('Error updating rating:', error)
+      // Revert on error
+      setCandidate(previousCandidate)
       await showAlert('Error', 'Failed to update rating. Please try again.', 'error')
     }
   }
