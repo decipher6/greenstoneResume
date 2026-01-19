@@ -31,13 +31,13 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
     <div className="flex min-h-screen h-full overflow-hidden">
       {/* Sidebar */}
       <div 
-        className={`glass-card m-4 rounded-2xl flex flex-col transition-all duration-300 ease-in-out ${
+        className={`glass-card m-4 rounded-2xl flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
           isExpanded ? 'w-80' : 'w-20'
         }`}
         onMouseEnter={() => setIsExpanded(true)}
         onMouseLeave={() => setIsExpanded(false)}
       >
-        <div className={`p-6 flex flex-col h-full ${isExpanded ? '' : 'items-center'}`}>
+        <div className={`p-6 flex flex-col h-full ${isExpanded ? '' : 'items-center'} overflow-hidden`}>
           {/* Logo */}
           <div className={`flex flex-col ${isExpanded ? 'items-center' : 'items-center'} gap-3 mb-8`}>
             <img 
@@ -46,7 +46,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
               className={`object-contain ${isExpanded ? 'w-[72px] h-[72px]' : 'w-[88px] h-[88px]'}`}
             />
             {isExpanded && (
-              <div className="text-center">
+              <div className="text-center whitespace-nowrap">
                 <p className="text-sm text-gray-400">AI Resume Checker</p>
               </div>
             )}
@@ -71,7 +71,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
                 >
                   <Icon size={20} />
                   {isExpanded && (
-                    <span className="font-medium">{item.label}</span>
+                    <span className="font-medium whitespace-nowrap">{item.label}</span>
                   )}
                 </Link>
               )
@@ -85,9 +85,9 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
                   <User size={16} className="text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{user?.name || 'User'}</p>
-                  <p className="text-xs text-gray-400 break-words">{user?.email || 'admin@gsequity.com'}</p>
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <p className="text-sm font-medium text-white truncate whitespace-nowrap">{user?.name || 'User'}</p>
+                  <p className="text-xs text-gray-400 truncate whitespace-nowrap">{user?.email || 'admin@gsequity.com'}</p>
                 </div>
                 <button
                   onClick={logout}
