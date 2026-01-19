@@ -32,7 +32,12 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
   const location = useLocation()
   const { user, logout } = useAuth()
   const [isExpanded, setIsExpanded] = useState(false)
-  const [stats, setStats] = useState(null)
+  const [stats, setStats] = useState({
+    active_jobs: 0,
+    total_candidates: 0,
+    jobs_on_hold: 0,
+    jobs_filled: 0
+  })
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -54,28 +59,59 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
   const { title, subtitle } = getPageInfo()
 
   useEffect(() => {
+    if (!user) {
+      // Reset stats when user logs out
+      setStats({
+        active_jobs: 0,
+        total_candidates: 0,
+        jobs_on_hold: 0,
+        jobs_filled: 0
+      })
+      return
+    }
+
+    const fetchStats = async () => {
+      try {
+        const statsRes = await getDashboardStats()
+        if (statsRes?.data) {
+          setStats(statsRes.data)
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error)
+        // Silently fail - keep default values
+      }
+    }
+
+    // Initial fetch
     fetchStats()
+    
     // Refresh stats every 30 seconds
     const interval = setInterval(fetchStats, 30000)
     return () => clearInterval(interval)
-  }, [])
-
-  const fetchStats = async () => {
-    try {
-      const statsRes = await getDashboardStats()
-      setStats(statsRes.data)
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error)
-    }
-  }
+  }, [user])
 
   // Expose refresh function via window for child components to trigger refresh
   useEffect(() => {
-    window.refreshDashboardStats = fetchStats
-    return () => {
-      delete window.refreshDashboardStats
+    if (!user) return
+
+    const refreshStats = async () => {
+      try {
+        const statsRes = await getDashboardStats()
+        if (statsRes?.data) {
+          setStats(statsRes.data)
+        }
+      } catch (error) {
+        console.error('Error refreshing dashboard stats:', error)
+      }
     }
-  }, [])
+
+    window.refreshDashboardStats = refreshStats
+    return () => {
+      if (window.refreshDashboardStats) {
+        delete window.refreshDashboardStats
+      }
+    }
+  }, [user])
 
   return (
     <div className="flex min-h-screen h-full overflow-hidden">
@@ -161,34 +197,36 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Stats Cards - Always visible */}
-        <div className="px-4 pt-4 pb-0 flex-shrink-0">
-          <div className="grid grid-cols-4 gap-4">
-            <StatCard
-              icon={Briefcase}
-              label="Active Jobs"
-              value={stats?.active_jobs || 0}
-              color="green"
-            />
-            <StatCard
-              icon={Users}
-              label="Total Candidates"
-              value={stats?.total_candidates || 0}
-              color="purple"
-            />
-            <StatCard
-              icon={PauseCircle}
-              label="Jobs On Hold"
-              value={stats?.jobs_on_hold || 0}
-              color="orange"
-            />
-            <StatCard
-              icon={CheckCircle2}
-              label="Jobs Filled"
-              value={stats?.jobs_filled || 0}
-              color="blue"
-            />
+        {user && (
+          <div className="px-4 pt-4 pb-0 flex-shrink-0">
+            <div className="grid grid-cols-4 gap-4">
+              <StatCard
+                icon={Briefcase}
+                label="Active Jobs"
+                value={stats?.active_jobs ?? 0}
+                color="green"
+              />
+              <StatCard
+                icon={Users}
+                label="Total Candidates"
+                value={stats?.total_candidates ?? 0}
+                color="purple"
+              />
+              <StatCard
+                icon={PauseCircle}
+                label="Jobs On Hold"
+                value={stats?.jobs_on_hold ?? 0}
+                color="orange"
+              />
+              <StatCard
+                icon={CheckCircle2}
+                label="Jobs Filled"
+                value={stats?.jobs_filled ?? 0}
+                color="blue"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Header - Hidden for Dashboard, Job Detail, and Candidate Profile pages */}
         {location.pathname !== '/' && !location.pathname.startsWith('/jobs/') && !location.pathname.startsWith('/candidates/') && (
