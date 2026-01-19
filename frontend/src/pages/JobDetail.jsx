@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Filter, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Filter, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
-  runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate
+  runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate, reAnalyzeCandidate
 } from '../services/api'
 import api from '../services/api'
 import { useModal } from '../context/ModalContext'

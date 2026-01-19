@@ -1,16 +1,16 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { 
-  Clock, Filter, X, ChevronLeft, ChevronRight, ChevronDown, User,
+  Clock, Filter, X, ChevronDown, User,
   Briefcase, UserPlus, Mail, FileText, Trash2, Upload, Download, CheckCircle,
-  PlayCircle, Settings, LogIn, LogOut, FileCheck
+  PlayCircle, Settings, LogIn, LogOut, FileCheck, Search
 } from 'lucide-react'
-import { getActivityLogs, getActivityLogsCount, getActivityTypes, getActivityUsers } from '../services/api'
+import { getActivityLogs, getActivityTypes, getActivityUsers } from '../services/api'
 
 const ActivityLogs = () => {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [totalCount, setTotalCount] = useState(0)
-  const [currentPage, setCurrentPage] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [activityTypes, setActivityTypes] = useState([])
   const [users, setUsers] = useState([])
   
@@ -22,23 +22,58 @@ const ActivityLogs = () => {
   const [endDate, setEndDate] = useState('')
   const [selectedType, setSelectedType] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
+  const [nameSearch, setNameSearch] = useState('')
   
-  // Refs for closing dropdowns on outside click
+  // Refs for closing dropdowns on outside click and infinite scroll
   const dateFilterRef = useRef(null)
   const typeFilterRef = useRef(null)
   const userFilterRef = useRef(null)
+  const observerTarget = useRef(null)
   
   const logsPerPage = 30
+  const skipRef = useRef(0)
 
   useEffect(() => {
     fetchActivityTypes()
     fetchActivityUsers()
   }, [])
 
+  // Reset and fetch logs when filters change
   useEffect(() => {
-    fetchLogs()
-    fetchCount()
-  }, [currentPage, startDate, endDate, selectedType, selectedUserId])
+    skipRef.current = 0
+    setLogs([])
+    setHasMore(true)
+    fetchLogs(true)
+  }, [startDate, endDate, selectedType, selectedUserId])
+
+  const loadMoreLogs = useCallback(() => {
+    if (!loadingMore && hasMore && !loading) {
+      fetchLogs(false)
+    }
+  }, [loadingMore, hasMore, loading])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          loadMoreLogs()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentTarget = observerTarget.current
+    if (currentTarget) {
+      observer.observe(currentTarget)
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [hasMore, loading, loadingMore, loadMoreLogs])
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -79,39 +114,44 @@ const ActivityLogs = () => {
     }
   }
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (reset = false) => {
     try {
-      setLoading(true)
-      const skip = (currentPage - 1) * logsPerPage
+      if (reset) {
+        setLoading(true)
+        skipRef.current = 0
+      } else {
+        setLoadingMore(true)
+      }
+      
       const params = {
         limit: logsPerPage,
-        skip,
+        skip: skipRef.current,
         ...(startDate && { start_date: startDate }),
         ...(endDate && { end_date: endDate }),
         ...(selectedType && { activity_type: selectedType }),
         ...(selectedUserId && { user_id: selectedUserId })
       }
       const response = await getActivityLogs(params)
-      setLogs(response.data || [])
+      const newLogs = response.data || []
+      
+      if (reset) {
+        setLogs(newLogs)
+      } else {
+        setLogs(prev => [...prev, ...newLogs])
+      }
+      
+      // Check if there are more logs to load
+      if (newLogs.length < logsPerPage) {
+        setHasMore(false)
+      } else {
+        skipRef.current += logsPerPage
+      }
     } catch (error) {
       console.error('Error fetching activity logs:', error)
+      setHasMore(false)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchCount = async () => {
-    try {
-      const params = {
-        ...(startDate && { start_date: startDate }),
-        ...(endDate && { end_date: endDate }),
-        ...(selectedType && { activity_type: selectedType }),
-        ...(selectedUserId && { user_id: selectedUserId })
-      }
-      const response = await getActivityLogsCount(params)
-      setTotalCount(response.data?.count || 0)
-    } catch (error) {
-      console.error('Error fetching count:', error)
+      setLoadingMore(false)
     }
   }
 
@@ -255,22 +295,36 @@ const ActivityLogs = () => {
     setEndDate('')
     setSelectedType('')
     setSelectedUserId('')
-    setCurrentPage(1)
+    setNameSearch('')
   }
 
-  const hasActiveFilters = startDate || endDate || selectedType || selectedUserId
+  const hasActiveFilters = startDate || endDate || selectedType || selectedUserId || nameSearch
 
-  const totalPages = Math.ceil(totalCount / logsPerPage)
+  // Filter logs by name/description search (client-side)
+  const getFilteredLogs = () => {
+    if (!nameSearch) return logs
+    
+    const searchLower = nameSearch.toLowerCase()
+    return logs.filter(log => {
+      const description = log.description?.toLowerCase() || ''
+      const userName = log.user_name?.toLowerCase() || ''
+      return description.includes(searchLower) || userName.includes(searchLower)
+    })
+  }
+
+  const filteredLogs = getFilteredLogs()
+  const groupedLogs = groupLogsByDate(filteredLogs)
 
   if (loading && logs.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-gray-400">Loading activity logs...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400"></div>
+          <p className="text-gray-400">Loading activity logs...</p>
+        </div>
       </div>
     )
   }
-
-  const groupedLogs = groupLogsByDate(logs)
 
   return (
     <div className="space-y-6">
@@ -279,6 +333,28 @@ const ActivityLogs = () => {
       <div className="bg-glass-100 rounded-lg p-4 mb-6">
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm text-gray-300 font-medium">Filter by:</span>
+          
+          {/* Name/Description Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name or description..."
+                value={nameSearch}
+                onChange={(e) => setNameSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-glass-200 rounded-lg text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 border border-glass-300"
+              />
+              {nameSearch && (
+                <button
+                  onClick={() => setNameSearch('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
           
           {/* Date Range Filter */}
           <div className="relative" ref={dateFilterRef}>
@@ -419,73 +495,8 @@ const ActivityLogs = () => {
         </div>
       </div>
 
-      {/* Pagination Controls */}
-      {totalCount > 0 && (
-        <div className="flex items-center justify-between text-sm text-gray-400 mb-4">
-          <div>
-            Showing {((currentPage - 1) * logsPerPage) + 1} to {Math.min(currentPage * logsPerPage, totalCount)} of {totalCount} logs
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
-            >
-              <ChevronLeft size={16} />
-              Newer
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum
-                if (totalPages <= 5) {
-                  pageNum = i + 1
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i
-                } else {
-                  pageNum = currentPage - 2 + i
-                }
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1 rounded transition-colors ${
-                      currentPage === pageNum
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-glass-200 hover:bg-glass-300'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                )
-              })}
-              {totalPages > 5 && currentPage < totalPages - 2 && (
-                <>
-                  <span className="px-2">...</span>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 transition-colors"
-                  >
-                    {totalPages}
-                  </button>
-                </>
-              )}
-            </div>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 rounded bg-glass-200 hover:bg-glass-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
-            >
-              Older
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Logs Display */}
-      {logs.length === 0 ? (
+      {filteredLogs.length === 0 && !loading ? (
         <div className="text-center py-12 text-gray-400">
           <Clock size={48} className="mx-auto mb-4 opacity-50" />
           <p>No activity logs found</p>
@@ -548,6 +559,19 @@ const ActivityLogs = () => {
               </div>
             </div>
           ))}
+          
+          {/* Infinite scroll trigger and loading indicator */}
+          <div ref={observerTarget} className="flex justify-center py-4 min-h-[60px]">
+            {loadingMore && (
+              <div className="flex flex-col items-center gap-2">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-400"></div>
+                <p className="text-sm text-gray-400">Loading more logs...</p>
+              </div>
+            )}
+            {!hasMore && !loadingMore && logs.length > 0 && (
+              <p className="text-sm text-gray-500">No more logs to load</p>
+            )}
+          </div>
         </div>
       )}
     </div>
