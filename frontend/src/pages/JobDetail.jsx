@@ -299,6 +299,31 @@ const JobDetail = () => {
     }
   }
 
+  const handleBulkReAnalyze = async () => {
+    if (selectedCandidates.length === 0) return
+    
+    const confirmed = await showConfirm({
+      title: 'Re-analyze Selected Candidates',
+      message: `Re-analyze ${selectedCandidates.length} selected candidate(s)? This will update all scores and justifications.`,
+      type: 'info',
+      confirmText: 'Re-analyze',
+      cancelText: 'Cancel'
+    })
+    
+    if (confirmed) {
+      try {
+        await Promise.all(selectedCandidates.map(id => reAnalyzeCandidate(id)))
+        setSelectedCandidates([])
+        await showAlert('Success', `Re-analysis started for ${selectedCandidates.length} candidate(s).`, 'success')
+        fetchData() // Refresh data
+      } catch (error) {
+        console.error('Error re-analyzing candidates:', error)
+        await showAlert('Error', 'Failed to start re-analysis for some candidates. Please try again.', 'error')
+        fetchData()
+      }
+    }
+  }
+
   const applyFilters = () => {
     fetchData()
   }
@@ -716,6 +741,13 @@ const JobDetail = () => {
               <div className="p-4 border-b border-glass-200 bg-glass-100 flex items-center justify-between">
                 <span className="text-sm text-gray-400">{selectedCandidates.length} candidates selected</span>
                 <div className="flex gap-2">
+                  <button
+                    onClick={handleBulkReAnalyze}
+                    className="glass-button-secondary flex items-center gap-2 text-primary-400 hover:bg-primary-500/20"
+                  >
+                    <RefreshCw size={16} />
+                    Re-analyze ({selectedCandidates.length})
+                  </button>
                   <button
                     onClick={handleBulkDelete}
                     className="glass-button-secondary flex items-center gap-2 text-red-400 hover:bg-red-500/20"

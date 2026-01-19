@@ -598,6 +598,14 @@ const CandidateProfile = () => {
                       )}
                     </div>
                     <button
+                      onClick={handleReAnalyze}
+                      disabled={reAnalyzing}
+                      className="glass-button-secondary w-full flex items-center justify-center gap-2 text-sm text-primary-400 hover:bg-primary-500/20 border-primary-500/30"
+                    >
+                      <RefreshCw size={16} className={reAnalyzing ? 'animate-spin' : ''} />
+                      {reAnalyzing ? 'Re-analyzing...' : 'Re-analyze'}
+                    </button>
+                    <button
                       onClick={() => setShowEmailModal(true)}
                       className="glass-button-secondary w-full flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 border-red-500/30"
                     >
