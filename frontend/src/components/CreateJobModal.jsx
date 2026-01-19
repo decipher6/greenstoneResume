@@ -118,14 +118,23 @@ const CreateJobModal = ({ onClose }) => {
 
           <div>
             <label className="block text-sm font-medium mb-2">Department</label>
-            <input
-              type="text"
+            <select
               required
-              placeholder="e.g. Engineering"
               className="glass-input w-full"
               value={formData.department}
               onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-            />
+            >
+              <option value="">Select a department</option>
+              <option value="Investor Relations">Investor Relations</option>
+              <option value="Partner Relations">Partner Relations</option>
+              <option value="Investor Development">Investor Development</option>
+              <option value="IR Research">IR Research</option>
+              <option value="Legal">Legal</option>
+              <option value="Compliance">Compliance</option>
+              <option value="Technology">Technology</option>
+              <option value="Finance">Finance</option>
+              <option value="HR and Operations">HR and Operations</option>
+            </select>
           </div>
 
           <div>

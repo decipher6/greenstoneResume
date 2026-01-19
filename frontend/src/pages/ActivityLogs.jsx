@@ -199,6 +199,20 @@ const ActivityLogs = () => {
     return name.substring(0, 2).toUpperCase()
   }
 
+  const getActivityTypeLabel = (type) => {
+    const typeMap = {
+      'job': 'Job Management',
+      'candidate': 'Candidate Actions',
+      'email': 'Email Activities',
+      'assessment': 'Assessment Uploads',
+      'user': 'User Activities',
+      'analysis': 'AI Analysis',
+      'login': 'User Login',
+      'logout': 'User Logout'
+    }
+    return typeMap[type?.toLowerCase()] || type || 'All Types'
+  }
+
   const groupLogsByDate = (logs) => {
     const grouped = {}
     logs.forEach(log => {
@@ -314,11 +328,11 @@ const ActivityLogs = () => {
                   : 'bg-glass-200 hover:bg-glass-300 text-gray-300'
               }`}
             >
-              Activity Type
+              {selectedType ? getActivityTypeLabel(selectedType) : 'Activity Type'}
               <ChevronDown size={14} className={`transition-transform ${showTypeFilter ? 'rotate-180' : ''}`} />
             </button>
             {showTypeFilter && (
-              <div className="absolute top-full left-0 mt-2 bg-gray-800 rounded-lg p-2 z-50 min-w-[200px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto">
+              <div className="absolute top-full left-0 mt-2 bg-gray-800 rounded-lg p-2 z-50 min-w-[240px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto">
                 <select
                   value={selectedType}
                   onChange={(e) => {
@@ -327,9 +341,9 @@ const ActivityLogs = () => {
                   }}
                   className="w-full px-3 py-2 bg-gray-700 rounded border border-glass-300 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
-                  <option value="">All Types</option>
+                  <option value="">All Activity Types</option>
                   {activityTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                    <option key={type} value={type}>{getActivityTypeLabel(type)}</option>
                   ))}
                 </select>
               </div>
