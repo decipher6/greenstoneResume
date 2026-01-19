@@ -41,11 +41,15 @@ export const uploadCandidatesBulk = (jobId, files) => {
   const formData = new FormData()
   files.forEach(file => formData.append('files', file))
   formData.append('job_id', jobId)
-  // Increased timeout to 10 minutes for very large batches
-  // Files are chunked on frontend, so each chunk should complete faster
+  // Smaller chunks = shorter timeout needed per request
+  // 2 minutes per chunk should be plenty for 5 files
+  const timeout = files.length <= 5 ? 120000 : 300000 // 2 min for small batches, 5 min for larger
   return api.post('/candidates/upload-bulk', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 600000, // 10 minutes timeout for large uploads
+    timeout: timeout,
+    // Add retry configuration
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity,
   })
 }
 export const deleteCandidate = (candidateId) => api.delete(`/candidates/${candidateId}`)
