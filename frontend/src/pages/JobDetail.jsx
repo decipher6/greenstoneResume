@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Filter, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Filter, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw, ArrowUpDown } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
   runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate, reAnalyzeCandidate
@@ -20,16 +20,13 @@ const JobDetail = () => {
   const [nameSearch, setNameSearch] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    status: '',
-    rating: '',
-    min_resume_score: '',
-    min_ccat_score: '',
-    min_overall_score: '',
+    status: [], // Multi-select: analyzed, shortlisted, interview, rejected
+    rating: [], // Multi-select: 1-5 stars
     sort_by: 'overall_score'
   })
+  const [nameSort, setNameSort] = useState(null) // null, 'asc', 'desc'
+  const [ratingSort, setRatingSort] = useState(null) // null, 'asc', 'desc'
+  const [scoreSort, setScoreSort] = useState(null) // null, 'asc', 'desc'
   const [autoAnalyze, setAutoAnalyze] = useState(true)
   const [editingCandidateId, setEditingCandidateId] = useState(null) // candidateId being edited
   const [editValues, setEditValues] = useState({}) // { candidateId: { name, email, phone } }
@@ -56,11 +53,6 @@ const JobDetail = () => {
   const fetchData = useCallback(async () => {
     try {
       const params = new URLSearchParams()
-      if (filters.min_resume_score) params.append('min_resume_score', filters.min_resume_score)
-      if (filters.min_ccat_score) params.append('min_ccat_score', filters.min_ccat_score)
-      if (filters.min_overall_score) params.append('min_overall_score', filters.min_overall_score)
-      // Always use the latest nameSearch value from ref (for backward compatibility)
-      if (nameSearchRef.current.trim()) params.append('name', nameSearchRef.current.trim())
       // Default to sorting by overall_score descending if no sort_by specified
       params.append('sort_by', filters.sort_by || 'overall_score')
       
@@ -84,12 +76,12 @@ const JobDetail = () => {
     } catch (error) {
       console.error('Error fetching data:', error)
     }
-  }, [jobId, topCandidatesLimit, filters.min_resume_score, filters.min_ccat_score, filters.min_overall_score, filters.sort_by])
+  }, [jobId, topCandidatesLimit, filters.sort_by])
 
-  // Fetch data when API filters change (score filters trigger API calls)
+  // Fetch data when API filters change
   useEffect(() => {
     fetchData()
-  }, [jobId, topCandidatesLimit, filters.min_resume_score, filters.min_ccat_score, filters.min_overall_score, filters.sort_by, fetchData])
+  }, [jobId, topCandidatesLimit, filters.sort_by, fetchData])
 
   const validateFiles = (files) => {
     const fileArray = Array.from(files)
@@ -569,19 +561,15 @@ const JobDetail = () => {
   }
 
   const clearFilters = () => {
-    const clearedFilters = {
-      name: '',
-      email: '',
-      phone: '',
-      status: '',
-      rating: '',
-      min_resume_score: '',
-      min_ccat_score: '',
-      min_overall_score: '',
+    setFilters({
+      status: [],
+      rating: [],
       sort_by: 'overall_score'
-    }
-    setFilters(clearedFilters)
+    })
     setNameSearch('')
+    setNameSort(null)
+    setRatingSort(null)
+    setScoreSort(null)
     // Fetch with cleared filters
     setTimeout(() => {
       const params = new URLSearchParams()
@@ -591,47 +579,127 @@ const JobDetail = () => {
     }, 100)
   }
 
-  // Client-side filtering for name, email, phone, status, rating
+  // Client-side filtering and sorting
   const getFilteredCandidates = () => {
     let filtered = [...candidates]
 
-    // Also apply nameSearch for backward compatibility
-    const searchQuery = filters.name || nameSearch
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
+    // Apply name search
+    if (nameSearch.trim()) {
+      const query = nameSearch.toLowerCase()
       filtered = filtered.filter(c => 
         c.name?.toLowerCase().includes(query)
       )
     }
 
-    if (filters.email) {
-      const query = filters.email.toLowerCase()
+    // Status filter (multi-select)
+    if (filters.status && filters.status.length > 0) {
       filtered = filtered.filter(c => 
-        c.contact_info?.email?.toLowerCase().includes(query)
+        filters.status.includes(c.status || 'analyzed')
       )
     }
 
-    if (filters.phone) {
-      const query = filters.phone.toLowerCase()
-      filtered = filtered.filter(c => 
-        c.contact_info?.phone?.toLowerCase().includes(query)
-      )
+    // Rating filter (multi-select)
+    if (filters.rating && filters.rating.length > 0) {
+      filtered = filtered.filter(c => {
+        const rating = c.rating || 0
+        return filters.rating.includes(rating.toString())
+      })
     }
 
-    if (filters.status) {
-      filtered = filtered.filter(c => 
-        (c.status || 'analyzed') === filters.status
-      )
+    // Sort by name
+    if (nameSort) {
+      filtered.sort((a, b) => {
+        const aName = (a.name || '').toLowerCase()
+        const bName = (b.name || '').toLowerCase()
+        if (nameSort === 'asc') {
+          return aName.localeCompare(bName)
+        } else {
+          return bName.localeCompare(aName)
+        }
+      })
     }
 
-    if (filters.rating) {
-      const ratingNum = parseInt(filters.rating)
-      filtered = filtered.filter(c => 
-        c.rating === ratingNum
-      )
+    // Sort by rating
+    if (ratingSort) {
+      filtered.sort((a, b) => {
+        const aRating = a.rating || 0
+        const bRating = b.rating || 0
+        if (ratingSort === 'asc') {
+          return aRating - bRating
+        } else {
+          return bRating - aRating
+        }
+      })
+    }
+
+    // Sort by score
+    if (scoreSort) {
+      filtered.sort((a, b) => {
+        const aScore = parseFloat(a.score_breakdown?.resume_score || 0)
+        const bScore = parseFloat(b.score_breakdown?.resume_score || 0)
+        if (scoreSort === 'asc') {
+          return aScore - bScore
+        } else {
+          return bScore - aScore
+        }
+      })
     }
 
     return filtered
+  }
+
+  const toggleStatusFilter = (status) => {
+    setFilters(prev => ({
+      ...prev,
+      status: prev.status.includes(status)
+        ? prev.status.filter(s => s !== status)
+        : [...prev.status, status]
+    }))
+  }
+
+  const toggleRatingFilter = (rating) => {
+    setFilters(prev => ({
+      ...prev,
+      rating: prev.rating.includes(rating)
+        ? prev.rating.filter(r => r !== rating)
+        : [...prev.rating, rating]
+    }))
+  }
+
+  const toggleNameSort = () => {
+    if (nameSort === null) {
+      setNameSort('asc')
+      setRatingSort(null)
+      setScoreSort(null)
+    } else if (nameSort === 'asc') {
+      setNameSort('desc')
+    } else {
+      setNameSort(null)
+    }
+  }
+
+  const toggleRatingSort = () => {
+    if (ratingSort === null) {
+      setRatingSort('asc')
+      setNameSort(null)
+      setScoreSort(null)
+    } else if (ratingSort === 'asc') {
+      setRatingSort('desc')
+    } else {
+      setRatingSort(null)
+    }
+  }
+
+  const toggleScoreSort = () => {
+    if (scoreSort === null) {
+      setScoreSort('asc')
+      setNameSort(null)
+      setRatingSort(null)
+    } else if (scoreSort === 'asc') {
+      setScoreSort('desc')
+    } else {
+      setScoreSort(null)
+    }
   }
 
   const toggleCandidateSelection = (candidateId) => {
@@ -966,6 +1034,16 @@ const JobDetail = () => {
                 <h3 className="text-lg font-semibold">Candidates</h3>
                 
                 <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by name..."
+                      className="glass-input pl-10 pr-4 py-2 w-64 text-sm"
+                      value={nameSearch}
+                      onChange={(e) => setNameSearch(e.target.value)}
+                    />
+                  </div>
                   <button
                     onClick={() => setShowFilters(!showFilters)}
                     className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
@@ -977,7 +1055,7 @@ const JobDetail = () => {
                   >
                     <Filter size={18} />
                   </button>
-                  {(Object.values(filters).some(f => f) || nameSearch) && (
+                  {(filters.status.length > 0 || filters.rating.length > 0 || nameSearch || nameSort || ratingSort || scoreSort) && (
                     <button
                       onClick={clearFilters}
                       className="glass-button-secondary flex items-center gap-2 text-sm"
@@ -1028,107 +1106,84 @@ const JobDetail = () => {
                   }}
                 />
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th 
+                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                onClick={toggleNameSort}
+              >
                 <div className="space-y-2">
-                  <div>Name</div>
-                  {showFilters && (
-                    <input
-                      type="text"
-                      placeholder="Filter name..."
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.name}
-                      onChange={(e) => setFilters({...filters, name: e.target.value})}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span>Name</span>
+                    <ArrowUpDown size={14} className="text-gray-400" />
+                    {nameSort === 'asc' && <span className="text-xs text-gray-400">(A-Z)</span>}
+                    {nameSort === 'desc' && <span className="text-xs text-gray-400">(Z-A)</span>}
+                  </div>
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">
-                <div className="space-y-2">
-                  <div>Email</div>
-                  {showFilters && (
-                    <input
-                      type="text"
-                      placeholder="Filter email..."
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.email}
-                      onChange={(e) => setFilters({...filters, email: e.target.value})}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  )}
-                </div>
+                <div>Email</div>
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">
-                <div className="space-y-2">
-                  <div>Phone</div>
-                  {showFilters && (
-                    <input
-                      type="text"
-                      placeholder="Filter phone..."
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.phone}
-                      onChange={(e) => setFilters({...filters, phone: e.target.value})}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  )}
-                </div>
+                <div>Phone</div>
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">
                 <div className="space-y-2">
                   <div>Status</div>
                   {showFilters && (
-                    <select
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.status}
-                      onChange={(e) => setFilters({...filters, status: e.target.value})}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <option value="">All</option>
-                      <option value="uploaded">Uploaded</option>
-                      <option value="analyzing">Analyzing</option>
-                      <option value="analyzed">Analyzed</option>
-                      <option value="shortlisted">Shortlisted</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
+                    <div className="space-y-1 max-h-32 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                      {['analyzed', 'shortlisted', 'interview', 'rejected'].map(status => (
+                        <label key={status} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-glass-100 p-1 rounded">
+                          <input
+                            type="checkbox"
+                            checked={filters.status.includes(status)}
+                            onChange={() => toggleStatusFilter(status)}
+                            className="rounded"
+                          />
+                          <span className="capitalize">{status}</span>
+                        </label>
+                      ))}
+                    </div>
                   )}
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th 
+                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                onClick={toggleRatingSort}
+              >
                 <div className="space-y-2">
-                  <div>Rating</div>
+                  <div className="flex items-center gap-2">
+                    <span>Rating</span>
+                    <ArrowUpDown size={14} className="text-gray-400" />
+                    {ratingSort === 'asc' && <span className="text-xs text-gray-400">(Low-High)</span>}
+                    {ratingSort === 'desc' && <span className="text-xs text-gray-400">(High-Low)</span>}
+                  </div>
                   {showFilters && (
-                    <select
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.rating}
-                      onChange={(e) => setFilters({...filters, rating: e.target.value})}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <option value="">All</option>
-                      <option value="5">5 Stars</option>
-                      <option value="4">4 Stars</option>
-                      <option value="3">3 Stars</option>
-                      <option value="2">2 Stars</option>
-                      <option value="1">1 Star</option>
-                    </select>
+                    <div className="space-y-1 max-h-32 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                      {[5, 4, 3, 2, 1].map(rating => (
+                        <label key={rating} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-glass-100 p-1 rounded">
+                          <input
+                            type="checkbox"
+                            checked={filters.rating.includes(rating.toString())}
+                            onChange={() => toggleRatingFilter(rating.toString())}
+                            className="rounded"
+                          />
+                          <span>{rating} Star{rating !== 1 ? 's' : ''}</span>
+                        </label>
+                      ))}
+                    </div>
                   )}
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th 
+                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                onClick={toggleScoreSort}
+              >
                 <div className="space-y-2">
-                  <div>Score</div>
-                  {showFilters && (
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="0.1"
-                      placeholder="Min score"
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.min_resume_score}
-                      onChange={(e) => setFilters({...filters, min_resume_score: e.target.value})}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span>Score</span>
+                    <ArrowUpDown size={14} className="text-gray-400" />
+                    {scoreSort === 'asc' && <span className="text-xs text-gray-400">(Low-High)</span>}
+                    {scoreSort === 'desc' && <span className="text-xs text-gray-400">(High-Low)</span>}
+                  </div>
                 </div>
               </th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
