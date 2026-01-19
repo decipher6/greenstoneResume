@@ -4,7 +4,7 @@ import {
   Briefcase, UserPlus, Mail, FileText, Trash2, Upload, Download, CheckCircle,
   PlayCircle, Settings, LogIn, LogOut, FileCheck
 } from 'lucide-react'
-import { getActivityLogs, getActivityLogsCount, getActivityTypes } from '../services/api'
+import { getActivityLogs, getActivityLogsCount, getActivityTypes, getActivityUsers } from '../services/api'
 
 const ActivityLogs = () => {
   const [logs, setLogs] = useState([])
@@ -12,28 +12,33 @@ const ActivityLogs = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [activityTypes, setActivityTypes] = useState([])
+  const [users, setUsers] = useState([])
   
   // Filter states
   const [showDateFilter, setShowDateFilter] = useState(false)
   const [showTypeFilter, setShowTypeFilter] = useState(false)
+  const [showUserFilter, setShowUserFilter] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [selectedType, setSelectedType] = useState('')
+  const [selectedUserId, setSelectedUserId] = useState('')
   
   // Refs for closing dropdowns on outside click
   const dateFilterRef = useRef(null)
   const typeFilterRef = useRef(null)
+  const userFilterRef = useRef(null)
   
   const logsPerPage = 30
 
   useEffect(() => {
     fetchActivityTypes()
+    fetchActivityUsers()
   }, [])
 
   useEffect(() => {
     fetchLogs()
     fetchCount()
-  }, [currentPage, startDate, endDate, selectedType])
+  }, [currentPage, startDate, endDate, selectedType, selectedUserId])
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -43,6 +48,9 @@ const ActivityLogs = () => {
       }
       if (typeFilterRef.current && !typeFilterRef.current.contains(event.target)) {
         setShowTypeFilter(false)
+      }
+      if (userFilterRef.current && !userFilterRef.current.contains(event.target)) {
+        setShowUserFilter(false)
       }
     }
 
@@ -61,6 +69,16 @@ const ActivityLogs = () => {
     }
   }
 
+  const fetchActivityUsers = async () => {
+    try {
+      const response = await getActivityUsers()
+      // Backend returns { users: [...] } where each user has id, name, email
+      setUsers(response.data?.users || [])
+    } catch (error) {
+      console.error('Error fetching activity users:', error)
+    }
+  }
+
   const fetchLogs = async () => {
     try {
       setLoading(true)
@@ -70,7 +88,8 @@ const ActivityLogs = () => {
         skip,
         ...(startDate && { start_date: startDate }),
         ...(endDate && { end_date: endDate }),
-        ...(selectedType && { activity_type: selectedType })
+        ...(selectedType && { activity_type: selectedType }),
+        ...(selectedUserId && { user_id: selectedUserId })
       }
       const response = await getActivityLogs(params)
       setLogs(response.data || [])
@@ -86,7 +105,8 @@ const ActivityLogs = () => {
       const params = {
         ...(startDate && { start_date: startDate }),
         ...(endDate && { end_date: endDate }),
-        ...(selectedType && { activity_type: selectedType })
+        ...(selectedType && { activity_type: selectedType }),
+        ...(selectedUserId && { user_id: selectedUserId })
       }
       const response = await getActivityLogsCount(params)
       setTotalCount(response.data?.count || 0)
@@ -234,10 +254,11 @@ const ActivityLogs = () => {
     setStartDate('')
     setEndDate('')
     setSelectedType('')
+    setSelectedUserId('')
     setCurrentPage(1)
   }
 
-  const hasActiveFilters = startDate || endDate || selectedType
+  const hasActiveFilters = startDate || endDate || selectedType || selectedUserId
 
   const totalPages = Math.ceil(totalCount / logsPerPage)
 
@@ -321,6 +342,7 @@ const ActivityLogs = () => {
               onClick={() => {
                 setShowTypeFilter(!showTypeFilter)
                 setShowDateFilter(false)
+                setShowUserFilter(false)
               }}
               className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
                 selectedType 
@@ -344,6 +366,42 @@ const ActivityLogs = () => {
                   <option value="">All Activity Types</option>
                   {activityTypes.map(type => (
                     <option key={type} value={type}>{getActivityTypeLabel(type)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* User Filter */}
+          <div className="relative" ref={userFilterRef}>
+            <button
+              onClick={() => {
+                setShowUserFilter(!showUserFilter)
+                setShowDateFilter(false)
+                setShowTypeFilter(false)
+              }}
+              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                selectedUserId 
+                  ? 'bg-primary-500 hover:bg-primary-600 text-white' 
+                  : 'bg-glass-200 hover:bg-glass-300 text-gray-300'
+              }`}
+            >
+              {selectedUserId ? users.find(u => u.id === selectedUserId)?.name || 'User' : 'User'}
+              <ChevronDown size={14} className={`transition-transform ${showUserFilter ? 'rotate-180' : ''}`} />
+            </button>
+            {showUserFilter && (
+              <div className="absolute top-full left-0 mt-2 bg-gray-800 rounded-lg p-2 z-50 min-w-[240px] shadow-xl border border-glass-300 max-h-60 overflow-y-auto">
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => {
+                    setSelectedUserId(e.target.value)
+                    setShowUserFilter(false)
+                  }}
+                  className="w-full px-3 py-2 bg-gray-700 rounded border border-glass-300 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">All Users</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>{user.name || user.email || 'Unknown User'}</option>
                   ))}
                 </select>
               </div>
