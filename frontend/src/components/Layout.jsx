@@ -1,12 +1,38 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, User, LogOut, Clock } from 'lucide-react'
+import { LayoutDashboard, User, LogOut, Clock, Briefcase, Users, PauseCircle, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { getDashboardStats } from '../services/api'
+
+const StatCard = ({ icon: Icon, label, value, color }) => {
+  const colorClasses = {
+    green: 'from-green-400/40 to-green-500/40 border-green-400/60 text-green-300',
+    purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30 text-purple-400',
+    pink: 'from-pink-500/20 to-pink-600/20 border-pink-500/30 text-pink-400',
+    orange: 'from-orange-500/20 to-orange-600/20 border-orange-500/30 text-orange-400',
+    blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/30 text-blue-400',
+  }
+
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${colorClasses[color]} flex items-center justify-center flex-shrink-0`}>
+            <Icon size={24} />
+          </div>
+          <div className="text-3xl font-bold">{value}</div>
+        </div>
+      </div>
+      <div className="text-sm text-gray-400">{label}</div>
+    </div>
+  )
+}
 
 const Layout = ({ children, pageTitle, pageSubtitle }) => {
   const location = useLocation()
   const { user, logout } = useAuth()
   const [isExpanded, setIsExpanded] = useState(false)
+  const [stats, setStats] = useState(null)
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -26,6 +52,30 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
   }
 
   const { title, subtitle } = getPageInfo()
+
+  useEffect(() => {
+    fetchStats()
+    // Refresh stats every 30 seconds
+    const interval = setInterval(fetchStats, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const fetchStats = async () => {
+    try {
+      const statsRes = await getDashboardStats()
+      setStats(statsRes.data)
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error)
+    }
+  }
+
+  // Expose refresh function via window for child components to trigger refresh
+  useEffect(() => {
+    window.refreshDashboardStats = fetchStats
+    return () => {
+      delete window.refreshDashboardStats
+    }
+  }, [])
 
   return (
     <div className="flex min-h-screen h-full overflow-hidden">
@@ -110,6 +160,36 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        {/* Stats Cards - Always visible */}
+        <div className="px-4 pt-4 pb-0 flex-shrink-0">
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard
+              icon={Briefcase}
+              label="Active Jobs"
+              value={stats?.active_jobs || 0}
+              color="green"
+            />
+            <StatCard
+              icon={Users}
+              label="Total Candidates"
+              value={stats?.total_candidates || 0}
+              color="purple"
+            />
+            <StatCard
+              icon={PauseCircle}
+              label="Jobs On Hold"
+              value={stats?.jobs_on_hold || 0}
+              color="orange"
+            />
+            <StatCard
+              icon={CheckCircle2}
+              label="Jobs Filled"
+              value={stats?.jobs_filled || 0}
+              color="blue"
+            />
+          </div>
+        </div>
+
         {/* Header - Hidden for Dashboard, Job Detail, and Candidate Profile pages */}
         {location.pathname !== '/' && !location.pathname.startsWith('/jobs/') && !location.pathname.startsWith('/candidates/') && (
           <header className="glass-card m-4 mb-0 rounded-2xl p-6 flex-shrink-0">

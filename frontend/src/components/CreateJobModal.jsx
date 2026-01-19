@@ -37,6 +37,10 @@ const CreateJobModal = ({ onClose }) => {
     try {
       const response = await createJob(formData)
       const jobId = response.data.id
+      // Refresh stats in Layout
+      if (window.refreshDashboardStats) {
+        window.refreshDashboardStats()
+      }
       onClose()
       // Navigate to the newly created job detail page
       navigate(`/jobs/${jobId}`)

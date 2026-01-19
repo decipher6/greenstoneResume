@@ -332,6 +332,11 @@ const JobDetail = () => {
       setPendingFiles([])
       fetchData()
       
+      // Refresh stats in Layout
+      if (window.refreshDashboardStats) {
+        window.refreshDashboardStats()
+      }
+      
       // Auto-analyze if setting is enabled
       if (autoAnalyze && totalUploaded > 0) {
         setTimeout(async () => {
@@ -505,6 +510,10 @@ const JobDetail = () => {
       try {
         await deleteCandidate(candidateId)
         fetchData()
+        // Refresh stats in Layout
+        if (window.refreshDashboardStats) {
+          window.refreshDashboardStats()
+        }
         await showAlert('Success', 'Candidate deleted successfully.', 'success')
       } catch (error) {
         console.error('Error deleting candidate:', error)
@@ -530,6 +539,10 @@ const JobDetail = () => {
         await Promise.all(selectedCandidates.map(id => deleteCandidate(id)))
         setSelectedCandidates([])
         fetchData()
+        // Refresh stats in Layout
+        if (window.refreshDashboardStats) {
+          window.refreshDashboardStats()
+        }
         await showAlert('Success', `Successfully deleted ${selectedCandidates.length} candidate(s).`, 'success')
       } catch (error) {
         console.error('Error deleting candidates:', error)
