@@ -264,37 +264,7 @@ async def parse_doc(file_content: bytes) -> str:
     """Extract text from DOC file using multiple strategies for best results"""
     text = None
     
-    # Strategy 1: Try textract (requires antiword to be installed on system)
-    try:
-        import textract
-        # Write to temp file since textract works with file paths
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp_file:
-            tmp_file.write(file_content)
-            tmp_path = tmp_file.name
-        
-        try:
-            extracted = textract.process(tmp_path, encoding='utf-8')
-            if extracted:
-                text = extracted.decode('utf-8', errors='ignore')
-        finally:
-            # Clean up temp file
-            try:
-                os.unlink(tmp_path)
-            except:
-                pass
-        
-        if text and len(text.strip()) > 50:  # Got meaningful text
-            cleaned = clean_doc_text(text)
-            if cleaned and len(cleaned.strip()) > 50:
-                return cleaned
-    except ImportError:
-        # textract not installed, skip
-        pass
-    except Exception as e:
-        # textract failed, try next method
-        pass
-    
-    # Strategy 2: Try antiword directly via subprocess (if available) - most reliable
+    # Strategy 1: Try antiword directly via subprocess (if available) - most reliable
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp_file:
             tmp_file.write(file_content)
@@ -325,7 +295,7 @@ async def parse_doc(file_content: bytes) -> str:
     except Exception as e:
         pass
     
-    # Strategy 3: Try improved binary parsing with better cleaning (fallback)
+    # Strategy 2: Try improved binary parsing with better cleaning (fallback)
     try:
         # Try multiple encodings
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
