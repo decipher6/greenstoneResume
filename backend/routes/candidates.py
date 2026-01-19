@@ -36,19 +36,25 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
         if not file_content or len(file_content) == 0:
             return {"success": False, "error": "File is empty", "filename": filename}
         
-        # Parse resume
+        # Parse resume - accept whatever text is available
         try:
             resume_text = await parse_resume(file_content, filename)
-            if not resume_text or len(resume_text.strip()) == 0:
-                return {"success": False, "error": "Could not extract text from file (file may be corrupted or image-based PDF)", "filename": filename}
+            # Accept files even with minimal text (image-based PDFs will have placeholder text)
+            if not resume_text:
+                # Use filename as fallback text
+                resume_text = f"Resume: {filename}"
+                print(f"Warning: No text extracted from {filename}, using filename as placeholder")
         except Exception as parse_error:
             error_msg = str(parse_error)
-            # Provide more helpful error messages
-            if "pdfplumber" in error_msg.lower() or "pdf" in error_msg.lower():
-                error_msg = f"PDF parsing failed: {error_msg}. File may be corrupted or password-protected."
-            elif "mammoth" in error_msg.lower() or "docx" in error_msg.lower():
-                error_msg = f"DOCX parsing failed: {error_msg}. File may be corrupted."
-            return {"success": False, "error": error_msg, "filename": filename}
+            # Only fail on critical errors (password-protected, not parseable at all)
+            if "password" in error_msg.lower() or "encrypted" in error_msg.lower():
+                return {"success": False, "error": f"PDF is password-protected: {error_msg}", "filename": filename}
+            elif "unsupported" in error_msg.lower():
+                return {"success": False, "error": error_msg, "filename": filename}
+            else:
+                # For other parsing errors, use filename as fallback and continue
+                resume_text = f"Resume: {filename}\nNote: Text extraction had issues: {error_msg}"
+                print(f"Warning: Parsing error for {filename}, using fallback text: {error_msg}")
         
         # Extract contact info and name
         try:
