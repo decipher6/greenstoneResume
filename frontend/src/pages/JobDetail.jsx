@@ -206,8 +206,37 @@ const JobDetail = () => {
       if (totalFailed > 0) {
         message += `\n\n${totalFailed} file(s) failed to upload.`
         if (allFailedFiles.length > 0) {
-          const failedNames = allFailedFiles.slice(0, 5).map(f => f.filename || 'Unknown').join(', ')
-          message += `\n\nFailed files: ${failedNames}${allFailedFiles.length > 5 ? '...' : ''}`
+          // Group errors by type for better visibility
+          const errorGroups = {}
+          allFailedFiles.forEach(f => {
+            const error = f.error || 'Unknown error'
+            if (!errorGroups[error]) {
+              errorGroups[error] = []
+            }
+            errorGroups[error].push(f.filename || 'Unknown')
+          })
+          
+          // Show error summary
+          const errorTypes = Object.keys(errorGroups)
+          if (errorTypes.length > 0) {
+            message += `\n\nCommon errors:\n`
+            errorTypes.slice(0, 3).forEach((error, idx) => {
+              const count = errorGroups[error].length
+              message += `\n${idx + 1}. ${error} (${count} file${count !== 1 ? 's' : ''})`
+              if (count <= 3) {
+                message += `: ${errorGroups[error].join(', ')}`
+              } else {
+                message += `: ${errorGroups[error].slice(0, 3).join(', ')} and ${count - 3} more`
+              }
+            })
+            if (errorTypes.length > 3) {
+              message += `\n... and ${errorTypes.length - 3} more error type${errorTypes.length - 3 !== 1 ? 's' : ''}`
+            }
+          } else {
+            // Fallback to showing filenames
+            const failedNames = allFailedFiles.slice(0, 5).map(f => f.filename || 'Unknown').join(', ')
+            message += `\n\nFailed files: ${failedNames}${allFailedFiles.length > 5 ? '...' : ''}`
+          }
         }
         await showAlert('Partial Success', message, 'warning')
       } else {

@@ -40,9 +40,15 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
         try:
             resume_text = await parse_resume(file_content, filename)
             if not resume_text or len(resume_text.strip()) == 0:
-                return {"success": False, "error": "Could not extract text from file", "filename": filename}
+                return {"success": False, "error": "Could not extract text from file (file may be corrupted or image-based PDF)", "filename": filename}
         except Exception as parse_error:
-            return {"success": False, "error": f"Failed to parse file: {str(parse_error)}", "filename": filename}
+            error_msg = str(parse_error)
+            # Provide more helpful error messages
+            if "pdfplumber" in error_msg.lower() or "pdf" in error_msg.lower():
+                error_msg = f"PDF parsing failed: {error_msg}. File may be corrupted or password-protected."
+            elif "mammoth" in error_msg.lower() or "docx" in error_msg.lower():
+                error_msg = f"DOCX parsing failed: {error_msg}. File may be corrupted."
+            return {"success": False, "error": error_msg, "filename": filename}
         
         # Extract contact info and name
         try:
@@ -89,136 +95,202 @@ async def upload_candidates_bulk(
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """Upload multiple candidate CVs (processes in parallel batches for performance)"""
-    db = get_db()
-    
-    # Verify job exists
-    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    # Removed hard limit - process any number of files (chunked on frontend if needed)
-    # Large batches are handled efficiently with parallel processing
-    
-    # Validate file formats
-    allowed_extensions = ['.pdf', '.docx', '.doc']
-    invalid_files = []
-    for file in files:
-        ext = '.' + (file.filename or '').split('.')[-1].lower()
-        if ext not in allowed_extensions:
-            invalid_files.append(file.filename)
-    
-    if invalid_files:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file format(s): {', '.join(invalid_files)}. Supported formats: .pdf, .docx, .doc"
-        )
-    
-    # Process files in parallel batches (optimized for 100+ file uploads)
-    # Batch size of 15 provides good balance between throughput and resource usage
-    BATCH_SIZE = 15
-    total_files = len(files)
-    
-    if DEBUG and total_files >= 50:
-        print(f"Processing large batch: {total_files} files in batches of {BATCH_SIZE}")
-    
-    uploaded_candidates = []
-    failed_files = []
-    
-    # Read all file contents first (to avoid issues with parallel file reading)
-    file_data = []
-    for file in files:
+    try:
+        db = get_db()
+        
+        # Verify job exists
         try:
-            await file.seek(0)  # Reset to beginning
-            content = await file.read()
-            filename = file.filename or "unknown"
-            file_data.append({"content": content, "filename": filename})
+            job = await db.jobs.find_one({"_id": ObjectId(job_id)})
         except Exception as e:
-            failed_files.append({"filename": file.filename or "unknown", "error": f"Failed to read file: {str(e)}"})
-            file_data.append(None)
-    
-    # Process files in batches
-    total_batches = (len(file_data) + BATCH_SIZE - 1) // BATCH_SIZE
-    for batch_num, batch_start in enumerate(range(0, len(file_data), BATCH_SIZE), 1):
-        batch = file_data[batch_start:batch_start + BATCH_SIZE]
+            print(f"Error finding job {job_id}: {e}")
+            raise HTTPException(status_code=400, detail=f"Invalid job ID: {job_id}")
         
-        if DEBUG and total_files >= 50:
-            print(f"Processing batch {batch_num}/{total_batches} ({len(batch)} files)")
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
         
-        # Process batch in parallel with unique file indices
-        tasks = []
-        for idx, file_info in enumerate(batch):
-            if file_info is None:
-                continue  # Skip files that failed to read
-            tasks.append(process_single_file(
-                file_info["content"], 
-                file_info["filename"], 
-                job_id, 
-                batch_start + idx
-            ))
+        # Removed hard limit - process any number of files (chunked on frontend if needed)
+        # Large batches are handled efficiently with parallel processing
         
-        if not tasks:
-            continue
-            
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Validate file formats - but don't fail entire upload, just mark invalid files
+        allowed_extensions = ['.pdf', '.docx', '.doc']
+        uploaded_candidates = []
+        failed_files = []
         
-        # Collect successful candidates and errors
-        batch_candidates = []
-        for result in results:
-            if isinstance(result, Exception):
-                failed_files.append({"filename": "unknown", "error": str(result)})
-            elif result.get("success"):
-                batch_candidates.append(result["data"])
+        # Filter out invalid files upfront and add to failed_files
+        valid_files = []
+        for file in files:
+            ext = '.' + (file.filename or '').split('.')[-1].lower()
+            if ext not in allowed_extensions:
+                failed_files.append({
+                    "filename": file.filename or "unknown",
+                    "error": f"Invalid file format. Supported formats: .pdf, .docx, .doc"
+                })
             else:
-                failed_files.append({"filename": result.get("filename", "unknown"), "error": result.get("error", "Unknown error")})
+                valid_files.append(file)
         
-        # Bulk insert candidates for this batch
-        if batch_candidates:
+        if len(valid_files) == 0:
+            # All files were invalid
+            return {
+                "uploaded": 0,
+                "failed": len(failed_files),
+                "candidates": [],
+                "failed_files": failed_files[:50]  # Return up to 50 errors
+            }
+    
+        # Process files in parallel batches (optimized for 100+ file uploads)
+        # Batch size of 15 provides good balance between throughput and resource usage
+        BATCH_SIZE = 15
+        total_files = len(valid_files)
+        
+        if DEBUG or total_files >= 10:
+            print(f"Processing batch: {total_files} valid files (out of {len(files)} total) in batches of {BATCH_SIZE}")
+        
+        # Read all file contents first (to avoid issues with parallel file reading)
+        file_data = []
+        for file in valid_files:
             try:
-                insert_results = await db.candidates.insert_many(batch_candidates)
-                # Add IDs to candidate dicts
-                for idx, candidate_dict in enumerate(batch_candidates):
-                    candidate_dict["id"] = str(insert_results.inserted_ids[idx])
-                    uploaded_candidates.append(Candidate(**candidate_dict))
+                await file.seek(0)  # Reset to beginning
+                content = await file.read()
+                if not content or len(content) == 0:
+                    failed_files.append({"filename": file.filename or "unknown", "error": "File is empty"})
+                    file_data.append(None)
+                else:
+                    filename = file.filename or "unknown"
+                    file_data.append({"content": content, "filename": filename})
             except Exception as e:
-                print(f"Error bulk inserting candidates: {e}")
-                # Fallback to individual inserts if bulk insert fails
-                for candidate_dict in batch_candidates:
-                    try:
-                        result = await db.candidates.insert_one(candidate_dict)
-                        candidate_dict["id"] = str(result.inserted_id)
+                error_msg = str(e)
+                print(f"Error reading file {file.filename}: {error_msg}")
+                failed_files.append({"filename": file.filename or "unknown", "error": f"Failed to read file: {error_msg}"})
+                file_data.append(None)
+    
+        # Process files in batches
+        total_batches = (len(file_data) + BATCH_SIZE - 1) // BATCH_SIZE
+        for batch_num, batch_start in enumerate(range(0, len(file_data), BATCH_SIZE), 1):
+            batch = file_data[batch_start:batch_start + BATCH_SIZE]
+            
+            if DEBUG or total_files >= 10:
+                print(f"Processing batch {batch_num}/{total_batches} ({len([f for f in batch if f is not None])} files)")
+            
+            # Process batch in parallel with unique file indices
+            tasks = []
+            for idx, file_info in enumerate(batch):
+                if file_info is None:
+                    continue  # Skip files that failed to read
+                tasks.append(process_single_file(
+                    file_info["content"], 
+                    file_info["filename"], 
+                    job_id, 
+                    batch_start + idx
+                ))
+            
+            if not tasks:
+                continue
+                
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Collect successful candidates and errors
+            batch_candidates = []
+            for result in results:
+                if isinstance(result, Exception):
+                    error_msg = str(result)
+                    print(f"Exception in file processing: {error_msg}")
+                    failed_files.append({"filename": "unknown", "error": error_msg})
+                elif isinstance(result, dict):
+                    if result.get("success"):
+                        batch_candidates.append(result["data"])
+                    else:
+                        error_msg = result.get("error", "Unknown error")
+                        filename = result.get("filename", "unknown")
+                        print(f"File processing failed for {filename}: {error_msg}")
+                        failed_files.append({"filename": filename, "error": error_msg})
+                else:
+                    print(f"Unexpected result type: {type(result)}")
+                    failed_files.append({"filename": "unknown", "error": "Unexpected processing result"})
+            
+            # Bulk insert candidates for this batch
+            if batch_candidates:
+                try:
+                    insert_results = await db.candidates.insert_many(batch_candidates)
+                    # Add IDs to candidate dicts
+                    for idx, candidate_dict in enumerate(batch_candidates):
+                        candidate_dict["id"] = str(insert_results.inserted_ids[idx])
                         uploaded_candidates.append(Candidate(**candidate_dict))
-                    except Exception as e2:
-                        print(f"Error inserting candidate {candidate_dict.get('name', 'unknown')}: {e2}")
-                        failed_files.append({"filename": candidate_dict.get('resume_file_path', 'unknown'), "error": str(e2)})
+                except Exception as e:
+                    error_msg = str(e)
+                    print(f"Error bulk inserting candidates: {error_msg}")
+                    import traceback
+                    traceback.print_exc()
+                    # Fallback to individual inserts if bulk insert fails
+                    for candidate_dict in batch_candidates:
+                        try:
+                            result = await db.candidates.insert_one(candidate_dict)
+                            candidate_dict["id"] = str(result.inserted_id)
+                            uploaded_candidates.append(Candidate(**candidate_dict))
+                        except Exception as e2:
+                            error_msg2 = str(e2)
+                            print(f"Error inserting candidate {candidate_dict.get('name', 'unknown')}: {error_msg2}")
+                            failed_files.append({
+                                "filename": candidate_dict.get('resume_file_path', 'unknown'), 
+                                "error": f"Database insert failed: {error_msg2}"
+                            })
+        
+        # Update job candidate count
+        if uploaded_candidates:
+            try:
+                await db.jobs.update_one(
+                    {"_id": ObjectId(job_id)},
+                    {"$inc": {"candidate_count": len(uploaded_candidates)}}
+                )
+            except Exception as e:
+                print(f"Error updating job candidate count: {e}")
+        
+        # Log activity
+        try:
+            job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+            await log_activity(
+                action="candidates_uploaded",
+                entity_type="candidate",
+                description=f"Uploaded {len(uploaded_candidates)} candidate(s) for job: {job.get('title', 'Unknown') if job else 'Unknown'}",
+                entity_id=job_id,
+                user_id=user_id,
+                metadata={"count": len(uploaded_candidates), "job_id": job_id, "failed": len(failed_files)}
+            )
+        except Exception as e:
+            print(f"Error logging activity: {e}")
+        
+        response = {
+            "uploaded": len(uploaded_candidates),
+            "failed": len(failed_files),
+            "candidates": uploaded_candidates
+        }
+        
+        # Return ALL failed files with errors (up to 100 to avoid huge response)
+        if failed_files:
+            response["failed_files"] = failed_files[:100]
+            # Log summary of failures
+            if len(failed_files) > 0:
+                error_summary = {}
+                for failed in failed_files[:20]:  # Sample first 20 errors
+                    error_type = failed.get("error", "Unknown error")
+                    error_summary[error_type] = error_summary.get(error_type, 0) + 1
+                print(f"Upload summary: {len(uploaded_candidates)} succeeded, {len(failed_files)} failed")
+                print(f"Error types: {error_summary}")
+        
+        return response
     
-    # Update job candidate count
-    if uploaded_candidates:
-        await db.jobs.update_one(
-            {"_id": ObjectId(job_id)},
-            {"$inc": {"candidate_count": len(uploaded_candidates)}}
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404, 400)
+        raise
+    except Exception as e:
+        # Catch any unexpected errors and return them properly
+        error_msg = str(e)
+        print(f"Unexpected error in upload_candidates_bulk: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error during upload: {error_msg}"
         )
-    
-    # Log activity
-    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
-    await log_activity(
-        action="candidates_uploaded",
-        entity_type="candidate",
-        description=f"Uploaded {len(uploaded_candidates)} candidate(s) for job: {job.get('title', 'Unknown') if job else 'Unknown'}",
-        entity_id=job_id,
-        user_id=user_id,
-        metadata={"count": len(uploaded_candidates), "job_id": job_id, "failed": len(failed_files)}
-    )
-    
-    response = {
-        "uploaded": len(uploaded_candidates),
-        "failed": len(failed_files),
-        "candidates": uploaded_candidates
-    }
-    
-    if failed_files:
-        response["failed_files"] = failed_files[:10]  # Limit to first 10 errors to avoid huge response
-    
-    return response
 
 @router.get("/job/{job_id}", response_model=List[Candidate])
 async def get_candidates_by_job(
