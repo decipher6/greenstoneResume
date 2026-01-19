@@ -63,7 +63,6 @@ class ScoreBreakdown(BaseModel):
 
 class CriterionScore(BaseModel):
     criterion_name: str
-    display_name: Optional[str] = None
     score: float
     weight: float
 

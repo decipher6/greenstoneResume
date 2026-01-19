@@ -456,7 +456,6 @@ async def process_candidate_analysis(job_id: str, candidate_id: str):
             
             criterion_scores.append({
                 "criterion_name": criterion_name,
-                "display_name": next((cs.get("display_name") for cs in llm_criterion_scores if str(cs.get("criterion_name")).strip().lower() == criterion_name.lower()), criterion_name),
                 "score": float(score),
                 "weight": criterion["weight"]
             })
