@@ -113,8 +113,14 @@ async def upload_candidates_bulk(
             detail=f"Invalid file format(s): {', '.join(invalid_files)}. Supported formats: .pdf, .docx, .doc"
         )
     
-    # Process files in parallel batches (10 at a time to avoid overwhelming the system)
-    BATCH_SIZE = 10
+    # Process files in parallel batches (optimized for 100+ file uploads)
+    # Batch size of 15 provides good balance between throughput and resource usage
+    BATCH_SIZE = 15
+    total_files = len(files)
+    
+    if DEBUG and total_files >= 50:
+        print(f"Processing large batch: {total_files} files in batches of {BATCH_SIZE}")
+    
     uploaded_candidates = []
     failed_files = []
     
@@ -131,8 +137,12 @@ async def upload_candidates_bulk(
             file_data.append(None)
     
     # Process files in batches
-    for batch_start in range(0, len(file_data), BATCH_SIZE):
+    total_batches = (len(file_data) + BATCH_SIZE - 1) // BATCH_SIZE
+    for batch_num, batch_start in enumerate(range(0, len(file_data), BATCH_SIZE), 1):
         batch = file_data[batch_start:batch_start + BATCH_SIZE]
+        
+        if DEBUG and total_files >= 50:
+            print(f"Processing batch {batch_num}/{total_batches} ({len(batch)} files)")
         
         # Process batch in parallel with unique file indices
         tasks = []

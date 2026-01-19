@@ -36,7 +36,13 @@ const JobDetail = () => {
   const [isDragging, setIsDragging] = useState(false)
   const [pendingFiles, setPendingFiles] = useState([])
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
+  const [uploadProgress, setUploadProgress] = useState({ 
+    current: 0, 
+    total: 0, 
+    filesProcessed: 0, 
+    totalFiles: 0,
+    currentChunk: 0
+  })
   const [activeTab, setActiveTab] = useState('candidates') // 'description', 'candidates', or 'shortlist'
   const [shortlistedCandidates, setShortlistedCandidates] = useState([])
   
@@ -87,14 +93,19 @@ const JobDetail = () => {
   const validateFiles = (files) => {
     const fileArray = Array.from(files)
     
-    // No hard limit - files will be uploaded in chunks if needed
-    // Warn user if selecting a very large number
-    if (fileArray.length > 500) {
+    // Support up to 1000 files - warn for very large batches
+    // 100 CVs is fully supported and recommended
+    if (fileArray.length > 1000) {
       return {
         valid: false,
-        error: `You selected ${fileArray.length} files. For best performance, please upload in batches of 200-300 files at a time.`,
+        error: `You selected ${fileArray.length} files. For best performance, please upload in batches of up to 500 files at a time.`,
         errorTitle: 'Large Batch Warning'
       }
+    }
+    
+    // Inform user about batch processing for large uploads
+    if (fileArray.length > 100) {
+      console.log(`Processing ${fileArray.length} files in optimized batches...`)
     }
 
     // Validate file formats
@@ -152,13 +163,21 @@ const JobDetail = () => {
       let totalUploaded = 0
       let totalFailed = 0
       const allFailedFiles = []
+      const totalFiles = pendingFiles.length
 
       // Upload chunks sequentially to avoid overwhelming the server
-      setUploadProgress({ current: 0, total: chunks.length })
+      setUploadProgress({ current: 0, total: chunks.length, filesProcessed: 0, totalFiles })
       for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
         const chunk = chunks[chunkIndex]
         try {
-          setUploadProgress({ current: chunkIndex + 1, total: chunks.length })
+          const filesProcessed = chunkIndex * CHUNK_SIZE
+          setUploadProgress({ 
+            current: chunkIndex + 1, 
+            total: chunks.length,
+            filesProcessed,
+            totalFiles,
+            currentChunk: chunk.length
+          })
           const response = await uploadCandidatesBulk(jobId, chunk)
           const data = response.data || {}
           const uploaded = data.uploaded || 0
@@ -228,7 +247,7 @@ const JobDetail = () => {
       await showAlert('Error', errorMessage, 'error')
     } finally {
       setIsUploading(false)
-      setUploadProgress({ current: 0, total: 0 })
+      setUploadProgress({ current: 0, total: 0, filesProcessed: 0, totalFiles: 0, currentChunk: 0 })
     }
   }
 
@@ -682,7 +701,8 @@ const JobDetail = () => {
                 {isDragging ? 'Drop files to upload' : 'Drag & Drop Resumes Here'}
               </h3>
               <p className="text-sm text-gray-400 mb-4">
-                Drop PDF, DOCX, or DOC files here, or click to browse
+                Drop PDF, DOCX, or DOC files here, or click to browse<br />
+                <span className="text-xs text-gray-500">Supports bulk uploads of up to 100+ CVs at once</span>
               </p>
               <label className="glass-button cursor-pointer flex items-center gap-2 inline-flex">
                 <FileText size={18} />
@@ -749,8 +769,13 @@ const JobDetail = () => {
                   {isUploading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      {uploadProgress.total > 1 ? (
-                        <span>Uploading... ({uploadProgress.current}/{uploadProgress.total} chunks)</span>
+                      {uploadProgress.totalFiles > 0 ? (
+                        <span>
+                          Uploading... {uploadProgress.filesProcessed || 0}/{uploadProgress.totalFiles} files
+                          {uploadProgress.total > 1 && ` (Batch ${uploadProgress.current}/${uploadProgress.total})`}
+                        </span>
+                      ) : uploadProgress.total > 1 ? (
+                        <span>Uploading... (Batch {uploadProgress.current}/{uploadProgress.total})</span>
                       ) : (
                         <span>Uploading...</span>
                       )}
@@ -758,7 +783,7 @@ const JobDetail = () => {
                   ) : (
                     <>
                       <Upload size={18} />
-                      Upload All ({pendingFiles.length})
+                      Upload All ({pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''})
                     </>
                   )}
                 </button>
