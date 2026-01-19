@@ -27,6 +27,7 @@ const JobDetail = () => {
   const [nameSort, setNameSort] = useState(null) // null, 'asc', 'desc'
   const [ratingSort, setRatingSort] = useState(null) // null, 'asc', 'desc'
   const [scoreSort, setScoreSort] = useState(null) // null, 'asc', 'desc'
+  const [openDropdown, setOpenDropdown] = useState(null) // 'status' or 'rating' or null
   const [autoAnalyze, setAutoAnalyze] = useState(true)
   const [editingCandidateId, setEditingCandidateId] = useState(null) // candidateId being edited
   const [editValues, setEditValues] = useState({}) // { candidateId: { name, email, phone } }
@@ -702,6 +703,17 @@ const JobDetail = () => {
     }
   }
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openDropdown && !event.target.closest('.filter-dropdown-container')) {
+        setOpenDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openDropdown])
+
   const toggleCandidateSelection = (candidateId) => {
     setSelectedCandidates(prev => 
       prev.includes(candidateId) 
@@ -1125,58 +1137,85 @@ const JobDetail = () => {
               <th className="px-6 py-3 text-left text-sm font-semibold">
                 <div>Phone</div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                <div className="space-y-2">
-                  <div>Status</div>
-                  {showFilters && (
-                    <select
-                      multiple
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.status}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value)
-                        setFilters({...filters, status: selected})
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      size={4}
-                    >
-                      <option value="analyzed">Analyzed</option>
-                      <option value="shortlisted">Shortlisted</option>
-                      <option value="interview">Interview</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
+              <th className="px-6 py-3 text-left text-sm font-semibold relative">
+                <div className="space-y-2 filter-dropdown-container">
+                  <div 
+                    className="cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded flex items-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpenDropdown(openDropdown === 'status' ? null : 'status')
+                    }}
+                  >
+                    <span>Status</span>
+                    {filters.status.length > 0 && (
+                      <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+                        {filters.status.length}
+                      </span>
+                    )}
+                  </div>
+                  {openDropdown === 'status' && (
+                    <div className="absolute top-full left-0 mt-1 z-50 glass-card p-3 min-w-[200px] shadow-lg">
+                      <div className="space-y-2">
+                        {['analyzed', 'shortlisted', 'interview', 'rejected'].map(status => (
+                          <label key={status} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-glass-100 p-2 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.status.includes(status)}
+                              onChange={() => toggleStatusFilter(status)}
+                              className="rounded"
+                            />
+                            <span className="capitalize">{status}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </th>
               <th 
-                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
-                onClick={toggleRatingSort}
+                className="px-6 py-3 text-left text-sm font-semibold relative"
               >
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-2 filter-dropdown-container">
+                  <div 
+                    className="flex items-center gap-2 cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (e.target.closest('span') || e.target.closest('svg')) {
+                        toggleRatingSort()
+                      } else {
+                        setOpenDropdown(openDropdown === 'rating' ? null : 'rating')
+                      }
+                    }}
+                  >
                     <span>Rating</span>
-                    <ArrowUpDown size={14} className="text-gray-400" />
+                    <ArrowUpDown size={14} className="text-gray-400" onClick={(e) => {
+                      e.stopPropagation()
+                      toggleRatingSort()
+                    }} />
                     {ratingSort === 'asc' && <span className="text-xs text-gray-400">(Low-High)</span>}
                     {ratingSort === 'desc' && <span className="text-xs text-gray-400">(High-Low)</span>}
+                    {filters.rating.length > 0 && (
+                      <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+                        {filters.rating.length}
+                      </span>
+                    )}
                   </div>
-                  {showFilters && (
-                    <select
-                      multiple
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.rating}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value)
-                        setFilters({...filters, rating: selected})
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      size={5}
-                    >
-                      <option value="5">5 Stars</option>
-                      <option value="4">4 Stars</option>
-                      <option value="3">3 Stars</option>
-                      <option value="2">2 Stars</option>
-                      <option value="1">1 Star</option>
-                    </select>
+                  {openDropdown === 'rating' && (
+                    <div className="absolute top-full left-0 mt-1 z-50 glass-card p-3 min-w-[200px] shadow-lg">
+                      <div className="space-y-2">
+                        {[5, 4, 3, 2, 1].map(rating => (
+                          <label key={rating} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-glass-100 p-2 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.rating.includes(rating.toString())}
+                              onChange={() => toggleRatingFilter(rating.toString())}
+                              className="rounded"
+                            />
+                            <span>{rating} Star{rating !== 1 ? 's' : ''}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </th>

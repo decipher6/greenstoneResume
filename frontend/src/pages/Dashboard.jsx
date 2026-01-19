@@ -23,6 +23,7 @@ const Dashboard = () => {
   const [candidatesSort, setCandidatesSort] = useState(null) // null, 'asc', 'desc'
   const [lastRunSort, setLastRunSort] = useState('latest') // 'latest' or 'oldest'
   const [keywordSearch, setKeywordSearch] = useState('')
+  const [openDropdown, setOpenDropdown] = useState(null) // 'department' or 'status' or null
   const { showConfirm, showAlert } = useModal()
 
   useEffect(() => {
@@ -177,6 +178,17 @@ const Dashboard = () => {
         : [...prev.status, status]
     }))
   }
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openDropdown && !event.target.closest('.filter-dropdown-container')) {
+        setOpenDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openDropdown])
 
   const toggleTitleSort = () => {
     if (titleSort === null) {
@@ -352,25 +364,38 @@ const Dashboard = () => {
                   )}
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                <div className="space-y-2">
-                  <div>Department</div>
-                  {showFilters && (
-                    <select
-                      multiple
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.department}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value)
-                        setFilters({...filters, department: selected})
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      size={Math.min(departments.length, 5)}
-                    >
-                      {departments.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
+              <th className="px-6 py-3 text-left text-sm font-semibold relative">
+                <div className="space-y-2 filter-dropdown-container">
+                  <div 
+                    className="cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded flex items-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpenDropdown(openDropdown === 'department' ? null : 'department')
+                    }}
+                  >
+                    <span>Department</span>
+                    {filters.department.length > 0 && (
+                      <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+                        {filters.department.length}
+                      </span>
+                    )}
+                  </div>
+                  {openDropdown === 'department' && (
+                    <div className="absolute top-full left-0 mt-1 z-50 glass-card p-3 min-w-[200px] max-h-64 overflow-y-auto shadow-lg">
+                      <div className="space-y-2">
+                        {departments.map(dept => (
+                          <label key={dept} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-glass-100 p-2 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.department.includes(dept)}
+                              onChange={() => toggleDepartmentFilter(dept)}
+                              className="rounded"
+                            />
+                            <span>{dept}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </th>
@@ -423,26 +448,38 @@ const Dashboard = () => {
                   )}
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                <div className="space-y-2">
-                  <div>Status</div>
-                  {showFilters && (
-                    <select
-                      multiple
-                      className="glass-input w-full text-xs py-1.5 px-2"
-                      value={filters.status}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value)
-                        setFilters({...filters, status: selected})
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      size={4}
-                    >
-                      <option value="active">Active</option>
-                      <option value="on-hold">On-Hold</option>
-                      <option value="filled">Filled</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+              <th className="px-6 py-3 text-left text-sm font-semibold relative">
+                <div className="space-y-2 filter-dropdown-container">
+                  <div 
+                    className="cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded flex items-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpenDropdown(openDropdown === 'status' ? null : 'status')
+                    }}
+                  >
+                    <span>Status</span>
+                    {filters.status.length > 0 && (
+                      <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+                        {filters.status.length}
+                      </span>
+                    )}
+                  </div>
+                  {openDropdown === 'status' && (
+                    <div className="absolute top-full left-0 mt-1 z-50 glass-card p-3 min-w-[200px] shadow-lg">
+                      <div className="space-y-2">
+                        {['active', 'on-hold', 'filled', 'cancelled'].map(status => (
+                          <label key={status} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-glass-100 p-2 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.status.includes(status)}
+                              onChange={() => toggleStatusFilter(status)}
+                              className="rounded"
+                            />
+                            <span className="capitalize">{status === 'on-hold' ? 'On-Hold' : status}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </th>
