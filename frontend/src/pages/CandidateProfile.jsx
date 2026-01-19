@@ -466,21 +466,14 @@ const CandidateProfile = () => {
                       <span className="text-sm text-gray-300">Software Core</span>
                       <span className="text-2xl font-bold text-green-200">{overallScore.toFixed(1)}/10</span>
                     </div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-xs text-gray-300">Medium confidence</span>
-                    </div>
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-2 text-sm mb-4">
                       <div className="flex items-center justify-between">
                         <span className="text-gray-300">Resume</span>
                         <span className="font-medium text-gray-200">{resumeScore.toFixed(1)}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-300">Assessment</span>
+                        <span className="text-gray-300">CCAT</span>
                         <span className="font-medium text-gray-200">{ccatScore ? ccatScore.toFixed(1) : 'Not uploaded yet'}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-300">Culture Fit</span>
-                        <span className="font-medium text-gray-200">{personalityScore ? personalityScore.toFixed(1) : 'Not uploaded yet'}</span>
                       </div>
                     </div>
                     {(!ccatScore || !personalityScore) && (
@@ -634,9 +627,6 @@ const CandidateProfile = () => {
                     <div className="space-y-4">
                       {candidate.criterion_scores.map((criterion, index) => {
                         const score = parseFloat(criterion.score || 0)
-                        const scoreText = score >= 7 ? 'Strong performance' : 
-                                         score >= 5 ? 'Moderate performance' : 
-                                         'Needs improvement'
                         return (
                           <div key={index}>
                             <div className="flex items-center justify-between mb-2">
@@ -649,7 +639,6 @@ const CandidateProfile = () => {
                                 style={{ width: `${(score / 10) * 100}%` }}
                               />
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">{scoreText}</p>
                           </div>
                         )
                       })}
