@@ -137,9 +137,11 @@ const CandidateProfile = () => {
       // Prepare update data
       const updateData = { rating: newRating }
       
-      // Auto-shortlist if highly rated (4 or 5 stars)
+      // Auto-shortlist if highly rated (4 or 5 stars), otherwise revert to analyzed
       if (newRating >= 4) {
         updateData.status = 'shortlisted'
+      } else {
+        updateData.status = 'analyzed'
       }
       
       await updateCandidate(candidateId, updateData)
