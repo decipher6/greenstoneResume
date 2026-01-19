@@ -296,7 +296,7 @@ const CandidateProfile = () => {
       const isMet = score >= 6.0 // Consider 6+ as meeting requirement
 
       return {
-        name: criterion.name,
+        name: criterionScore?.display_name || criterion.name,
         score,
         isMet,
         weight: criterion.weight
@@ -627,7 +627,7 @@ const CandidateProfile = () => {
                         return (
                           <div key={index}>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium">{criterion.criterion_name}</span>
+                              <span className="text-sm font-medium">{criterion.display_name || criterion.criterion_name}</span>
                               <span className="text-sm font-semibold text-emerald-400">{score.toFixed(1)}/10</span>
                             </div>
                             <div className="h-2 bg-glass-200 rounded-full overflow-hidden">

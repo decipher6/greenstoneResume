@@ -103,17 +103,28 @@ CRITICAL REQUIREMENTS:
 4. Use decimal precision (e.g., 7.3, 8.7) to reflect nuanced evaluation
 5. Each score must be justified by specific evidence from the resume
 6. The overall_score MUST be the mathematically correct weighted average
-7. Provide a structured justification in the following format:
+7. Provide a structured justification and a concise "display_name" for each criterion (max 3-5 words) in the following format:
 
 REQUIRED JSON FORMAT - You MUST include ALL criteria with EXACT names:
-{{
+{
     "overall_score": 8.5,
     "criterion_scores": [
-        {{"criterion_name": "CRITERION_NAME_1", "score": 9.0}},
-        {{"criterion_name": "CRITERION_NAME_2", "score": 8.5}}
+        {
+            "criterion_name": "CRITERION_NAME_1", 
+            "display_name": "Concise name",
+            "score": 9.0
+        },
+        {
+            "criterion_name": "CRITERION_NAME_2", 
+            "display_name": "Another concise name",
+            "score": 8.5
+        }
     ],
-    "justification": "Top Strengths:\\n- [List 2-4 actual strengths: relevant experience, matching skills, qualifications that align with the job]\\n- [Only include positive attributes that make the candidate suitable]\\n\\nTop Gaps / Risks:\\n- [List 2-4 actual weaknesses: missing skills, lack of required experience, gaps in qualifications]\\n- [Only include negative aspects that are concerns for the role]\\n\\nRecommendation:\\n[Provide a concise 2-3 sentence summary with your hiring recommendation. Be brief and direct.]"
-}}
+    "justification": "Top Strengths:\n- [List 2-4 actual strengths: relevant experience, matching skills, qualifications that align with the job]\n- [Only include positive attributes that make the candidate suitable]\n\nTop Gaps / Risks:\n- [List 2-4 actual weaknesses: missing skills, lack of required experience, gaps in qualifications]\n- [Only include negative aspects that are concerns for the role]\n\nRecommendation:\n[Provide a concise 2-3 sentence summary with your hiring recommendation. Be brief and direct.]"
+}
+
+DISPLAY NAME GUIDELINES:
+The display_name MUST be a highly concise, 2-5 word summary of the criterion.
 
 IMPORTANT: Replace "CRITERION_NAME_1", "CRITERION_NAME_2" etc. with the EXACT criterion names from the list above.
 Each criterion MUST have a different score based on the actual resume content.
@@ -253,6 +264,7 @@ Remember: Replace "EXACT_CRITERION_NAME_1", "EXACT_CRITERION_NAME_2" with the ac
                 if isinstance(cs, dict) and "criterion_name" in cs and "score" in cs:
                     validated_criterion_scores.append({
                         "criterion_name": str(cs["criterion_name"]).strip(),
+                        "display_name": str(cs.get("display_name", cs["criterion_name"])).strip(),
                         "score": max(0, min(10, float(cs["score"])))
                     })
             scoring_result["criterion_scores"] = validated_criterion_scores
@@ -277,11 +289,13 @@ Remember: Replace "EXACT_CRITERION_NAME_1", "EXACT_CRITERION_NAME_2" with the ac
             
             # Try to extract criterion scores using regex
             criterion_scores = []
-            criterion_pattern = r'"criterion_name"\s*:\s*"([^"]+)"\s*,\s*"score"\s*:\s*(\d+\.?\d*)'
+            # Updated pattern to optionally match display_name
+            criterion_pattern = r'"criterion_name"\s*:\s*"([^"]+)"\s*(?:,\s*"display_name"\s*:\s*"([^"]+)"\s*)?,\s*"score"\s*:\s*(\d+\.?\d*)'
             for match in re.finditer(criterion_pattern, content):
                 criterion_scores.append({
                     "criterion_name": match.group(1),
-                    "score": float(match.group(2))
+                    "display_name": match.group(2) if match.group(2) else match.group(1),
+                    "score": float(match.group(3))
                 })
             
             # Extract justification - handle both quoted and unquoted
@@ -321,6 +335,7 @@ Remember: Replace "EXACT_CRITERION_NAME_1", "EXACT_CRITERION_NAME_2" with the ac
                 score = max(0, min(10, llm_score + variation))
                 criterion_scores.append({
                     "criterion_name": criterion["name"],
+                    "display_name": criterion["name"],
                     "score": round(score, 1)
                 })
         
