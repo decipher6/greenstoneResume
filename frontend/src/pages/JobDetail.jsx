@@ -18,6 +18,7 @@ const JobDetail = () => {
   const [topCandidatesLimit, setTopCandidatesLimit] = useState(5)
   const [selectedCandidates, setSelectedCandidates] = useState([])
   const [nameSearch, setNameSearch] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
     name: '',
     email: '',
@@ -674,16 +675,28 @@ const JobDetail = () => {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Candidates</h3>
                 
-                {/* Clear Filters Button */}
-                {(Object.values(filters).some(f => f) || nameSearch) && (
+                <div className="flex items-center gap-3">
                   <button
-                    onClick={clearFilters}
-                    className="glass-button-secondary flex items-center gap-2 text-sm"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
+                      showFilters 
+                        ? 'bg-glass-200 text-primary-400' 
+                        : 'hover:bg-glass-200 text-gray-400'
+                    }`}
+                    title="Toggle Filters"
                   >
-                    <X size={16} />
-                    Clear Filters
+                    <Filter size={18} />
                   </button>
-                )}
+                  {(Object.values(filters).some(f => f) || nameSearch) && (
+                    <button
+                      onClick={clearFilters}
+                      className="glass-button-secondary flex items-center gap-2 text-sm"
+                    >
+                      <X size={16} />
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -721,92 +734,104 @@ const JobDetail = () => {
               <th className="px-6 py-3 text-left text-sm font-semibold">
                 <div className="space-y-2">
                   <div>Name</div>
-                  <input
-                    type="text"
-                    placeholder="Filter name..."
-                    className="glass-input w-full text-xs py-1.5 px-2"
-                    value={filters.name}
-                    onChange={(e) => setFilters({...filters, name: e.target.value})}
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                  {showFilters && (
+                    <input
+                      type="text"
+                      placeholder="Filter name..."
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.name}
+                      onChange={(e) => setFilters({...filters, name: e.target.value})}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">
                 <div className="space-y-2">
                   <div>Email</div>
-                  <input
-                    type="text"
-                    placeholder="Filter email..."
-                    className="glass-input w-full text-xs py-1.5 px-2"
-                    value={filters.email}
-                    onChange={(e) => setFilters({...filters, email: e.target.value})}
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                  {showFilters && (
+                    <input
+                      type="text"
+                      placeholder="Filter email..."
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.email}
+                      onChange={(e) => setFilters({...filters, email: e.target.value})}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">
                 <div className="space-y-2">
                   <div>Phone</div>
-                  <input
-                    type="text"
-                    placeholder="Filter phone..."
-                    className="glass-input w-full text-xs py-1.5 px-2"
-                    value={filters.phone}
-                    onChange={(e) => setFilters({...filters, phone: e.target.value})}
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                  {showFilters && (
+                    <input
+                      type="text"
+                      placeholder="Filter phone..."
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.phone}
+                      onChange={(e) => setFilters({...filters, phone: e.target.value})}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">
                 <div className="space-y-2">
                   <div>Status</div>
-                  <select
-                    className="glass-input w-full text-xs py-1.5 px-2"
-                    value={filters.status}
-                    onChange={(e) => setFilters({...filters, status: e.target.value})}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <option value="">All</option>
-                    <option value="uploaded">Uploaded</option>
-                    <option value="analyzing">Analyzing</option>
-                    <option value="analyzed">Analyzed</option>
-                    <option value="shortlisted">Shortlisted</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
+                  {showFilters && (
+                    <select
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.status}
+                      onChange={(e) => setFilters({...filters, status: e.target.value})}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="">All</option>
+                      <option value="uploaded">Uploaded</option>
+                      <option value="analyzing">Analyzing</option>
+                      <option value="analyzed">Analyzed</option>
+                      <option value="shortlisted">Shortlisted</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  )}
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">
                 <div className="space-y-2">
                   <div>Rating</div>
-                  <select
-                    className="glass-input w-full text-xs py-1.5 px-2"
-                    value={filters.rating}
-                    onChange={(e) => setFilters({...filters, rating: e.target.value})}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <option value="">All</option>
-                    <option value="5">5 Stars</option>
-                    <option value="4">4 Stars</option>
-                    <option value="3">3 Stars</option>
-                    <option value="2">2 Stars</option>
-                    <option value="1">1 Star</option>
-                  </select>
+                  {showFilters && (
+                    <select
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.rating}
+                      onChange={(e) => setFilters({...filters, rating: e.target.value})}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="">All</option>
+                      <option value="5">5 Stars</option>
+                      <option value="4">4 Stars</option>
+                      <option value="3">3 Stars</option>
+                      <option value="2">2 Stars</option>
+                      <option value="1">1 Star</option>
+                    </select>
+                  )}
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">
                 <div className="space-y-2">
                   <div>Score</div>
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                    placeholder="Min score"
-                    className="glass-input w-full text-xs py-1.5 px-2"
-                    value={filters.min_resume_score}
-                    onChange={(e) => setFilters({...filters, min_resume_score: e.target.value})}
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                  {showFilters && (
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      placeholder="Min score"
+                      className="glass-input w-full text-xs py-1.5 px-2"
+                      value={filters.min_resume_score}
+                      onChange={(e) => setFilters({...filters, min_resume_score: e.target.value})}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
                 </div>
               </th>
               <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
