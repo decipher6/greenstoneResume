@@ -8,11 +8,16 @@ from models import ActivityLog
 
 router = APIRouter()
 
+# Helper function to get current time (stored without adjustment, adjusted on read)
+def get_current_time():
+    """Get current datetime (will be adjusted +4 hours when reading for display)"""
+    return datetime.now()
+
 # Automatic cleanup task - delete logs older than 30 days
 async def cleanup_old_logs():
     """Delete activity logs older than 30 days"""
     db = get_db()
-    cutoff_date = datetime.now() - timedelta(days=30)
+    cutoff_date = get_current_time() - timedelta(days=30)
     try:
         result = await db.activity_logs.delete_many({"created_at": {"$lt": cutoff_date}})
         if result.deleted_count > 0:
@@ -38,7 +43,7 @@ async def log_activity(
         "entity_id": entity_id,
         "user_id": user_id,
         "metadata": metadata or {},
-        "created_at": datetime.now()
+        "created_at": get_current_time()
     }
     try:
         await db.activity_logs.insert_one(log_dict)
@@ -107,7 +112,11 @@ async def get_activity_logs(
     async for log in db.activity_logs.find(query).sort("created_at", -1).skip(skip).limit(limit):
         log["id"] = str(log["_id"])
         if "created_at" not in log:
-            log["created_at"] = datetime.now()
+            log["created_at"] = get_current_time()
+        
+        # Add 4 hours to all timestamps for display (fixes timezone offset)
+        if isinstance(log.get("created_at"), datetime):
+            log["created_at"] = log["created_at"] + timedelta(hours=4)
         
         # Fetch user name if user_id exists
         if log.get("user_id"):
@@ -218,7 +227,11 @@ async def create_activity_log(log: ActivityLog):
     
     log_dict = log.dict(exclude={"id"})
     if not log_dict.get("created_at"):
-        log_dict["created_at"] = datetime.now()
+        log_dict["created_at"] = get_current_time()
+    
+    # Add 4 hours to timestamp for display (fixes timezone offset)
+    if isinstance(log_dict.get("created_at"), datetime):
+        log_dict["created_at"] = log_dict["created_at"] + timedelta(hours=4)
     
     result = await db.activity_logs.insert_one(log_dict)
     log_dict["id"] = str(result.inserted_id)

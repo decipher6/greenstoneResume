@@ -3,9 +3,12 @@ import mammoth
 import re
 from io import BytesIO
 from typing import Optional
-import subprocess
 import tempfile
 import os
+import convertapi
+from dotenv import load_dotenv
+
+load_dotenv()
 
 async def parse_pdf(file_content: bytes) -> str:
     """Extract text from PDF file - handles both text-based and image-based PDFs"""
@@ -262,41 +265,70 @@ def clean_doc_text(text: str) -> str:
     return text.strip()
 
 async def parse_doc(file_content: bytes) -> str:
-    """Extract text from DOC file using antiword (primary) with binary decoding fallback"""
+    """Extract text from DOC file by converting to DOCX using ConvertAPI, then parsing with mammoth"""
     text = None
     
-    # Strategy 1: Use antiword subprocess for .doc files (most reliable)
+    # Strategy 1: Convert .doc to .docx using ConvertAPI, then parse with mammoth
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp_file:
-            tmp_file.write(file_content)
-            tmp_path = tmp_file.name
+        # Get ConvertAPI credentials from environment variable
+        convertapi_key = os.getenv("CONVERTAPI_KEY")
+        if not convertapi_key:
+            raise ValueError("CONVERTAPI_KEY environment variable is not set")
         
-        try:
-            result = subprocess.run(
-                ['antiword', tmp_path],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                errors='ignore'
-            )
-            if result.returncode == 0 and result.stdout:
-                text = result.stdout
-                if text and len(text.strip()) > 50:
-                    cleaned = clean_doc_text(text)
-                    if cleaned and len(cleaned.strip()) > 50:
-                        return cleaned
-        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
-            # antiword not available or failed
-            pass
-        finally:
+        # Set ConvertAPI credentials
+        convertapi.api_credentials = convertapi_key
+        
+        # Create temporary directory for conversion output
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Write .doc file to temporary location
+            doc_path = None
             try:
-                os.unlink(tmp_path)
-            except:
-                pass
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.doc', dir=temp_dir) as tmp_doc:
+                    tmp_doc.write(file_content)
+                    doc_path = tmp_doc.name
+                
+                # Convert .doc to .docx using ConvertAPI
+                result = convertapi.convert('docx', {
+                    'File': doc_path
+                }, from_format='doc')
+                
+                # Save converted file(s) to temp directory
+                result.save_files(temp_dir)
+                
+                # Find the converted .docx file (ConvertAPI may name it differently)
+                converted_files = [f for f in os.listdir(temp_dir) if f.endswith('.docx') and f != os.path.basename(doc_path)]
+                
+                if converted_files:
+                    # Use the first .docx file found
+                    docx_path = os.path.join(temp_dir, converted_files[0])
+                    
+                    # Read the converted .docx file
+                    with open(docx_path, 'rb') as f:
+                        docx_content = f.read()
+                    
+                    # Parse the .docx file using mammoth
+                    mammoth_result = mammoth.extract_raw_text(BytesIO(docx_content))
+                    text = mammoth_result.value.strip()
+                    
+                    if text and len(text.strip()) > 50:
+                        # Clean the extracted text
+                        cleaned = clean_doc_text(text)
+                        if cleaned and len(cleaned.strip()) > 50:
+                            return cleaned
+            finally:
+                # Cleanup temporary files
+                try:
+                    if doc_path and os.path.exists(doc_path):
+                        os.unlink(doc_path)
+                except:
+                    pass
     except Exception as e:
+        # ConvertAPI conversion failed, continue to fallback
+        # Log error for debugging but don't fail
+        print(f"ConvertAPI conversion failed: {str(e)}")
         pass
     
-    # Strategy 2: Only use binary decoding as last resort (if antiword unavailable)
+    # Strategy 2: Only use binary decoding as last resort
     try:
         # Try multiple encodings
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
