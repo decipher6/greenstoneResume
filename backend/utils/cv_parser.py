@@ -156,8 +156,9 @@ def clean_doc_text(text: str) -> str:
         alpha_count = sum(1 for c in line if c.isalpha())
         alpha_ratio = alpha_count / len(line) if line else 0
         
-        # Skip lines with very low alphabetic content
-        if alpha_ratio < 0.15 and len(line) > 5:
+        # Keep lines only if they have reasonable alphabetic content
+        # (alpha_ratio >= 0.3 OR alpha_count >= 5)
+        if alpha_ratio < 0.3 and alpha_count < 5 and len(line) > 5:
             continue
         
         # Skip lines that are just repeated characters or patterns
@@ -176,7 +177,7 @@ def clean_doc_text(text: str) -> str:
     text = '\n'.join(cleaned_lines)
     
     # Aggressively remove artifacts from the beginning
-    # Find the first line that looks like real text (has multiple words, proper capitalization, etc.)
+    # Find the first line that looks like real text (has at least 3 meaningful words)
     lines = text.split('\n')
     start_idx = 0
     for i, line in enumerate(lines):
@@ -185,24 +186,24 @@ def clean_doc_text(text: str) -> str:
             continue
         # Check if this looks like real text
         words = line.split()
-        if len(words) >= 2:  # At least 2 words
+        if len(words) >= 3:  # At least 3 words
             # Check if it has proper words (not just symbols)
             word_count = sum(1 for w in words if any(c.isalpha() for c in w))
-            if word_count >= 2:
+            if word_count >= 3:  # At least 3 meaningful words
                 start_idx = i
                 break
     
     # Aggressively remove artifacts from the end
-    # Find the last line that looks like real text
+    # Find the last line that looks like real text (has at least 3 meaningful words)
     end_idx = len(lines)
     for i in range(len(lines) - 1, -1, -1):
         line = lines[i].strip()
         if not line:
             continue
         words = line.split()
-        if len(words) >= 2:
+        if len(words) >= 3:  # At least 3 words
             word_count = sum(1 for w in words if any(c.isalpha() for c in w))
-            if word_count >= 2:
+            if word_count >= 3:  # At least 3 meaningful words
                 end_idx = i + 1
                 break
     
@@ -213,7 +214,7 @@ def clean_doc_text(text: str) -> str:
         # Fallback: use all lines if we couldn't find good boundaries
         text = '\n'.join(lines)
     
-    # Remove leading/trailing garbage characters
+    # More aggressively trim binary artifacts from start and end
     # Remove non-alphabetic characters from the very start
     while text and len(text) > 0:
         first_char = text[0]
@@ -233,7 +234,7 @@ def clean_doc_text(text: str) -> str:
     text = re.sub(r'\n{3,}', '\n\n', text)  # Multiple newlines to double newline
     
     # Final cleanup: remove any remaining weird patterns at start/end
-    # Remove lines at start that don't look like text
+    # Remove lines at start that don't look like text (need at least 3 meaningful words)
     lines = text.split('\n')
     while lines and len(lines) > 0:
         first_line = lines[0].strip()
@@ -241,18 +242,18 @@ def clean_doc_text(text: str) -> str:
             lines.pop(0)
             continue
         words = first_line.split()
-        if len(words) >= 2 and sum(1 for w in words if any(c.isalpha() for c in w)) >= 2:
+        if len(words) >= 3 and sum(1 for w in words if any(c.isalpha() for c in w)) >= 3:
             break
         lines.pop(0)
     
-    # Remove lines at end that don't look like text
+    # Remove lines at end that don't look like text (need at least 3 meaningful words)
     while lines and len(lines) > 0:
         last_line = lines[-1].strip()
         if not last_line:
             lines.pop()
             continue
         words = last_line.split()
-        if len(words) >= 2 and sum(1 for w in words if any(c.isalpha() for c in w)) >= 2:
+        if len(words) >= 3 and sum(1 for w in words if any(c.isalpha() for c in w)) >= 3:
             break
         lines.pop()
     
@@ -264,7 +265,19 @@ async def parse_doc(file_content: bytes) -> str:
     """Extract text from DOC file using multiple strategies for best results"""
     text = None
     
-    # Strategy 1: Try antiword directly via subprocess (if available) - most reliable
+    # Strategy 1: Try mammoth.extract_raw_text() first (it supports .doc files too)
+    try:
+        result = mammoth.extract_raw_text(BytesIO(file_content))
+        text = result.value.strip()
+        if text and len(text.strip()) > 50:
+            cleaned = clean_doc_text(text)
+            if cleaned and len(cleaned.strip()) > 50:
+                return cleaned
+    except Exception as e:
+        # mammoth may not support all .doc formats, continue to next strategy
+        pass
+    
+    # Strategy 2: Fallback to antiword subprocess if available
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp_file:
             tmp_file.write(file_content)
@@ -295,7 +308,7 @@ async def parse_doc(file_content: bytes) -> str:
     except Exception as e:
         pass
     
-    # Strategy 2: Try improved binary parsing with better cleaning (fallback)
+    # Strategy 3: Only use binary decoding as last resort
     try:
         # Try multiple encodings
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
