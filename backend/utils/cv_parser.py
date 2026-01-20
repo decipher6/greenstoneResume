@@ -262,22 +262,10 @@ def clean_doc_text(text: str) -> str:
     return text.strip()
 
 async def parse_doc(file_content: bytes) -> str:
-    """Extract text from DOC file using multiple strategies for best results"""
+    """Extract text from DOC file using antiword (primary) with binary decoding fallback"""
     text = None
     
-    # Strategy 1: Try mammoth.extract_raw_text() first (it supports .doc files too)
-    try:
-        result = mammoth.extract_raw_text(BytesIO(file_content))
-        text = result.value.strip()
-        if text and len(text.strip()) > 50:
-            cleaned = clean_doc_text(text)
-            if cleaned and len(cleaned.strip()) > 50:
-                return cleaned
-    except Exception as e:
-        # mammoth may not support all .doc formats, continue to next strategy
-        pass
-    
-    # Strategy 2: Fallback to antiword subprocess if available
+    # Strategy 1: Use antiword subprocess for .doc files (most reliable)
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp_file:
             tmp_file.write(file_content)
@@ -308,7 +296,7 @@ async def parse_doc(file_content: bytes) -> str:
     except Exception as e:
         pass
     
-    # Strategy 3: Only use binary decoding as last resort
+    # Strategy 2: Only use binary decoding as last resort (if antiword unavailable)
     try:
         # Try multiple encodings
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
