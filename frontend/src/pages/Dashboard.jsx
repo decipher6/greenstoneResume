@@ -237,7 +237,7 @@ const Dashboard = () => {
             <div className="flex-1"></div>
               <div className="flex items-center gap-2">
                 <div className="relative">
-                <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-300" />
+                  <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-200 z-10 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="Search by keyword..."

@@ -1046,7 +1046,7 @@ const JobDetail = () => {
                 
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-200 z-10 pointer-events-none" />
                     <input
                       type="text"
                       placeholder="Search by name..."
