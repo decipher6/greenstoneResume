@@ -1281,8 +1281,8 @@ const JobDetail = () => {
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400 flex-1">
+                    <div className="flex items-center gap-x-1">
+                      <span className="text-gray-400">
                         {candidate.contact_info?.email || '-'}
                       </span>
                       {candidate.contact_info?.email && (
@@ -1292,7 +1292,6 @@ const JobDetail = () => {
                             try {
                               await navigator.clipboard.writeText(candidate.contact_info.email)
                               setCopiedField(`${candidate.id}-email`)
-                              await showAlert('Copied', 'Email copied to clipboard', 'success')
                               setTimeout(() => setCopiedField(null), 2000)
                             } catch (err) {
                               await showAlert('Error', 'Failed to copy email', 'error')
@@ -1321,8 +1320,8 @@ const JobDetail = () => {
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400 flex-1">
+                    <div className="flex items-center gap-x-1">
+                      <span className="text-gray-400">
                         {candidate.contact_info?.phone || '-'}
                       </span>
                       {candidate.contact_info?.phone && (
@@ -1332,7 +1331,6 @@ const JobDetail = () => {
                             try {
                               await navigator.clipboard.writeText(candidate.contact_info.phone)
                               setCopiedField(`${candidate.id}-phone`)
-                              await showAlert('Copied', 'Phone number copied to clipboard', 'success')
                               setTimeout(() => setCopiedField(null), 2000)
                             } catch (err) {
                               await showAlert('Error', 'Failed to copy phone number', 'error')
@@ -1495,8 +1493,8 @@ const JobDetail = () => {
                         <span className="font-medium">{candidate.name}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 flex-1">
+                        <div className="flex items-center gap-x-1">
+                          <span className="text-gray-400">
                             {candidate.contact_info?.email || '-'}
                           </span>
                           {candidate.contact_info?.email && (
@@ -1506,7 +1504,6 @@ const JobDetail = () => {
                                 try {
                                   await navigator.clipboard.writeText(candidate.contact_info.email)
                                   setCopiedField(`${candidate.id}-email`)
-                                  await showAlert('Copied', 'Email copied to clipboard', 'success')
                                   setTimeout(() => setCopiedField(null), 2000)
                                 } catch (err) {
                                   await showAlert('Error', 'Failed to copy email', 'error')
@@ -1525,8 +1522,8 @@ const JobDetail = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 flex-1">
+                        <div className="flex items-center gap-x-1">
+                          <span className="text-gray-400">
                             {candidate.contact_info?.phone || '-'}
                           </span>
                           {candidate.contact_info?.phone && (
@@ -1536,7 +1533,6 @@ const JobDetail = () => {
                                 try {
                                   await navigator.clipboard.writeText(candidate.contact_info.phone)
                                   setCopiedField(`${candidate.id}-phone`)
-                                  await showAlert('Copied', 'Phone number copied to clipboard', 'success')
                                   setTimeout(() => setCopiedField(null), 2000)
                                 } catch (err) {
                                   await showAlert('Error', 'Failed to copy phone number', 'error')
