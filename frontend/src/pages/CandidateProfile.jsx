@@ -229,7 +229,18 @@ const CandidateProfile = () => {
       const weaknessItems = weaknessesText
         .split(/\n/)
         .map(line => line.replace(/^[\s\-•\d+\.\)]+/, '').trim())
-        .filter(line => line.length > 0)
+        .filter(line => {
+          // Filter out empty lines and header text
+          if (line.length === 0) return false
+          const lower = line.toLowerCase()
+          // Exclude lines that are clearly headers or section labels
+          if (lower.includes('top gaps') || lower.includes('top risks') || 
+              lower.includes('gaps / risks') || lower === 'risks' || 
+              lower === 'gaps' || lower.startsWith('top ')) {
+            return false
+          }
+          return true
+        })
       
       weaknesses.push(...weaknessItems)
     }

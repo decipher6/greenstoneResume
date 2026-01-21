@@ -2,13 +2,158 @@ import pdfplumber
 import mammoth
 import re
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Dict, Tuple
 import tempfile
 import os
 import convertapi
 from dotenv import load_dotenv
+import asyncio
+import base64
+from google import genai
 
 load_dotenv()
+
+# Initialize Gemini client for OCR
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+async def extract_info_from_image_pdf_with_ai(file_content: bytes) -> Tuple[str, Dict[str, Optional[str]]]:
+    """
+    Use Gemini Vision API to extract text and contact info from image-based PDF.
+    Returns (extracted_text, contact_info_dict)
+    """
+    if not gemini_client:
+        return ("Image-based PDF - OCR not available (GEMINI_API_KEY missing).", {})
+    
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        # Fallback: try to use pdfplumber to get images (limited support)
+        return ("Image-based PDF - OCR requires PyMuPDF. Install with: pip install pymupdf", {})
+    
+    try:
+        # Open PDF with PyMuPDF
+        pdf_doc = fitz.open(stream=file_content, filetype="pdf")
+        all_text_parts = []
+        
+        # Process first 3 pages (most resumes are 1-2 pages)
+        max_pages = min(3, len(pdf_doc))
+        
+        for page_num in range(max_pages):
+            page = pdf_doc[page_num]
+            
+            # Convert page to image (PNG)
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better OCR
+            img_bytes = pix.tobytes("png")
+            
+            # Convert to base64 for Gemini API
+            img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+            
+            # Use Gemini Vision API to extract text
+            prompt = """Extract all text from this resume image. Return the complete text content exactly as it appears, preserving line breaks and structure. 
+            Also identify and extract:
+            1. Candidate's full name (usually at the top)
+            2. Email address
+            3. Phone number
+            
+            Format your response as:
+            TEXT_CONTENT:
+            [all the text from the resume]
+            
+            CONTACT_INFO:
+            Name: [full name]
+            Email: [email address]
+            Phone: [phone number]"""
+            
+            try:
+                # Use Gemini Vision API
+                response = await asyncio.to_thread(
+                    gemini_client.models.generate_content,
+                    model="gemini-1.5-flash",
+                    contents=[
+                        prompt,
+                        {
+                            "mime_type": "image/png",
+                            "data": img_base64
+                        }
+                    ]
+                )
+                
+                if response and response.text:
+                    page_text = response.text
+                    all_text_parts.append(page_text)
+            except Exception as e:
+                print(f"Error in Gemini OCR for page {page_num + 1}: {str(e)}")
+                continue
+        
+        pdf_doc.close()
+        
+        if not all_text_parts:
+            return ("Image-based PDF - OCR extraction failed.", {})
+        
+        # Combine all pages
+        combined_text = "\n\n".join(all_text_parts)
+        
+        # Extract contact info from the OCR text
+        contact_info = {}
+        
+        # Extract name
+        name_match = re.search(r'Name:\s*([^\n]+)', combined_text, re.IGNORECASE)
+        if name_match:
+            contact_info['name'] = name_match.group(1).strip()
+        
+        # Extract email
+        email_match = re.search(r'Email:\s*([^\n]+)', combined_text, re.IGNORECASE)
+        if email_match:
+            email = email_match.group(1).strip()
+            # Validate it's actually an email
+            if '@' in email and '.' in email.split('@')[1]:
+                contact_info['email'] = email
+        
+        # Extract phone
+        phone_match = re.search(r'Phone:\s*([^\n]+)', combined_text, re.IGNORECASE)
+        if phone_match:
+            phone = phone_match.group(1).strip()
+            # Clean phone number
+            cleaned_phone = re.sub(r'[^\d+]', '', phone)
+            if len(cleaned_phone) >= 7:
+                contact_info['phone'] = cleaned_phone
+        
+        # Also try to extract from the text content itself (in case AI didn't format it)
+        if not contact_info.get('email'):
+            email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+            emails = re.findall(email_pattern, combined_text)
+            if emails:
+                contact_info['email'] = emails[0]
+        
+        if not contact_info.get('phone'):
+            phone_pattern = r'[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,6}(?:[-\s\.\(\)]?[0-9]{1,6}){2,8}'
+            phones = re.findall(phone_pattern, combined_text)
+            if phones:
+                cleaned_phone = re.sub(r'[^\d+]', '', phones[0])
+                if len(cleaned_phone) >= 7:
+                    contact_info['phone'] = cleaned_phone
+        
+        # Extract name from first line if not found
+        if not contact_info.get('name'):
+            lines = combined_text.split('\n')
+            for line in lines[:5]:
+                line = line.strip()
+                if line and len(line.split()) >= 2 and len(line.split()) <= 4:
+                    if line.replace(' ', '').isalpha() or (line.replace(' ', '').isalnum() and len(line) < 50):
+                        contact_info['name'] = line
+                        break
+        
+        # Clean up the text - remove the CONTACT_INFO section if present
+        text_content = re.sub(r'CONTACT_INFO:.*?Phone:.*?\n', '', combined_text, flags=re.DOTALL | re.IGNORECASE)
+        text_content = re.sub(r'TEXT_CONTENT:\s*', '', text_content, flags=re.IGNORECASE)
+        text_content = text_content.strip()
+        
+        return (text_content if text_content else combined_text, contact_info)
+        
+    except Exception as e:
+        print(f"Error in OCR extraction: {str(e)}")
+        return (f"Image-based PDF - OCR extraction error: {str(e)}", {})
 
 async def parse_pdf(file_content: bytes) -> str:
     """Extract text from PDF file - handles both text-based and image-based PDFs"""
@@ -86,8 +231,12 @@ async def parse_pdf(file_content: bytes) -> str:
             except:
                 pass
             
-            # Last resort: return a minimal placeholder indicating image-based PDF
+            # Last resort: try OCR for image-based PDF
             # This allows the file to be accepted even if no text is extractable
+            ocr_text, _ = await extract_info_from_image_pdf_with_ai(file_content)
+            if ocr_text and not ocr_text.startswith("Image-based PDF - OCR"):
+                return ocr_text
+            # If OCR also failed, return placeholder
             return "Image-based PDF - text extraction not available. File accepted for processing."
             
     except Exception as e:

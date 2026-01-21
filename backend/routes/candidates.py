@@ -37,6 +37,7 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
             return {"success": False, "error": "File is empty", "filename": filename}
         
         # Parse resume - accept whatever text is available
+        ocr_contact_info = {}
         try:
             resume_text = await parse_resume(file_content, filename)
             # Accept files even with minimal text (image-based PDFs will have placeholder text)
@@ -44,6 +45,30 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
                 # Use filename as fallback text
                 resume_text = f"Resume: {filename}"
                 print(f"Warning: No text extracted from {filename}, using filename as placeholder")
+            
+            # Check if this is an image-based PDF that needs OCR
+            is_image_pdf = (
+                "Image-based PDF" in resume_text or 
+                "text extraction not available" in resume_text or
+                "text extraction limited" in resume_text
+            )
+            
+            if is_image_pdf and filename.lower().endswith('.pdf'):
+                # Try OCR extraction for image-based PDFs
+                from utils.cv_parser import extract_info_from_image_pdf_with_ai
+                try:
+                    ocr_text, ocr_contact_info = await extract_info_from_image_pdf_with_ai(file_content)
+                    if ocr_text and not ocr_text.startswith("Image-based PDF - OCR"):
+                        # Use OCR'd text instead of placeholder
+                        resume_text = ocr_text
+                        print(f"Successfully extracted text via OCR for {filename}")
+                    elif ocr_contact_info:
+                        # Even if OCR text extraction failed, we might have contact info
+                        print(f"Extracted contact info via OCR for {filename}: {ocr_contact_info}")
+                except Exception as ocr_error:
+                    print(f"OCR extraction failed for {filename}: {str(ocr_error)}")
+                    # Continue with placeholder text
+                    
         except Exception as parse_error:
             error_msg = str(parse_error)
             # Only fail on critical errors (password-protected, not parseable at all)
@@ -58,14 +83,26 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
         
         # Extract contact info and name
         try:
-            contact_info_dict = await extract_contact_info(resume_text)
-            # Pass contact_info to extract_name so it can use email as fallback
-            name = await extract_name(resume_text, contact_info_dict)
+            # Use OCR contact info if available, otherwise extract from text
+            if ocr_contact_info and (ocr_contact_info.get('email') or ocr_contact_info.get('phone') or ocr_contact_info.get('name')):
+                contact_info_dict = ocr_contact_info
+                # Use OCR name if available, otherwise try to extract from text
+                if ocr_contact_info.get('name'):
+                    name = ocr_contact_info['name']
+                else:
+                    name = await extract_name(resume_text, contact_info_dict)
+            else:
+                contact_info_dict = await extract_contact_info(resume_text)
+                # Pass contact_info to extract_name so it can use email as fallback
+                name = await extract_name(resume_text, contact_info_dict)
         except Exception as extract_error:
             # Continue even if extraction fails, use defaults
-            contact_info_dict = {}
+            contact_info_dict = ocr_contact_info if ocr_contact_info else {}
             # Try to extract email from filename or use filename as fallback
-            name = filename.split('.')[0]  # Use filename as fallback
+            if not contact_info_dict.get('name'):
+                name = filename.split('.')[0]  # Use filename as fallback
+            else:
+                name = contact_info_dict.get('name')
             print(f"Warning: Extraction failed for {filename}: {extract_error}")
         
         # Ensure upload directory exists (only for non-serverless)
@@ -548,15 +585,31 @@ async def process_candidate_analysis(job_id: str, candidate_id: str):
         if not resume_text:
             raise Exception("No resume text available")
         
+        # Check if this is an image-based PDF with limited text
+        is_image_pdf = (
+            "Image-based PDF" in resume_text or 
+            "text extraction not available" in resume_text or
+            "text extraction limited" in resume_text
+        )
+        
         # Score with LLM
         evaluation_criteria = [{"name": c["name"], "weight": c["weight"]} 
                               for c in job.get("evaluation_criteria", [])]
         
-        scoring_result = await score_resume_with_llm(
-            resume_text,
-            job.get("description", ""),
-            evaluation_criteria
-        )
+        if is_image_pdf and len(resume_text) < 200:
+            # For image-based PDFs with minimal text, provide a note but still attempt scoring
+            # The LLM will see the limited text and adjust accordingly
+            scoring_result = await score_resume_with_llm(
+                resume_text + "\n\nNote: This appears to be an image-based PDF. Text extraction was limited. Scoring may be based on available information only.",
+                job.get("description", ""),
+                evaluation_criteria
+            )
+        else:
+            scoring_result = await score_resume_with_llm(
+                resume_text,
+                job.get("description", ""),
+                evaluation_criteria
+            )
         
         # Build criterion scores with improved matching and validation
         criterion_scores = []
