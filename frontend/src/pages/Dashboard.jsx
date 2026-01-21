@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus, Eye, Calendar, LucideTrash, Search, X, ArrowUpDown, Users } from 'lucide-react'
+import { Plus, Eye, Calendar, LucideTrash, Search, X, ArrowUpDown, Users, Filter } from 'lucide-react'
 import { getJobs, deleteJob, updateJobStatus } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
 import { useModal } from '../context/ModalContext'
@@ -310,7 +310,7 @@ const Dashboard = () => {
           <thead className="bg-glass-100 border-b border-glass-200 sticky top-0 z-10">
             <tr>
               <th 
-                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                className="px-6 py-4 text-left text-base font-bold cursor-pointer hover:bg-glass-200 transition-colors select-none"
                 onClick={toggleTitleSort}
               >
                 <div className="flex items-center gap-2">
@@ -320,7 +320,7 @@ const Dashboard = () => {
                   {titleSort === 'desc' && <span className="text-xs text-gray-400">(Z-A)</span>}
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold relative">
+              <th className="px-6 py-4 text-left text-base font-bold relative">
                 <div className="space-y-2 filter-dropdown-container">
                   <div 
                     className="cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded flex items-center gap-2"
@@ -330,6 +330,7 @@ const Dashboard = () => {
                     }}
                   >
                     <span>Department</span>
+                    <Filter size={14} className="text-gray-400" />
                     {filters.department.length > 0 && (
                       <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
                         {filters.department.length}
@@ -356,7 +357,7 @@ const Dashboard = () => {
                 </div>
               </th>
               <th 
-                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                className="px-6 py-4 text-left text-base font-bold cursor-pointer hover:bg-glass-200 transition-colors select-none"
                 onClick={toggleCandidatesSort}
               >
                 <div className="flex items-center gap-2">
@@ -367,7 +368,7 @@ const Dashboard = () => {
                 </div>
               </th>
               <th 
-                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                className="px-6 py-4 text-left text-base font-bold cursor-pointer hover:bg-glass-200 transition-colors select-none"
                 onClick={toggleLastRunSort}
               >
                 <div className="flex items-center gap-2">
@@ -381,7 +382,7 @@ const Dashboard = () => {
                   )}
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold relative">
+              <th className="px-6 py-4 text-left text-base font-bold relative">
                 <div className="space-y-2 filter-dropdown-container">
                   <div 
                     className="cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded flex items-center gap-2"
@@ -391,6 +392,7 @@ const Dashboard = () => {
                     }}
                   >
                     <span>Status</span>
+                    <Filter size={14} className="text-gray-400" />
                     {filters.status.length > 0 && (
                       <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
                         {filters.status.length}
@@ -416,7 +418,7 @@ const Dashboard = () => {
                   )}
                 </div>
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
+              <th className="px-6 py-4 text-left text-base font-bold">Actions</th>
             </tr>
           </thead>
           <tbody>

@@ -436,6 +436,79 @@ async def get_candidate(candidate_id: str):
                 candidate["score_breakdown"][key] = float(value["$numberDouble"])
     return Candidate(**candidate)
 
+@router.get("/{candidate_id}/view-resume")
+async def view_resume(candidate_id: str):
+    """View the resume file for a candidate (for embedding in iframe)"""
+    db = get_db()
+    try:
+        candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid candidate ID")
+    
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    resume_file_id = candidate.get("resume_file_id")
+    resume_file_path = candidate.get("resume_file_path")
+    
+    # Try MongoDB GridFS first (new storage method)
+    if resume_file_id:
+        try:
+            fs = AsyncIOMotorGridFSBucket(db)
+            grid_out = await fs.open_download_stream(ObjectId(resume_file_id))
+            file_content = await grid_out.read()
+            
+            # Get filename from GridFS to determine content type
+            filename = grid_out.filename or "resume.pdf"
+            file_ext = os.path.splitext(filename)[1].lower() if filename else ".pdf"
+            
+            # Determine media type
+            if file_ext == ".pdf":
+                media_type = "application/pdf"
+            elif file_ext in [".docx", ".doc"]:
+                media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            else:
+                media_type = "application/octet-stream"
+            
+            return StreamingResponse(
+                BytesIO(file_content),
+                media_type=media_type,
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "X-Content-Type-Options": "nosniff"
+                }
+            )
+        except Exception as gridfs_error:
+            print(f"Error retrieving file from GridFS: {gridfs_error}, trying disk storage")
+            # Fall through to disk storage
+    
+    # Fallback to disk storage (backward compatibility)
+    if resume_file_path:
+        if not os.path.exists(resume_file_path):
+            raise HTTPException(status_code=404, detail="Resume file does not exist on server")
+        
+        # Get file extension to determine content type
+        file_ext = os.path.splitext(resume_file_path)[1].lower()
+        
+        # Determine media type
+        if file_ext == ".pdf":
+            media_type = "application/pdf"
+        elif file_ext in [".docx", ".doc"]:
+            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        else:
+            media_type = "application/octet-stream"
+        
+        return FileResponse(
+            path=resume_file_path,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": "inline",
+                "X-Content-Type-Options": "nosniff"
+            }
+        )
+    
+    raise HTTPException(status_code=404, detail="Resume file not found for this candidate")
+
 @router.get("/{candidate_id}/download-resume")
 async def download_resume(candidate_id: str):
     """Download the resume file for a candidate from MongoDB GridFS or disk"""
@@ -465,6 +538,8 @@ async def download_resume(candidate_id: str):
             candidate_name = candidate.get("name", "candidate")
             safe_name = "".join(c for c in candidate_name if c.isalnum() or c in (' ', '-', '_')).strip()
             safe_name = safe_name.replace(' ', '_')
+            # Remove trailing underscores
+            safe_name = safe_name.rstrip('_')
             
             # Get file extension from GridFS filename
             file_ext = os.path.splitext(filename)[1] if filename else ".pdf"
@@ -502,6 +577,8 @@ async def download_resume(candidate_id: str):
         candidate_name = candidate.get("name", "candidate")
         safe_name = "".join(c for c in candidate_name if c.isalnum() or c in (' ', '-', '_')).strip()
         safe_name = safe_name.replace(' ', '_')
+        # Remove trailing underscores
+        safe_name = safe_name.rstrip('_')
         
         # Get file extension from original filename
         file_ext = os.path.splitext(original_filename)[1] if original_filename else os.path.splitext(filename)[1]

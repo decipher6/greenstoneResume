@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star, Copy, Check, Download } from 'lucide-react'
-import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, updateCandidate, downloadCandidateResume } from '../services/api'
+import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, updateCandidate, downloadCandidateResume, viewCandidateResume } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
 import SendEmailModal from '../components/SendEmailModal'
@@ -805,14 +805,18 @@ const CandidateProfile = () => {
                   </button>
                 )}
               </div>
-              {candidate.resume_text ? (
+              {(candidate.resume_file_path || candidate.resume_file_id) ? (
+                <div className="w-full">
+                  <ResumeViewer candidateId={candidateId} />
+                </div>
+              ) : candidate.resume_text ? (
                 <div className="prose prose-invert max-w-none">
                   <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-glass-100 p-4 rounded-lg">
                     {candidate.resume_text}
                   </pre>
                 </div>
               ) : (
-                <p className="text-gray-400">No resume text available.</p>
+                <p className="text-gray-400">No resume available.</p>
               )}
             </div>
           )}
@@ -874,6 +878,22 @@ const CandidateProfile = () => {
           }}
         />
       )}
+    </div>
+  )
+}
+
+// Resume Viewer Component
+const ResumeViewer = ({ candidateId }) => {
+  const viewUrl = viewCandidateResume(candidateId)
+  
+  return (
+    <div className="w-full h-[800px] border border-glass-200 rounded-lg overflow-hidden bg-glass-100">
+      <iframe
+        src={viewUrl}
+        className="w-full h-full"
+        title="Resume Viewer"
+        style={{ border: 'none' }}
+      />
     </div>
   )
 }

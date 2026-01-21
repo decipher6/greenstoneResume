@@ -60,6 +60,10 @@ export const downloadCandidateResume = (candidateId) => {
     responseType: 'blob'
   })
 }
+export const viewCandidateResume = (candidateId) => {
+  const baseUrl = API_BASE_URL || '/api'
+  return `${baseUrl}/candidates/${candidateId}/view-resume`
+}
 
 // Assessments
 export const uploadCandidateAssessments = (candidateId, file) => {
