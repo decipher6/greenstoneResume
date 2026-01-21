@@ -79,7 +79,8 @@ class Candidate(BaseModel):
     name: str
     contact_info: ContactInfo
     resume_text: Optional[str] = None
-    resume_file_path: Optional[str] = None
+    resume_file_path: Optional[str] = None  # Legacy: disk storage path
+    resume_file_id: Optional[str] = None  # MongoDB GridFS file ID
     linkedin_url: Optional[str] = None
     status: CandidateStatus = CandidateStatus.uploaded
     rating: Optional[int] = None  # 1-5 star rating

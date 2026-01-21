@@ -1,12 +1,14 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks, Body, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 import aiofiles
 import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
 
 from database import get_db
 
@@ -106,22 +108,44 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
                 name = contact_info_dict.get('name')
             print(f"Warning: Extraction failed for {filename}: {extract_error}")
         
-        # Ensure upload directory exists (only for non-serverless)
-        ensure_upload_dir()
-        # Use unique timestamp with file index to avoid collisions
-        timestamp = datetime.now().timestamp()
-        file_path = os.path.join(UPLOAD_DIR, f"{job_id}_{timestamp}_{file_index}_{filename}")
+        # Store file in MongoDB GridFS
+        db = get_db()
+        resume_file_id = None
+        resume_file_path = None
         
-        # Write file to disk
-        async with aiofiles.open(file_path, 'wb') as f:
-            await f.write(file_content)
+        try:
+            # Create GridFS bucket
+            fs = AsyncIOMotorGridFSBucket(db)
+            
+            # Store file in GridFS with metadata
+            file_id = await fs.upload_from_stream(
+                filename=filename,
+                source=BytesIO(file_content),
+                metadata={
+                    "job_id": job_id,
+                    "candidate_name": name,
+                    "uploaded_at": datetime.now().isoformat(),
+                    "file_index": file_index
+                }
+            )
+            resume_file_id = str(file_id)
+            print(f"Stored resume in MongoDB GridFS: {resume_file_id} for {filename}")
+        except Exception as gridfs_error:
+            print(f"Error storing file in GridFS: {gridfs_error}, falling back to disk storage")
+            # Fallback to disk storage if GridFS fails
+            ensure_upload_dir()
+            timestamp = datetime.now().timestamp()
+            resume_file_path = os.path.join(UPLOAD_DIR, f"{job_id}_{timestamp}_{file_index}_{filename}")
+            async with aiofiles.open(resume_file_path, 'wb') as f:
+                await f.write(file_content)
         
         candidate_dict = {
             "job_id": job_id,
             "name": name,
             "contact_info": contact_info_dict,
             "resume_text": resume_text,
-            "resume_file_path": file_path,
+            "resume_file_path": resume_file_path,  # Keep for backward compatibility
+            "resume_file_id": resume_file_id,  # New: MongoDB GridFS file ID
             "status": CandidateStatus.uploaded.value,
             "created_at": datetime.now()
         }
@@ -414,7 +438,7 @@ async def get_candidate(candidate_id: str):
 
 @router.get("/{candidate_id}/download-resume")
 async def download_resume(candidate_id: str):
-    """Download the resume file for a candidate"""
+    """Download the resume file for a candidate from MongoDB GridFS or disk"""
     db = get_db()
     try:
         candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
@@ -424,42 +448,74 @@ async def download_resume(candidate_id: str):
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
     
+    resume_file_id = candidate.get("resume_file_id")
     resume_file_path = candidate.get("resume_file_path")
-    if not resume_file_path:
-        raise HTTPException(status_code=404, detail="Resume file not found for this candidate")
     
-    if not os.path.exists(resume_file_path):
-        raise HTTPException(status_code=404, detail="Resume file does not exist on server")
+    # Try MongoDB GridFS first (new storage method)
+    if resume_file_id:
+        try:
+            fs = AsyncIOMotorGridFSBucket(db)
+            grid_out = await fs.open_download_stream(ObjectId(resume_file_id))
+            file_content = await grid_out.read()
+            
+            # Get filename from GridFS metadata or use default
+            filename = grid_out.filename or "resume.pdf"
+            
+            # Use candidate name for better filename if available
+            candidate_name = candidate.get("name", "candidate")
+            safe_name = "".join(c for c in candidate_name if c.isalnum() or c in (' ', '-', '_')).strip()
+            safe_name = safe_name.replace(' ', '_')
+            
+            # Get file extension from GridFS filename
+            file_ext = os.path.splitext(filename)[1] if filename else ".pdf"
+            
+            # Create a better filename
+            download_filename = f"{safe_name}_resume{file_ext}" if safe_name else f"resume{file_ext}"
+            
+            return StreamingResponse(
+                BytesIO(file_content),
+                media_type='application/octet-stream',
+                headers={"Content-Disposition": f'attachment; filename="{download_filename}"'}
+            )
+        except Exception as gridfs_error:
+            print(f"Error retrieving file from GridFS: {gridfs_error}, trying disk storage")
+            # Fall through to disk storage
     
-    # Get the original filename from the path or use candidate name
-    filename = os.path.basename(resume_file_path)
-    # Extract original filename if it's in the format: {job_id}_{timestamp}_{file_index}_{filename}
-    if '_' in filename:
-        parts = filename.split('_', 3)
-        if len(parts) >= 4:
-            original_filename = parts[3]
+    # Fallback to disk storage (backward compatibility)
+    if resume_file_path:
+        if not os.path.exists(resume_file_path):
+            raise HTTPException(status_code=404, detail="Resume file does not exist on server")
+        
+        # Get the original filename from the path
+        filename = os.path.basename(resume_file_path)
+        # Extract original filename if it's in the format: {job_id}_{timestamp}_{file_index}_{filename}
+        if '_' in filename:
+            parts = filename.split('_', 3)
+            if len(parts) >= 4:
+                original_filename = parts[3]
+            else:
+                original_filename = filename
         else:
             original_filename = filename
-    else:
-        original_filename = filename
+        
+        # Use candidate name for better filename if available
+        candidate_name = candidate.get("name", "candidate")
+        safe_name = "".join(c for c in candidate_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_name = safe_name.replace(' ', '_')
+        
+        # Get file extension from original filename
+        file_ext = os.path.splitext(original_filename)[1] if original_filename else os.path.splitext(filename)[1]
+        
+        # Create a better filename
+        download_filename = f"{safe_name}_resume{file_ext}" if safe_name else f"resume{file_ext}"
+        
+        return FileResponse(
+            path=resume_file_path,
+            filename=download_filename,
+            media_type='application/octet-stream'
+        )
     
-    # Use candidate name for better filename if available
-    candidate_name = candidate.get("name", "candidate")
-    # Sanitize name for filename
-    safe_name = "".join(c for c in candidate_name if c.isalnum() or c in (' ', '-', '_')).strip()
-    safe_name = safe_name.replace(' ', '_')
-    
-    # Get file extension from original filename
-    file_ext = os.path.splitext(original_filename)[1] if original_filename else os.path.splitext(filename)[1]
-    
-    # Create a better filename: {candidate_name}_{original_extension}
-    download_filename = f"{safe_name}_resume{file_ext}" if safe_name else f"resume{file_ext}"
-    
-    return FileResponse(
-        path=resume_file_path,
-        filename=download_filename,
-        media_type='application/octet-stream'
-    )
+    raise HTTPException(status_code=404, detail="Resume file not found for this candidate")
 
 @router.patch("/{candidate_id}")
 async def update_candidate(candidate_id: str, update_data: dict = Body(...), user_id: Optional[str] = Depends(get_current_user_id)):
@@ -582,15 +638,29 @@ async def delete_candidate(candidate_id: str, user_id: Optional[str] = Depends(g
     job = await db.jobs.find_one({"_id": ObjectId(job_id)}) if job_id else None
     job_title = job.get("title") if job else None
     
-    # Delete file if exists (may not exist on serverless after function execution)
-    if candidate.get("resume_file_path"):
+    # Delete file from MongoDB GridFS (new storage method)
+    resume_file_id = candidate.get("resume_file_id")
+    if resume_file_id:
         try:
-            if os.path.exists(candidate["resume_file_path"]):
-                os.remove(candidate["resume_file_path"])
+            fs = AsyncIOMotorGridFSBucket(db)
+            await fs.delete(ObjectId(resume_file_id))
+            print(f"Deleted resume from MongoDB GridFS: {resume_file_id}")
+        except Exception as e:
+            # File may have been cleaned up already
+            if DEBUG:
+                print(f"Could not delete file from GridFS {resume_file_id}: {e}")
+    
+    # Delete file from disk (backward compatibility with old storage)
+    resume_file_path = candidate.get("resume_file_path")
+    if resume_file_path:
+        try:
+            if os.path.exists(resume_file_path):
+                os.remove(resume_file_path)
+                print(f"Deleted resume from disk: {resume_file_path}")
         except Exception as e:
             # File may have been cleaned up already (common on serverless)
             if DEBUG:
-                print(f"Could not delete file {candidate.get('resume_file_path')}: {e}")
+                print(f"Could not delete file from disk {resume_file_path}: {e}")
     
     await db.candidates.delete_one({"_id": ObjectId(candidate_id)})
     
