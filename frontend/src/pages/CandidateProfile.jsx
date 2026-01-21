@@ -794,16 +794,6 @@ const CandidateProfile = () => {
             <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Resume</h3>
-                {(candidate.resume_file_path || candidate.resume_file_id) && (
-                  <button
-                    onClick={handleDownloadResume}
-                    className="glass-button flex items-center gap-2"
-                    title="Download Resume File"
-                  >
-                    <Download size={18} />
-                    Download Resume
-                  </button>
-                )}
               </div>
               {(candidate.resume_file_path || candidate.resume_file_id) ? (
                 <div className="w-full">

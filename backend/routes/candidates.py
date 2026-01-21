@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks, Body, Depends
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
@@ -9,6 +9,7 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
+import mammoth
 
 from database import get_db
 
@@ -438,7 +439,7 @@ async def get_candidate(candidate_id: str):
 
 @router.get("/{candidate_id}/view-resume")
 async def view_resume(candidate_id: str):
-    """View the resume file for a candidate (for embedding in iframe)"""
+    """View the resume file for a candidate (for embedding in iframe) - converts DOCX to HTML"""
     db = get_db()
     try:
         candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
@@ -450,6 +451,8 @@ async def view_resume(candidate_id: str):
     
     resume_file_id = candidate.get("resume_file_id")
     resume_file_path = candidate.get("resume_file_path")
+    file_content = None
+    filename = None
     
     # Try MongoDB GridFS first (new storage method)
     if resume_file_id:
@@ -457,57 +460,248 @@ async def view_resume(candidate_id: str):
             fs = AsyncIOMotorGridFSBucket(db)
             grid_out = await fs.open_download_stream(ObjectId(resume_file_id))
             file_content = await grid_out.read()
-            
-            # Get filename from GridFS to determine content type
             filename = grid_out.filename or "resume.pdf"
-            file_ext = os.path.splitext(filename)[1].lower() if filename else ".pdf"
-            
-            # Determine media type
-            if file_ext == ".pdf":
-                media_type = "application/pdf"
-            elif file_ext in [".docx", ".doc"]:
-                media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            else:
-                media_type = "application/octet-stream"
-            
-            return StreamingResponse(
-                BytesIO(file_content),
-                media_type=media_type,
-                headers={
-                    "Content-Disposition": f'inline; filename="{filename}"',
-                    "X-Content-Type-Options": "nosniff"
-                }
-            )
         except Exception as gridfs_error:
             print(f"Error retrieving file from GridFS: {gridfs_error}, trying disk storage")
             # Fall through to disk storage
     
     # Fallback to disk storage (backward compatibility)
-    if resume_file_path:
+    if not file_content and resume_file_path:
         if not os.path.exists(resume_file_path):
             raise HTTPException(status_code=404, detail="Resume file does not exist on server")
         
-        # Get file extension to determine content type
-        file_ext = os.path.splitext(resume_file_path)[1].lower()
-        
-        # Determine media type
-        if file_ext == ".pdf":
-            media_type = "application/pdf"
-        elif file_ext in [".docx", ".doc"]:
-            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        else:
-            media_type = "application/octet-stream"
-        
-        return FileResponse(
-            path=resume_file_path,
-            media_type=media_type,
+        async with aiofiles.open(resume_file_path, 'rb') as f:
+            file_content = await f.read()
+        filename = os.path.basename(resume_file_path)
+    
+    if not file_content:
+        raise HTTPException(status_code=404, detail="Resume file not found for this candidate")
+    
+    # Get file extension to determine how to handle
+    file_ext = os.path.splitext(filename)[1].lower() if filename else ".pdf"
+    
+    # For PDF files, return as-is
+    if file_ext == ".pdf":
+        return StreamingResponse(
+            BytesIO(file_content),
+            media_type="application/pdf",
             headers={
-                "Content-Disposition": "inline",
+                "Content-Disposition": f'inline; filename="{filename}"',
                 "X-Content-Type-Options": "nosniff"
             }
         )
     
-    raise HTTPException(status_code=404, detail="Resume file not found for this candidate")
+    # For DOCX files, convert to HTML using mammoth
+    elif file_ext == ".docx":
+        try:
+            # Convert DOCX to HTML
+            result = mammoth.convert_to_html(BytesIO(file_content))
+            html_content = result.value
+            warnings = result.messages
+            
+            # Create a styled HTML page
+            html_page = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume - {filename}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #e5e7eb;
+            background-color: #1f2937;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }}
+        .resume-content {{
+            background-color: #374151;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }}
+        h1, h2, h3, h4, h5, h6 {{
+            color: #f3f4f6;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }}
+        p {{
+            margin-bottom: 1em;
+        }}
+        ul, ol {{
+            margin-left: 2em;
+            margin-bottom: 1em;
+        }}
+        li {{
+            margin-bottom: 0.5em;
+        }}
+        strong {{
+            color: #fbbf24;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }}
+        table td, table th {{
+            border: 1px solid #4b5563;
+            padding: 8px;
+        }}
+        table th {{
+            background-color: #4b5563;
+            color: #f3f4f6;
+        }}
+    </style>
+</head>
+<body>
+    <div class="resume-content">
+        {html_content}
+    </div>
+</body>
+</html>"""
+            
+            return HTMLResponse(content=html_page)
+        except Exception as e:
+            print(f"Error converting DOCX to HTML: {e}")
+            # Fallback: return as binary with appropriate content type
+            return StreamingResponse(
+                BytesIO(file_content),
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "X-Content-Type-Options": "nosniff"
+                }
+            )
+    
+    # For .doc files, try to convert using ConvertAPI or return as-is
+    elif file_ext == ".doc":
+        try:
+            # Try to convert .doc to .docx first, then to HTML
+            from utils.cv_parser import parse_doc
+            # For viewing, we'll use a simpler approach - convert to text and display
+            # Actually, let's try to use ConvertAPI to convert to DOCX first
+            convertapi_key = os.getenv("CONVERTAPI_KEY")
+            if convertapi_key:
+                import convertapi
+                import tempfile
+                convertapi.api_credentials = convertapi_key
+                
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    doc_path = os.path.join(temp_dir, "temp.doc")
+                    with open(doc_path, 'wb') as f:
+                        f.write(file_content)
+                    
+                    try:
+                        result = convertapi.convert('docx', {'File': doc_path}, from_format='doc')
+                        result.save_files(temp_dir)
+                        
+                        converted_files = [f for f in os.listdir(temp_dir) if f.endswith('.docx')]
+                        if converted_files:
+                            docx_path = os.path.join(temp_dir, converted_files[0])
+                            with open(docx_path, 'rb') as f:
+                                docx_content = f.read()
+                            
+                            # Convert DOCX to HTML
+                            result = mammoth.convert_to_html(BytesIO(docx_content))
+                            html_content = result.value
+                            
+                            html_page = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume - {filename}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #e5e7eb;
+            background-color: #1f2937;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }}
+        .resume-content {{
+            background-color: #374151;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }}
+        h1, h2, h3, h4, h5, h6 {{
+            color: #f3f4f6;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }}
+        p {{
+            margin-bottom: 1em;
+        }}
+        ul, ol {{
+            margin-left: 2em;
+            margin-bottom: 1em;
+        }}
+        li {{
+            margin-bottom: 0.5em;
+        }}
+        strong {{
+            color: #fbbf24;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }}
+        table td, table th {{
+            border: 1px solid #4b5563;
+            padding: 8px;
+        }}
+        table th {{
+            background-color: #4b5563;
+            color: #f3f4f6;
+        }}
+    </style>
+</head>
+<body>
+    <div class="resume-content">
+        {html_content}
+    </div>
+</body>
+</html>"""
+                            
+                            return HTMLResponse(content=html_page)
+                    except Exception as convert_error:
+                        print(f"Error converting .doc to .docx: {convert_error}")
+            
+            # Fallback: return as binary
+            return StreamingResponse(
+                BytesIO(file_content),
+                media_type="application/msword",
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "X-Content-Type-Options": "nosniff"
+                }
+            )
+        except Exception as e:
+            print(f"Error processing .doc file: {e}")
+            return StreamingResponse(
+                BytesIO(file_content),
+                media_type="application/msword",
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "X-Content-Type-Options": "nosniff"
+                }
+            )
+    
+    # For other file types, return as binary
+    return StreamingResponse(
+        BytesIO(file_content),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff"
+        }
+    )
 
 @router.get("/{candidate_id}/download-resume")
 async def download_resume(candidate_id: str):
