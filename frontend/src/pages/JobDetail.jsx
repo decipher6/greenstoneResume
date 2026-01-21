@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw, ArrowUpDown, Copy, Check } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw, ArrowUpDown, Copy, Check, Download } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
-  runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate, reAnalyzeCandidate
+  runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate, reAnalyzeCandidate, downloadCandidateResume
 } from '../services/api'
 import api from '../services/api'
 import { useModal } from '../context/ModalContext'
@@ -482,6 +482,44 @@ const JobDetail = () => {
       // Revert on error
       setCandidates(previousCandidates)
       await showAlert('Error', 'Failed to update rating. Please try again.', 'error')
+    }
+  }
+
+  const handleDownloadResume = async (candidateId, e) => {
+    if (e) {
+      e.stopPropagation()
+    }
+    
+    try {
+      const response = await downloadCandidateResume(candidateId)
+      
+      // Create a blob from the response
+      const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/octet-stream' })
+      
+      // Get filename from Content-Disposition header or use default
+      let filename = 'resume.pdf'
+      const contentDisposition = response.headers['content-disposition']
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i)
+        if (filenameMatch) {
+          filename = filenameMatch[1]
+        }
+      }
+      
+      // Create a temporary URL and trigger download
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      await showAlert('Success', 'Resume downloaded successfully', 'success')
+    } catch (error) {
+      console.error('Error downloading resume:', error)
+      await showAlert('Error', 'Failed to download resume. The file may not exist.', 'error')
     }
   }
 
@@ -1417,6 +1455,15 @@ const JobDetail = () => {
                       </>
                     ) : (
                       <>
+                        {(candidate.resume_file_path || candidate.resume_file_id) && (
+                          <button
+                            onClick={(e) => handleDownloadResume(candidate.id, e)}
+                            className="p-2 rounded-lg hover:bg-blue-500/20 transition-colors"
+                            title="Download Resume"
+                          >
+                            <Download size={18} className="text-blue-400" />
+                          </button>
+                        )}
                         <button
                           onClick={(e) => startEditingRow(candidate.id, e)}
                           className="p-2 rounded-lg hover:bg-glass-200 transition-colors"
