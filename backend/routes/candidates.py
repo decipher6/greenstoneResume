@@ -491,58 +491,40 @@ async def view_resume(candidate_id: str):
             }
         )
     
-    # For DOCX files, convert to PDF using ConvertAPI for better viewing
+    # For DOCX files, convert to HTML using mammoth with minimal formatting changes
     elif file_ext == ".docx":
         try:
-            # Convert DOCX to PDF using ConvertAPI
-            convertapi_key = os.getenv("CONVERTAPI_KEY")
-            if convertapi_key:
-                import convertapi
-                convertapi.api_credentials = convertapi_key
-                
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    docx_path = os.path.join(temp_dir, "temp.docx")
-                    with open(docx_path, 'wb') as f:
-                        f.write(file_content)
-                    
-                    try:
-                        # Convert DOCX to PDF
-                        result = convertapi.convert('pdf', {'File': docx_path}, from_format='docx')
-                        result.save_files(temp_dir)
-                        
-                        # Find the converted PDF file
-                        pdf_files = [f for f in os.listdir(temp_dir) if f.endswith('.pdf')]
-                        if pdf_files:
-                            pdf_path = os.path.join(temp_dir, pdf_files[0])
-                            with open(pdf_path, 'rb') as f:
-                                pdf_content = f.read()
-                            
-                            # Return PDF for viewing
-                            return StreamingResponse(
-                                BytesIO(pdf_content),
-                                media_type="application/pdf",
-                                headers={
-                                    "Content-Disposition": f'inline; filename="{os.path.splitext(filename)[0]}.pdf"',
-                                    "X-Content-Type-Options": "nosniff"
-                                }
-                            )
-                    except Exception as convert_error:
-                        print(f"Error converting DOCX to PDF with ConvertAPI: {convert_error}")
-                        # Fall through to fallback
+            # Convert DOCX to HTML with options to preserve original formatting
+            # Use convert_to_html with preserve_empty_lines and include_default_style_map
+            result = mammoth.convert_to_html(
+                BytesIO(file_content),
+                style_map=[
+                    "p[style-name='Heading 1'] => h1:fresh",
+                    "p[style-name='Heading 2'] => h2:fresh",
+                    "p[style-name='Heading 3'] => h3:fresh",
+                    "p[style-name='Heading 4'] => h4:fresh",
+                    "p[style-name='Heading 5'] => h5:fresh",
+                    "p[style-name='Heading 6'] => h6:fresh",
+                ]
+            )
+            html_content = result.value
+            warnings = result.messages
             
-            # Fallback: Try mammoth HTML conversion if ConvertAPI fails
-            try:
-                result = mammoth.convert_to_html(BytesIO(file_content))
-                html_content = result.value
-                
-                html_page = f"""<!DOCTYPE html>
+            # Log warnings if any
+            if warnings:
+                print(f"DOCX conversion warnings: {warnings}")
+            
+            # Create a minimal HTML page that preserves the original document structure
+            html_page = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resume - {filename}</title>
     <style>
-        * {{ box-sizing: border-box; }}
+        * {{
+            box-sizing: border-box;
+        }}
         body {{
             font-family: 'Times New Roman', Times, serif;
             line-height: 1.15;
@@ -557,17 +539,41 @@ async def view_resume(candidate_id: str):
             padding: 0.5in;
             max-width: 8.5in;
             margin: 0 auto;
+            white-space: pre-wrap;
         }}
-        .resume-content p {{ margin: 0; padding: 0; line-height: 1.15; }}
+        /* Preserve original formatting from DOCX */
+        .resume-content p {{
+            margin: 0;
+            padding: 0;
+            line-height: 1.15;
+        }}
         .resume-content h1, .resume-content h2, .resume-content h3, 
         .resume-content h4, .resume-content h5, .resume-content h6 {{
-            margin: 0; padding: 0; font-weight: bold;
+            margin: 0;
+            padding: 0;
+            font-weight: bold;
         }}
-        .resume-content ul, .resume-content ol {{ margin: 0; padding-left: 0.5in; }}
-        .resume-content li {{ margin: 0; padding: 0; }}
-        .resume-content table {{ border-collapse: collapse; margin: 0; width: 100%; }}
+        .resume-content ul, .resume-content ol {{
+            margin: 0;
+            padding-left: 0.5in;
+        }}
+        .resume-content li {{
+            margin: 0;
+            padding: 0;
+        }}
+        .resume-content table {{
+            border-collapse: collapse;
+            margin: 0;
+            width: 100%;
+        }}
         .resume-content table td, .resume-content table th {{
-            border: 1px solid #000000; padding: 2pt; vertical-align: top;
+            border: 1px solid #000000;
+            padding: 2pt;
+            vertical-align: top;
+        }}
+        /* Preserve inline styles from mammoth */
+        .resume-content [style] {{
+            /* Keep all inline styles as-is */
         }}
     </style>
 </head>
@@ -577,28 +583,95 @@ async def view_resume(candidate_id: str):
     </div>
 </body>
 </html>"""
+            
+            # Return HTML with explicit Content-Type header to ensure browser displays it
+            return HTMLResponse(
+                content=html_page,
+                headers={
+                    "Content-Type": "text/html; charset=utf-8",
+                    "X-Content-Type-Options": "nosniff"
+                }
+            )
+        except Exception as e:
+            print(f"Error converting DOCX to HTML: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fallback: Try to extract text and display as HTML instead of returning binary
+            try:
+                # Try to extract raw text as fallback
+                text_result = mammoth.extract_raw_text(BytesIO(file_content))
+                text_content = text_result.value
+                
+                # Create a simple HTML page with the extracted text
+                fallback_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume - {filename}</title>
+    <style>
+        body {{
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.6;
+            color: #000000;
+            background-color: #ffffff;
+            padding: 40px;
+            max-width: 8.5in;
+            margin: 0 auto;
+        }}
+        .resume-content {{
+            white-space: pre-wrap;
+        }}
+    </style>
+</head>
+<body>
+    <div class="resume-content">
+        {text_content}
+    </div>
+</body>
+</html>"""
                 
                 return HTMLResponse(
-                    content=html_page,
+                    content=fallback_html,
                     headers={
                         "Content-Type": "text/html; charset=utf-8",
                         "X-Content-Type-Options": "nosniff"
                     }
                 )
-            except Exception as html_error:
-                print(f"Error converting DOCX to HTML: {html_error}")
-        
-        except Exception as e:
-            print(f"Error processing DOCX file: {e}")
-            # Final fallback: return as binary
-            return StreamingResponse(
-                BytesIO(file_content),
-                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                headers={
-                    "Content-Disposition": f'inline; filename="{filename}"',
-                    "X-Content-Type-Options": "nosniff"
-                }
-            )
+            except Exception as fallback_error:
+                print(f"Error in fallback text extraction: {fallback_error}")
+                # Last resort: return error message as HTML
+                error_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Error - {filename}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            text-align: center;
+        }}
+        .error {{
+            color: #d32f2f;
+            margin: 20px 0;
+        }}
+    </style>
+</head>
+<body>
+    <h1>Unable to Display Resume</h1>
+    <p class="error">The resume file could not be converted for viewing.</p>
+    <p>Please download the file to view it.</p>
+</body>
+</html>"""
+                return HTMLResponse(
+                    content=error_html,
+                    headers={
+                        "Content-Type": "text/html; charset=utf-8",
+                        "X-Content-Type-Options": "nosniff"
+                    }
+                )
     
     # For .doc files, try to convert using ConvertAPI or return as-is
     elif file_ext == ".doc":
@@ -628,31 +701,18 @@ async def view_resume(candidate_id: str):
                             with open(docx_path, 'rb') as f:
                                 docx_content = f.read()
                             
-                            # Convert DOCX to PDF for better viewing
-                            try:
-                                pdf_result = convertapi.convert('pdf', {'File': docx_path}, from_format='docx')
-                                pdf_result.save_files(temp_dir)
-                                
-                                pdf_files = [f for f in os.listdir(temp_dir) if f.endswith('.pdf')]
-                                if pdf_files:
-                                    pdf_path = os.path.join(temp_dir, pdf_files[0])
-                                    with open(pdf_path, 'rb') as f:
-                                        pdf_content = f.read()
-                                    
-                                    return StreamingResponse(
-                                        BytesIO(pdf_content),
-                                        media_type="application/pdf",
-                                        headers={
-                                            "Content-Disposition": f'inline; filename="{os.path.splitext(filename)[0]}.pdf"',
-                                            "X-Content-Type-Options": "nosniff"
-                                        }
-                                    )
-                            except Exception as pdf_error:
-                                print(f"Error converting DOCX to PDF: {pdf_error}")
-                                # Fall through to HTML conversion
-                            
-                            # Fallback: Convert DOCX to HTML
-                            result = mammoth.convert_to_html(BytesIO(docx_content))
+                            # Convert DOCX to HTML with minimal formatting changes
+                            result = mammoth.convert_to_html(
+                                BytesIO(docx_content),
+                                style_map=[
+                                    "p[style-name='Heading 1'] => h1:fresh",
+                                    "p[style-name='Heading 2'] => h2:fresh",
+                                    "p[style-name='Heading 3'] => h3:fresh",
+                                    "p[style-name='Heading 4'] => h4:fresh",
+                                    "p[style-name='Heading 5'] => h5:fresh",
+                                    "p[style-name='Heading 6'] => h6:fresh",
+                                ]
+                            )
                             html_content = result.value
                             
                             html_page = f"""<!DOCTYPE html>
@@ -662,7 +722,9 @@ async def view_resume(candidate_id: str):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resume - {filename}</title>
     <style>
-        * {{ box-sizing: border-box; }}
+        * {{
+            box-sizing: border-box;
+        }}
         body {{
             font-family: 'Times New Roman', Times, serif;
             line-height: 1.15;
@@ -677,17 +739,41 @@ async def view_resume(candidate_id: str):
             padding: 0.5in;
             max-width: 8.5in;
             margin: 0 auto;
+            white-space: pre-wrap;
         }}
-        .resume-content p {{ margin: 0; padding: 0; line-height: 1.15; }}
+        /* Preserve original formatting from DOCX */
+        .resume-content p {{
+            margin: 0;
+            padding: 0;
+            line-height: 1.15;
+        }}
         .resume-content h1, .resume-content h2, .resume-content h3, 
         .resume-content h4, .resume-content h5, .resume-content h6 {{
-            margin: 0; padding: 0; font-weight: bold;
+            margin: 0;
+            padding: 0;
+            font-weight: bold;
         }}
-        .resume-content ul, .resume-content ol {{ margin: 0; padding-left: 0.5in; }}
-        .resume-content li {{ margin: 0; padding: 0; }}
-        .resume-content table {{ border-collapse: collapse; margin: 0; width: 100%; }}
+        .resume-content ul, .resume-content ol {{
+            margin: 0;
+            padding-left: 0.5in;
+        }}
+        .resume-content li {{
+            margin: 0;
+            padding: 0;
+        }}
+        .resume-content table {{
+            border-collapse: collapse;
+            margin: 0;
+            width: 100%;
+        }}
         .resume-content table td, .resume-content table th {{
-            border: 1px solid #000000; padding: 2pt; vertical-align: top;
+            border: 1px solid #000000;
+            padding: 2pt;
+            vertical-align: top;
+        }}
+        /* Preserve inline styles from mammoth */
+        .resume-content [style] {{
+            /* Keep all inline styles as-is */
         }}
     </style>
 </head>
