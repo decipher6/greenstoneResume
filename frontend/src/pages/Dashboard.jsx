@@ -307,30 +307,30 @@ const Dashboard = () => {
         
         <div className="overflow-x-auto">
           <table className="w-full">
-          <thead className="bg-glass-100 border-b border-glass-200 sticky top-0 z-10">
+          <thead className="bg-glass-200/80 border-b-2 border-glass-300 sticky top-0 z-10">
             <tr>
               <th 
-                className="px-6 py-4 text-left text-base font-bold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                className="px-6 py-5 text-left text-lg font-extrabold text-white cursor-pointer hover:bg-glass-300 transition-colors select-none"
                 onClick={toggleTitleSort}
               >
                 <div className="flex items-center gap-2">
                   <span>Title</span>
-                  <ArrowUpDown size={14} className="text-gray-400" />
-                  {titleSort === 'asc' && <span className="text-xs text-gray-400">(A-Z)</span>}
-                  {titleSort === 'desc' && <span className="text-xs text-gray-400">(Z-A)</span>}
+                  <ArrowUpDown size={14} className="text-gray-300" />
+                  {titleSort === 'asc' && <span className="text-xs text-gray-300">(A-Z)</span>}
+                  {titleSort === 'desc' && <span className="text-xs text-gray-300">(Z-A)</span>}
                 </div>
               </th>
-              <th className="px-6 py-4 text-left text-base font-bold relative">
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white relative">
                 <div className="space-y-2 filter-dropdown-container">
                   <div 
-                    className="cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded flex items-center gap-2"
+                    className="cursor-pointer hover:bg-glass-300 transition-colors px-2 py-1 rounded flex items-center gap-2"
                     onClick={(e) => {
                       e.stopPropagation()
                       setOpenDropdown(openDropdown === 'department' ? null : 'department')
                     }}
                   >
                     <span>Department</span>
-                    <Filter size={14} className="text-gray-400" />
+                    <Filter size={14} className="text-gray-300" />
                     {filters.department.length > 0 && (
                       <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
                         {filters.department.length}
@@ -357,42 +357,42 @@ const Dashboard = () => {
                 </div>
               </th>
               <th 
-                className="px-6 py-4 text-left text-base font-bold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                className="px-6 py-5 text-left text-lg font-extrabold text-white cursor-pointer hover:bg-glass-300 transition-colors select-none"
                 onClick={toggleCandidatesSort}
               >
                 <div className="flex items-center gap-2">
                   <span># Candidates</span>
-                  <ArrowUpDown size={14} className="text-gray-400" />
-                  {candidatesSort === 'asc' && <span className="text-xs text-gray-400">(Low-High)</span>}
-                  {candidatesSort === 'desc' && <span className="text-xs text-gray-400">(High-Low)</span>}
+                  <ArrowUpDown size={14} className="text-gray-300" />
+                  {candidatesSort === 'asc' && <span className="text-xs text-gray-300">(Low-High)</span>}
+                  {candidatesSort === 'desc' && <span className="text-xs text-gray-300">(High-Low)</span>}
                 </div>
               </th>
               <th 
-                className="px-6 py-4 text-left text-base font-bold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                className="px-6 py-5 text-left text-lg font-extrabold text-white cursor-pointer hover:bg-glass-300 transition-colors select-none"
                 onClick={toggleLastRunSort}
               >
                 <div className="flex items-center gap-2">
                   <span>Last Run</span>
-                  <ArrowUpDown size={14} className="text-gray-400" />
+                  <ArrowUpDown size={14} className="text-gray-300" />
                   {lastRunSort === 'latest' && (
-                    <span className="text-xs text-gray-400">(Latest first)</span>
+                    <span className="text-xs text-gray-300">(Latest first)</span>
                   )}
                   {lastRunSort === 'oldest' && (
-                    <span className="text-xs text-gray-400">(Oldest first)</span>
+                    <span className="text-xs text-gray-300">(Oldest first)</span>
                   )}
                 </div>
               </th>
-              <th className="px-6 py-4 text-left text-base font-bold relative">
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white relative">
                 <div className="space-y-2 filter-dropdown-container">
                   <div 
-                    className="cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded flex items-center gap-2"
+                    className="cursor-pointer hover:bg-glass-300 transition-colors px-2 py-1 rounded flex items-center gap-2"
                     onClick={(e) => {
                       e.stopPropagation()
                       setOpenDropdown(openDropdown === 'status' ? null : 'status')
                     }}
                   >
                     <span>Status</span>
-                    <Filter size={14} className="text-gray-400" />
+                    <Filter size={14} className="text-gray-300" />
                     {filters.status.length > 0 && (
                       <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
                         {filters.status.length}
@@ -418,7 +418,7 @@ const Dashboard = () => {
                   )}
                 </div>
               </th>
-              <th className="px-6 py-4 text-left text-base font-bold">Actions</th>
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Actions</th>
             </tr>
           </thead>
           <tbody>

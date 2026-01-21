@@ -704,7 +704,13 @@ async def view_resume(candidate_id: str):
 </body>
 </html>"""
                             
-                            return HTMLResponse(content=html_page)
+                            return HTMLResponse(
+                                content=html_page,
+                                headers={
+                                    "Content-Type": "text/html; charset=utf-8",
+                                    "X-Content-Type-Options": "nosniff"
+                                }
+                            )
                     except Exception as convert_error:
                         print(f"Error converting .doc to .docx: {convert_error}")
             

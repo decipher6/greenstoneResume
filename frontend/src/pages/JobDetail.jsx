@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw, ArrowUpDown, Copy, Check, Download } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw, ArrowUpDown, Copy, Check } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
-  runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate, reAnalyzeCandidate, downloadCandidateResume
+  runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate, reAnalyzeCandidate
 } from '../services/api'
 import api from '../services/api'
 import { useModal } from '../context/ModalContext'
@@ -482,44 +482,6 @@ const JobDetail = () => {
       // Revert on error
       setCandidates(previousCandidates)
       await showAlert('Error', 'Failed to update rating. Please try again.', 'error')
-    }
-  }
-
-  const handleDownloadResume = async (candidateId, e) => {
-    if (e) {
-      e.stopPropagation()
-    }
-    
-    try {
-      const response = await downloadCandidateResume(candidateId)
-      
-      // Create a blob from the response
-      const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/octet-stream' })
-      
-      // Get filename from Content-Disposition header or use default
-      let filename = 'resume.pdf'
-      const contentDisposition = response.headers['content-disposition']
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i)
-        if (filenameMatch) {
-          filename = filenameMatch[1]
-        }
-      }
-      
-      // Create a temporary URL and trigger download
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-      
-      await showAlert('Success', 'Resume downloaded successfully', 'success')
-    } catch (error) {
-      console.error('Error downloading resume:', error)
-      await showAlert('Error', 'Failed to download resume. The file may not exist.', 'error')
     }
   }
 
@@ -1124,9 +1086,9 @@ const JobDetail = () => {
               </div>
             )}
             <table className="w-full">
-          <thead className="bg-glass-100 border-b border-glass-200">
+          <thead className="bg-glass-200/80 border-b-2 border-glass-300">
             <tr>
-              <th className="px-6 py-3 text-left">
+              <th className="px-6 py-5 text-left">
                 <input
                   type="checkbox"
                   checked={selectedCandidates.length === candidates.length && candidates.length > 0}
@@ -1139,32 +1101,32 @@ const JobDetail = () => {
                   }}
                 />
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white">
                 #
               </th>
               <th 
-                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                className="px-6 py-5 text-left text-lg font-extrabold text-white cursor-pointer hover:bg-glass-300 transition-colors select-none"
                 onClick={toggleNameSort}
               >
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span>Name</span>
-                    <ArrowUpDown size={14} className="text-gray-400" />
-                    {nameSort === 'asc' && <span className="text-xs text-gray-400">(A-Z)</span>}
-                    {nameSort === 'desc' && <span className="text-xs text-gray-400">(Z-A)</span>}
+                    <ArrowUpDown size={14} className="text-gray-300" />
+                    {nameSort === 'asc' && <span className="text-xs text-gray-300">(A-Z)</span>}
+                    {nameSort === 'desc' && <span className="text-xs text-gray-300">(Z-A)</span>}
                   </div>
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white">
                 <div>Email</div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white">
                 <div>Phone</div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold relative">
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white relative">
                 <div className="space-y-2 filter-dropdown-container">
                   <div 
-                    className="cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded flex items-center gap-2"
+                    className="cursor-pointer hover:bg-glass-300 transition-colors px-2 py-1 rounded flex items-center gap-2"
                     onClick={(e) => {
                       e.stopPropagation()
                       setOpenDropdown(openDropdown === 'status' ? null : 'status')
@@ -1197,11 +1159,11 @@ const JobDetail = () => {
                 </div>
               </th>
               <th 
-                className="px-6 py-3 text-left text-sm font-semibold relative"
+                className="px-6 py-5 text-left text-lg font-extrabold text-white relative"
               >
                 <div className="space-y-2 filter-dropdown-container">
                   <div 
-                    className="flex items-center gap-2 cursor-pointer hover:bg-glass-200 transition-colors px-2 py-1 rounded"
+                    className="flex items-center gap-2 cursor-pointer hover:bg-glass-300 transition-colors px-2 py-1 rounded"
                     onClick={(e) => {
                       e.stopPropagation()
                       if (e.target.closest('span') || e.target.closest('svg')) {
@@ -1212,12 +1174,12 @@ const JobDetail = () => {
                     }}
                   >
                     <span>Rating</span>
-                    <ArrowUpDown size={14} className="text-gray-400" onClick={(e) => {
+                    <ArrowUpDown size={14} className="text-gray-300" onClick={(e) => {
                       e.stopPropagation()
                       toggleRatingSort()
                     }} />
-                    {ratingSort === 'asc' && <span className="text-xs text-gray-400">(Low-High)</span>}
-                    {ratingSort === 'desc' && <span className="text-xs text-gray-400">(High-Low)</span>}
+                    {ratingSort === 'asc' && <span className="text-xs text-gray-300">(Low-High)</span>}
+                    {ratingSort === 'desc' && <span className="text-xs text-gray-300">(High-Low)</span>}
                     {filters.rating.length > 0 && (
                       <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
                         {filters.rating.length}
@@ -1244,19 +1206,19 @@ const JobDetail = () => {
                 </div>
               </th>
               <th 
-                className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
+                className="px-6 py-5 text-left text-lg font-extrabold text-white cursor-pointer hover:bg-glass-300 transition-colors select-none"
                 onClick={toggleScoreSort}
               >
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span>Score</span>
-                    <ArrowUpDown size={14} className="text-gray-400" />
-                    {scoreSort === 'asc' && <span className="text-xs text-gray-400">(Low-High)</span>}
-                    {scoreSort === 'desc' && <span className="text-xs text-gray-400">(High-Low)</span>}
+                    <ArrowUpDown size={14} className="text-gray-300" />
+                    {scoreSort === 'asc' && <span className="text-xs text-gray-300">(Low-High)</span>}
+                    {scoreSort === 'desc' && <span className="text-xs text-gray-300">(High-Low)</span>}
                   </div>
                 </div>
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1455,15 +1417,6 @@ const JobDetail = () => {
                       </>
                     ) : (
                       <>
-                        {(candidate.resume_file_path || candidate.resume_file_id) && (
-                          <button
-                            onClick={(e) => handleDownloadResume(candidate.id, e)}
-                            className="p-2 rounded-lg hover:bg-blue-500/20 transition-colors"
-                            title="Download Resume"
-                          >
-                            <Download size={18} className="text-blue-400" />
-                          </button>
-                        )}
                         <button
                           onClick={(e) => startEditingRow(candidate.id, e)}
                           className="p-2 rounded-lg hover:bg-glass-200 transition-colors"
@@ -1502,14 +1455,14 @@ const JobDetail = () => {
               <h3 className="text-lg font-semibold">Rated Candidates ({shortlistedCandidates.length})</h3>
             </div>
             <table className="w-full">
-              <thead className="bg-glass-100 border-b border-glass-200">
+              <thead className="bg-glass-200/80 border-b-2 border-glass-300">
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Name</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Phone</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Rating</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Score</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
+                  <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Name</th>
+                  <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Email</th>
+                  <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Phone</th>
+                  <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Rating</th>
+                  <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Score</th>
+                  <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Actions</th>
                 </tr>
               </thead>
               <tbody>
