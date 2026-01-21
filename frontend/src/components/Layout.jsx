@@ -195,7 +195,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Stats Cards - Always visible */}
-        <div className="px-4 pt-4 pb-0 flex-shrink-0">
+        <div className="px-4 pt-4 pb-4 flex-shrink-0">
           <div className="grid grid-cols-4 gap-4">
             <StatCard
               icon={Briefcase}

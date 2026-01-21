@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks, Body, Depends
+from fastapi.responses import FileResponse
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
@@ -410,6 +411,55 @@ async def get_candidate(candidate_id: str):
             if isinstance(value, dict) and "$numberDouble" in value:
                 candidate["score_breakdown"][key] = float(value["$numberDouble"])
     return Candidate(**candidate)
+
+@router.get("/{candidate_id}/download-resume")
+async def download_resume(candidate_id: str):
+    """Download the resume file for a candidate"""
+    db = get_db()
+    try:
+        candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid candidate ID")
+    
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    resume_file_path = candidate.get("resume_file_path")
+    if not resume_file_path:
+        raise HTTPException(status_code=404, detail="Resume file not found for this candidate")
+    
+    if not os.path.exists(resume_file_path):
+        raise HTTPException(status_code=404, detail="Resume file does not exist on server")
+    
+    # Get the original filename from the path or use candidate name
+    filename = os.path.basename(resume_file_path)
+    # Extract original filename if it's in the format: {job_id}_{timestamp}_{file_index}_{filename}
+    if '_' in filename:
+        parts = filename.split('_', 3)
+        if len(parts) >= 4:
+            original_filename = parts[3]
+        else:
+            original_filename = filename
+    else:
+        original_filename = filename
+    
+    # Use candidate name for better filename if available
+    candidate_name = candidate.get("name", "candidate")
+    # Sanitize name for filename
+    safe_name = "".join(c for c in candidate_name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_name = safe_name.replace(' ', '_')
+    
+    # Get file extension from original filename
+    file_ext = os.path.splitext(original_filename)[1] if original_filename else os.path.splitext(filename)[1]
+    
+    # Create a better filename: {candidate_name}_{original_extension}
+    download_filename = f"{safe_name}_resume{file_ext}" if safe_name else f"resume{file_ext}"
+    
+    return FileResponse(
+        path=resume_file_path,
+        filename=download_filename,
+        media_type='application/octet-stream'
+    )
 
 @router.patch("/{candidate_id}")
 async def update_candidate(candidate_id: str, update_data: dict = Body(...), user_id: Optional[str] = Depends(get_current_user_id)):

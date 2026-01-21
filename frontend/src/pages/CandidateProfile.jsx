@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star, Copy, Check } from 'lucide-react'
-import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, updateCandidate } from '../services/api'
+import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star, Copy, Check, Download } from 'lucide-react'
+import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, updateCandidate, downloadCandidateResume } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
 import SendEmailModal from '../components/SendEmailModal'
@@ -90,6 +90,40 @@ const CandidateProfile = () => {
     } finally {
       setUploading(false)
       e.target.value = '' // Reset input
+    }
+  }
+
+  const handleDownloadResume = async () => {
+    try {
+      const response = await downloadCandidateResume(candidateId)
+      
+      // Create a blob from the response
+      const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/octet-stream' })
+      
+      // Get filename from Content-Disposition header or use default
+      let filename = 'resume.pdf'
+      const contentDisposition = response.headers['content-disposition']
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i)
+        if (filenameMatch) {
+          filename = filenameMatch[1]
+        }
+      }
+      
+      // Create a temporary URL and trigger download
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      await showAlert('Success', 'Resume downloaded successfully', 'success')
+    } catch (error) {
+      console.error('Error downloading resume:', error)
+      await showAlert('Error', 'Failed to download resume. The file may not exist.', 'error')
     }
   }
 
@@ -758,7 +792,19 @@ const CandidateProfile = () => {
 
           {activeTab === 'resume' && (
             <div className="glass-card p-6">
-              <h3 className="text-lg font-semibold mb-4">Resume</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Resume</h3>
+                {candidate.resume_file_path && (
+                  <button
+                    onClick={handleDownloadResume}
+                    className="glass-button flex items-center gap-2"
+                    title="Download Resume File"
+                  >
+                    <Download size={18} />
+                    Download Resume
+                  </button>
+                )}
+              </div>
               {candidate.resume_text ? (
                 <div className="prose prose-invert max-w-none">
                   <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-glass-100 p-4 rounded-lg">

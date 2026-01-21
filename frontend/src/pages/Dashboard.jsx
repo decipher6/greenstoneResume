@@ -307,7 +307,7 @@ const Dashboard = () => {
         
         <div className="overflow-x-auto">
           <table className="w-full">
-          <thead className="bg-glass-100 border-b border-glass-200">
+          <thead className="bg-glass-100 border-b border-glass-200 sticky top-0 z-10">
             <tr>
               <th 
                 className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"

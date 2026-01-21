@@ -55,6 +55,11 @@ export const uploadCandidatesBulk = (jobId, files) => {
 export const deleteCandidate = (candidateId) => api.delete(`/candidates/${candidateId}`)
 export const updateCandidate = (candidateId, data) => api.patch(`/candidates/${candidateId}`, data)
 export const shortlistCandidate = (candidateId) => api.patch(`/candidates/${candidateId}`, { status: 'shortlisted' })
+export const downloadCandidateResume = (candidateId) => {
+  return api.get(`/candidates/${candidateId}/download-resume`, {
+    responseType: 'blob'
+  })
+}
 
 // Assessments
 export const uploadCandidateAssessments = (candidateId, file) => {
