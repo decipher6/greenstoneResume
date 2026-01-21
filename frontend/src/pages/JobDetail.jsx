@@ -841,12 +841,6 @@ const JobDetail = () => {
               <p className="text-sm text-gray-400 mt-1">{job.department} • {job.candidate_count} candidates</p>
             </div>
           </div>
-          {averageScore !== null && (
-            <div className="flex flex-col items-end">
-              <span className="text-sm text-gray-300">Average Resume Score</span>
-              <span className="text-2xl font-bold text-green-200">{averageScore}/10</span>
-            </div>
-          )}
         </div>
       </div>
 

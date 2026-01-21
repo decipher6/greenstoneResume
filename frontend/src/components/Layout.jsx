@@ -1,19 +1,34 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, User, LogOut, Clock, Briefcase, Users, PauseCircle, CheckCircle2, ArrowUpRight } from 'lucide-react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { LayoutDashboard, User, LogOut, Clock, Briefcase, Users, PauseCircle, CheckCircle2, ArrowUpRight, FileText, Brain } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { getDashboardStats } from '../services/api'
+import { getDashboardStats, getCandidates, getJob, getCandidate } from '../services/api'
 
 const Layout = ({ children, pageTitle, pageSubtitle }) => {
   const location = useLocation()
   const navigate = useNavigate()
+  const params = useParams()
   const { user, logout } = useAuth()
   const [isExpanded, setIsExpanded] = useState(false)
   const [stats, setStats] = useState(null)
+  const [jobStats, setJobStats] = useState(null)
+
+  const isJobPage = location.pathname.startsWith('/jobs/')
+  const isCandidatePage = location.pathname.startsWith('/candidates/')
 
   useEffect(() => {
     fetchStats()
   }, [])
+
+  useEffect(() => {
+    if (isJobPage && params.jobId) {
+      fetchJobStats(params.jobId)
+    } else if (isCandidatePage && params.candidateId) {
+      fetchCandidateJobStats(params.candidateId)
+    } else {
+      setJobStats(null)
+    }
+  }, [isJobPage, isCandidatePage, params.jobId, params.candidateId])
 
   const fetchStats = async () => {
     try {
@@ -21,6 +36,59 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
       setStats(statsRes.data)
     } catch (error) {
       console.error('Error fetching dashboard stats:', error)
+    }
+  }
+
+  const fetchJobStats = async (jobId) => {
+    try {
+      const [jobRes, candidatesRes] = await Promise.all([
+        getJob(jobId),
+        getCandidates(jobId)
+      ])
+      
+      const candidates = candidatesRes.data || []
+      const job = jobRes.data
+      
+      // Get candidate count for this job
+      const candidateCount = job?.candidate_count || candidates.length
+      
+      // Calculate average resume score
+      const scoredCandidates = candidates.filter(c => 
+        c.score_breakdown?.resume_score !== undefined && 
+        c.score_breakdown?.resume_score !== null
+      )
+      const avgResumeScore = scoredCandidates.length > 0
+        ? (scoredCandidates.reduce((acc, c) => acc + parseFloat(c.score_breakdown.resume_score), 0) / scoredCandidates.length).toFixed(1)
+        : null
+
+      // Calculate average CCAT score
+      const ccatCandidates = candidates.filter(c => 
+        c.score_breakdown?.ccat_score !== undefined && 
+        c.score_breakdown?.ccat_score !== null
+      )
+      const avgCCATScore = ccatCandidates.length > 0
+        ? (ccatCandidates.reduce((acc, c) => acc + parseFloat(c.score_breakdown.ccat_score), 0) / ccatCandidates.length).toFixed(1)
+        : null
+
+      setJobStats({
+        candidateCount,
+        avgResumeScore,
+        avgCCATScore
+      })
+    } catch (error) {
+      console.error('Error fetching job stats:', error)
+    }
+  }
+
+  const fetchCandidateJobStats = async (candidateId) => {
+    try {
+      const candidateRes = await getCandidate(candidateId)
+      
+      if (candidateRes.data?.job_id) {
+        await fetchJobStats(candidateRes.data.job_id)
+      }
+    } catch (error) {
+      console.error('Error fetching candidate job stats:', error)
     }
   }
 
@@ -138,25 +206,44 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
             />
             <StatCard
               icon={Users}
-              label="Total Candidates"
-              value={stats?.total_candidates || 0}
+              label={isJobPage || isCandidatePage ? "Job Candidates" : "Total Candidates"}
+              value={isJobPage || isCandidatePage ? (jobStats?.candidateCount || 0) : (stats?.total_candidates || 0)}
               color="purple"
-              onClick={() => navigate('/')}
+              onClick={isJobPage || isCandidatePage ? undefined : () => navigate('/')}
             />
-            <StatCard
-              icon={PauseCircle}
-              label="Jobs On Hold"
-              value={stats?.jobs_on_hold || 0}
-              color="orange"
-              onClick={() => navigate('/?status=on-hold')}
-            />
-            <StatCard
-              icon={CheckCircle2}
-              label="Jobs Filled"
-              value={stats?.jobs_filled || 0}
-              color="blue"
-              onClick={() => navigate('/?status=filled')}
-            />
+            {isJobPage || isCandidatePage ? (
+              <>
+                <StatCard
+                  icon={FileText}
+                  label="Average Resume Score"
+                  value={jobStats?.avgResumeScore ? `${jobStats.avgResumeScore}/10` : '-'}
+                  color="green"
+                />
+                <StatCard
+                  icon={Brain}
+                  label="Average CCAT Score"
+                  value={jobStats?.avgCCATScore ? `${jobStats.avgCCATScore}/10` : '-'}
+                  color="purple"
+                />
+              </>
+            ) : (
+              <>
+                <StatCard
+                  icon={PauseCircle}
+                  label="Jobs On Hold"
+                  value={stats?.jobs_on_hold || 0}
+                  color="orange"
+                  onClick={() => navigate('/?status=on-hold')}
+                />
+                <StatCard
+                  icon={CheckCircle2}
+                  label="Jobs Filled"
+                  value={stats?.jobs_filled || 0}
+                  color="blue"
+                  onClick={() => navigate('/?status=filled')}
+                />
+              </>
+            )}
           </div>
         </div>
 
