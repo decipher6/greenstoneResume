@@ -909,6 +909,53 @@ async def download_resume(candidate_id: str):
     
     raise HTTPException(status_code=404, detail="Resume file not found for this candidate")
 
+@router.get("/{candidate_id}/resume-file-info")
+async def get_resume_file_info(candidate_id: str):
+    """Get resume file information including file extension"""
+    db = get_db()
+    try:
+        candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid candidate ID")
+    
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    resume_file_id = candidate.get("resume_file_id")
+    resume_file_path = candidate.get("resume_file_path")
+    filename = None
+    file_ext = None
+    
+    # Try MongoDB GridFS first (new storage method)
+    if resume_file_id:
+        try:
+            fs = AsyncIOMotorGridFSBucket(db)
+            grid_out = await fs.open_download_stream(ObjectId(resume_file_id))
+            filename = grid_out.filename or "resume.pdf"
+            file_ext = os.path.splitext(filename)[1].lower() if filename else ".pdf"
+        except Exception as gridfs_error:
+            print(f"Error retrieving file info from GridFS: {gridfs_error}")
+    
+    # Fallback to disk storage (backward compatibility)
+    if not filename and resume_file_path:
+        filename = os.path.basename(resume_file_path)
+        # Extract original filename if it's in the format: {job_id}_{timestamp}_{file_index}_{filename}
+        if '_' in filename:
+            parts = filename.split('_', 3)
+            if len(parts) >= 4:
+                filename = parts[3]
+        file_ext = os.path.splitext(filename)[1].lower() if filename else ".pdf"
+    
+    if not file_ext:
+        file_ext = ".pdf"  # Default
+    
+    return {
+        "filename": filename,
+        "file_extension": file_ext,
+        "is_docx": file_ext == ".docx",
+        "is_pdf": file_ext == ".pdf"
+    }
+
 @router.patch("/{candidate_id}")
 async def update_candidate(candidate_id: str, update_data: dict = Body(...), user_id: Optional[str] = Depends(get_current_user_id)):
     """Update candidate information (name, email, phone, status)"""

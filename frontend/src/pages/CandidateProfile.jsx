@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star, Copy, Check, Download } from 'lucide-react'
-import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, updateCandidate, downloadCandidateResume, viewCandidateResume } from '../services/api'
+import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, updateCandidate, downloadCandidateResume, viewCandidateResume, getCandidateResumeFileInfo } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
 import SendEmailModal from '../components/SendEmailModal'
@@ -31,11 +31,34 @@ const CandidateProfile = () => {
   const [copiedField, setCopiedField] = useState(null) // Track which field was copied
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
+  const [resumeFileInfo, setResumeFileInfo] = useState(null)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
     fetchCandidate()
   }, [candidateId])
+
+  useEffect(() => {
+    // Fetch resume file info when candidate is loaded
+    if (candidate && (candidate.resume_file_path || candidate.resume_file_id)) {
+      fetchResumeFileInfo()
+    } else {
+      setResumeFileInfo(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidate])
+
+  const fetchResumeFileInfo = async () => {
+    if (!candidateId) return
+    try {
+      const response = await getCandidateResumeFileInfo(candidateId)
+      setResumeFileInfo(response.data)
+    } catch (error) {
+      console.error('Error fetching resume file info:', error)
+      // Don't show error to user, just log it
+      setResumeFileInfo(null)
+    }
+  }
 
   const fetchCandidate = async () => {
     setLoading(true)
@@ -794,6 +817,17 @@ const CandidateProfile = () => {
             <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Resume</h3>
+                {/* Show download button for DOCX files */}
+                {resumeFileInfo?.is_docx && (
+                  <button
+                    onClick={handleDownloadResume}
+                    className="glass-button flex items-center gap-2"
+                    title="Download original DOCX resume file"
+                  >
+                    <Download size={18} />
+                    Download Original
+                  </button>
+                )}
               </div>
               {(candidate.resume_file_path || candidate.resume_file_id) ? (
                 <div className="w-full">

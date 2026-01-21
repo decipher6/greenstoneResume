@@ -64,6 +64,7 @@ export const viewCandidateResume = (candidateId) => {
   const baseUrl = API_BASE_URL || '/api'
   return `${baseUrl}/candidates/${candidateId}/view-resume`
 }
+export const getCandidateResumeFileInfo = (candidateId) => api.get(`/candidates/${candidateId}/resume-file-info`)
 
 // Assessments
 export const uploadCandidateAssessments = (candidateId, file) => {
