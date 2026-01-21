@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star, Copy, Check } from 'lucide-react'
 import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, updateCandidate } from '../services/api'
@@ -21,9 +21,17 @@ const CandidateProfile = () => {
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [showInterviewModal, setShowInterviewModal] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
+  
+  // Reset to overview if assessments tab was active (since it's removed)
+  useEffect(() => {
+    if (activeTab === 'assessments') {
+      setActiveTab('overview')
+    }
+  }, [activeTab])
   const [copiedField, setCopiedField] = useState(null) // Track which field was copied
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     fetchCandidate()
@@ -291,6 +299,25 @@ const CandidateProfile = () => {
     return Math.round(percentile)
   }
 
+  // Calculate rank (1-based position)
+  const calculateRank = () => {
+    if (!allCandidates || allCandidates.length === 0 || !candidate?.score_breakdown?.overall_score) {
+      return null
+    }
+
+    const currentScore = parseFloat(candidate.score_breakdown.overall_score)
+    const scores = allCandidates
+      .map(c => parseFloat(c.score_breakdown?.overall_score || 0))
+      .filter(s => !isNaN(s))
+      .sort((a, b) => b - a) // Sort descending
+
+    if (scores.length === 0) return null
+
+    // Find the rank (1-based)
+    const rank = scores.findIndex(s => s <= currentScore)
+    return rank === -1 ? scores.length : rank + 1
+  }
+
   // Check job requirements match
   const checkRequirementsMatch = () => {
     if (!job?.evaluation_criteria || !candidate?.criterion_scores) {
@@ -373,6 +400,7 @@ const CandidateProfile = () => {
   
   const aiSummary = parseAISummary(candidate.ai_justification)
   const percentile = calculatePercentile()
+  const rank = calculateRank()
   const requirementsMatch = checkRequirementsMatch()
 
   return (
@@ -398,6 +426,11 @@ const CandidateProfile = () => {
               }`}>
                 {statusBadge}
               </span>
+              {rank && (
+                <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-400/40 text-purple-300 border border-purple-400/60">
+                  Rank #{rank} of {allCandidates.length}
+                </span>
+              )}
             </div>
             <p className="text-lg text-gray-400">{jobTitle}</p>
           </div>
@@ -438,7 +471,7 @@ const CandidateProfile = () => {
       <div className="glass-card">
         <div className="border-b border-glass-200">
           <div className="flex gap-6 px-6">
-            {['overview', 'resume', 'assessments', 'notes'].map((tab) => (
+            {['overview', 'resume', 'notes'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -481,9 +514,23 @@ const CandidateProfile = () => {
                     </div>
                     {(!ccatScore || !personalityScore) && (
                       <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                        <p className="text-xs text-yellow-400">
-                          Upload assessments to complete scoring.
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-yellow-400">
+                            Upload CCAT assessment to complete scoring.
+                          </p>
+                          <label className="cursor-pointer flex items-center gap-2 text-xs px-3 py-1.5 bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 rounded-lg hover:bg-yellow-500/30 transition-colors" title="Upload CCAT and Personality assessments">
+                            <Upload size={14} />
+                            {uploading ? 'Uploading...' : 'Upload'}
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept=".csv,.pdf"
+                              onChange={handleAssessmentUpload}
+                              className="hidden"
+                              disabled={uploading}
+                            />
+                          </label>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -713,78 +760,6 @@ const CandidateProfile = () => {
             </div>
           )}
 
-          {activeTab === 'assessments' && (
-            <div className="space-y-6">
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Assessments</h3>
-                  <label className="glass-button-secondary cursor-pointer flex items-center gap-2 text-sm" title="Upload CCAT and Personality assessments">
-                    <Upload size={16} />
-                    {uploading ? 'Uploading...' : 'Upload Assessments'}
-                    <input
-                      type="file"
-                      accept=".csv,.pdf"
-                      onChange={handleAssessmentUpload}
-                      className="hidden"
-                      disabled={uploading}
-                    />
-                  </label>
-                </div>
-                
-                {ccatScore && (
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-400">CCAT Score</span>
-                      <span className="text-lg font-semibold text-purple-400">{ccatScore.toFixed(1)}/10</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Cognitive ability assessment</p>
-                  </div>
-                )}
-
-                {personalityData.length > 0 && (
-                  <div>
-                    <h4 className="text-md font-semibold mb-4">Personality Profile</h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <RadarChart data={personalityData}>
-                        <PolarGrid stroke="rgba(255,255,255,0.2)" />
-                        <PolarAngleAxis 
-                          dataKey="trait" 
-                          stroke="#888"
-                          tick={{ fill: '#888', fontSize: 12 }}
-                        />
-                        <PolarRadiusAxis 
-                          angle={90} 
-                          domain={[0, 10]} 
-                          stroke="#888"
-                          tick={{ fill: '#888', fontSize: 12 }}
-                        />
-                        <Radar
-                          name="Personality"
-                          dataKey="value"
-                          stroke="#9333ea"
-                          fill="#9333ea"
-                          fillOpacity={0.6}
-                        />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'rgba(10, 10, 15, 0.95)', 
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            borderRadius: '8px',
-                            color: '#fff'
-                          }}
-                          labelStyle={{ color: '#fff' }}
-                        />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {!ccatScore && personalityData.length === 0 && (
-                  <p className="text-gray-400 text-sm">No assessment data available. Upload assessments to see results.</p>
-                )}
-              </div>
-            </div>
-          )}
 
           {activeTab === 'notes' && (
             <div className="glass-card p-6">

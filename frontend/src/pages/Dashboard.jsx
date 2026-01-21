@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Plus, Eye, Calendar, LucideTrash, Search, X, ArrowUpDown, Users } from 'lucide-react'
 import { getJobs, deleteJob, updateJobStatus } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
 import { useModal } from '../context/ModalContext'
 
 const Dashboard = () => {
+  const [searchParams] = useSearchParams()
   const [jobs, setJobs] = useState([])
   const [filteredJobs, setFilteredJobs] = useState([])
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -23,7 +24,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchJobs()
-  }, [])
+    // Check for status filter in URL
+    const statusParam = searchParams.get('status')
+    if (statusParam) {
+      setFilters(prev => ({
+        ...prev,
+        status: [statusParam]
+      }))
+    }
+  }, [searchParams])
 
   const fetchJobs = async () => {
     try {
@@ -67,9 +76,24 @@ const Dashboard = () => {
       )
     }
 
-    // Sort by title
+    // Group by status: active, on-hold, filled, cancelled
+    // Define status order
+    const statusOrder = ['active', 'on-hold', 'filled', 'cancelled']
+    
+    // Sort by title within status groups
     if (titleSort) {
       filtered.sort((a, b) => {
+        const aStatus = a.status || 'active'
+        const bStatus = b.status || 'active'
+        const aStatusIndex = statusOrder.indexOf(aStatus)
+        const bStatusIndex = statusOrder.indexOf(bStatus)
+        
+        // First sort by status
+        if (aStatusIndex !== bStatusIndex) {
+          return aStatusIndex - bStatusIndex
+        }
+        
+        // Then sort by title within same status
         const aTitle = (a.title || '').toLowerCase()
         const bTitle = (b.title || '').toLowerCase()
         if (titleSort === 'asc') {
@@ -79,10 +103,20 @@ const Dashboard = () => {
         }
       })
     }
-
-    // Sort by candidates
-    if (candidatesSort) {
+    // Sort by candidates within status groups
+    else if (candidatesSort) {
       filtered.sort((a, b) => {
+        const aStatus = a.status || 'active'
+        const bStatus = b.status || 'active'
+        const aStatusIndex = statusOrder.indexOf(aStatus)
+        const bStatusIndex = statusOrder.indexOf(bStatus)
+        
+        // First sort by status
+        if (aStatusIndex !== bStatusIndex) {
+          return aStatusIndex - bStatusIndex
+        }
+        
+        // Then sort by candidates within same status
         const aCount = a.candidate_count || 0
         const bCount = b.candidate_count || 0
         if (candidatesSort === 'asc') {
@@ -92,10 +126,20 @@ const Dashboard = () => {
         }
       })
     }
-
-    // Sort by last_run (if no other sorts applied)
-    if (!titleSort && !candidatesSort) {
+    // Sort by last_run within status groups (if no other sorts applied)
+    else {
       filtered.sort((a, b) => {
+        const aStatus = a.status || 'active'
+        const bStatus = b.status || 'active'
+        const aStatusIndex = statusOrder.indexOf(aStatus)
+        const bStatusIndex = statusOrder.indexOf(bStatus)
+        
+        // First sort by status
+        if (aStatusIndex !== bStatusIndex) {
+          return aStatusIndex - bStatusIndex
+        }
+        
+        // Then sort by last_run within same status
         const aDate = a.last_run ? new Date(a.last_run).getTime() : 0
         const bDate = b.last_run ? new Date(b.last_run).getTime() : 0
         
@@ -383,8 +427,8 @@ const Dashboard = () => {
                 </td>
               </tr>
             ) : (
-              filteredJobs.map((job) => (
-              <tr key={job.id} className="border-b border-glass-200 hover:bg-glass-100 transition-colors">
+              filteredJobs.map((job, index) => (
+              <tr key={job.id} className={`border-b border-glass-200 hover:bg-glass-100 transition-colors ${index % 2 === 0 ? 'bg-glass-100/50' : 'bg-transparent'}`}>
                 <td className="px-6 py-4">
                   <Link to={`/jobs/${job.id}`} className="font-medium hover:text-primary-400">
                     {job.title}

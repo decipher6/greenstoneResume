@@ -881,7 +881,7 @@ const JobDetail = () => {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            Rated ({shortlistedCandidates.length})
+            Highly Rated ({shortlistedCandidates.length})
           </button>
         </div>
       </div>
@@ -1107,6 +1107,9 @@ const JobDetail = () => {
                   }}
                 />
               </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                #
+              </th>
               <th 
                 className="px-6 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-glass-200 transition-colors select-none"
                 onClick={toggleNameSort}
@@ -1227,18 +1230,18 @@ const JobDetail = () => {
           <tbody>
             {getFilteredCandidates().length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
+                <td colSpan={9} className="px-6 py-12 text-center text-gray-400">
                   No candidates found matching your filters.
                 </td>
               </tr>
             ) : (
-              getFilteredCandidates().map((candidate) => (
+              getFilteredCandidates().map((candidate, index) => (
               <tr 
                 key={candidate.id} 
                 className={`border-b border-glass-200 transition-colors ${
                   editingCandidateId === candidate.id 
                     ? 'bg-primary-500/5' 
-                    : 'hover:bg-glass-100 cursor-pointer'
+                    : index % 2 === 0 ? 'bg-glass-100/50 hover:bg-glass-100 cursor-pointer' : 'bg-transparent hover:bg-glass-100 cursor-pointer'
                 }`}
                 onClick={(e) => handleRowClick(candidate.id, e)}
               >
@@ -1248,6 +1251,9 @@ const JobDetail = () => {
                     checked={selectedCandidates.includes(candidate.id)}
                     onChange={() => toggleCandidateSelection(candidate.id)}
                   />
+                </td>
+                <td className="px-6 py-4 text-gray-400 text-sm">
+                  {index + 1}
                 </td>
                 <td className="px-6 py-4">
                   {editingCandidateId === candidate.id ? (
@@ -1475,10 +1481,10 @@ const JobDetail = () => {
                     </td>
                   </tr>
                 ) : (
-                  shortlistedCandidates.map((candidate) => (
+                  shortlistedCandidates.map((candidate, index) => (
                     <tr 
                       key={candidate.id} 
-                      className="border-b border-glass-200 hover:bg-glass-100 cursor-pointer transition-colors"
+                      className={`border-b border-glass-200 hover:bg-glass-100 cursor-pointer transition-colors ${index % 2 === 0 ? 'bg-glass-100/50' : 'bg-transparent'}`}
                       onClick={(e) => {
                         if (!e.target.closest('button')) {
                           navigate(`/candidates/${candidate.id}`)

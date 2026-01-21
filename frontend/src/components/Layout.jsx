@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, User, LogOut, Clock, Briefcase, Users, PauseCircle, CheckCircle2, ArrowUpRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getDashboardStats } from '../services/api'
 
 const Layout = ({ children, pageTitle, pageSubtitle }) => {
   const location = useLocation()
+  const navigate = useNavigate()
   const { user, logout } = useAuth()
   const [isExpanded, setIsExpanded] = useState(false)
   const [stats, setStats] = useState(null)
@@ -133,24 +134,28 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
               label="Active Jobs"
               value={stats?.active_jobs || 0}
               color="green"
+              onClick={() => navigate('/?status=active')}
             />
             <StatCard
               icon={Users}
               label="Total Candidates"
               value={stats?.total_candidates || 0}
               color="purple"
+              onClick={() => navigate('/')}
             />
             <StatCard
               icon={PauseCircle}
               label="Jobs On Hold"
               value={stats?.jobs_on_hold || 0}
               color="orange"
+              onClick={() => navigate('/?status=on-hold')}
             />
             <StatCard
               icon={CheckCircle2}
               label="Jobs Filled"
               value={stats?.jobs_filled || 0}
               color="blue"
+              onClick={() => navigate('/?status=filled')}
             />
           </div>
         </div>
@@ -174,7 +179,7 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
   )
 }
 
-const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
+const StatCard = ({ icon: Icon, label, value, trend, trendUp, color, onClick }) => {
   const colorClasses = {
     green: 'from-green-400/40 to-green-500/40 border-green-400/60 text-green-300',
     purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30 text-purple-400',
@@ -184,7 +189,10 @@ const StatCard = ({ icon: Icon, label, value, trend, trendUp, color }) => {
   }
 
   return (
-    <div className="glass-card p-6">
+    <div 
+      className={`glass-card p-6 ${onClick ? 'cursor-pointer hover:bg-glass-100 transition-colors' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-4">
           <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${colorClasses[color]} flex items-center justify-center flex-shrink-0`}>
