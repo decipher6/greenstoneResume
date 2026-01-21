@@ -491,15 +491,26 @@ async def view_resume(candidate_id: str):
             }
         )
     
-    # For DOCX files, convert to HTML using mammoth
+    # For DOCX files, convert to HTML using mammoth with minimal formatting changes
     elif file_ext == ".docx":
         try:
-            # Convert DOCX to HTML
-            result = mammoth.convert_to_html(BytesIO(file_content))
+            # Convert DOCX to HTML with options to preserve original formatting
+            # Use convert_to_html with preserve_empty_lines and include_default_style_map
+            result = mammoth.convert_to_html(
+                BytesIO(file_content),
+                style_map=[
+                    "p[style-name='Heading 1'] => h1:fresh",
+                    "p[style-name='Heading 2'] => h2:fresh",
+                    "p[style-name='Heading 3'] => h3:fresh",
+                    "p[style-name='Heading 4'] => h4:fresh",
+                    "p[style-name='Heading 5'] => h5:fresh",
+                    "p[style-name='Heading 6'] => h6:fresh",
+                ]
+            )
             html_content = result.value
             warnings = result.messages
             
-            # Create a styled HTML page
+            # Create a minimal HTML page that preserves the original document structure
             html_page = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -507,51 +518,58 @@ async def view_resume(candidate_id: str):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resume - {filename}</title>
     <style>
+        * {{
+            box-sizing: border-box;
+        }}
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #e5e7eb;
-            background-color: #1f2937;
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.15;
+            color: #000000;
+            background-color: #ffffff;
+            padding: 0;
+            margin: 0;
+            font-size: 11pt;
         }}
         .resume-content {{
-            background-color: #374151;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            background-color: #ffffff;
+            padding: 0.5in;
+            max-width: 8.5in;
+            margin: 0 auto;
+            white-space: pre-wrap;
         }}
-        h1, h2, h3, h4, h5, h6 {{
-            color: #f3f4f6;
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
+        /* Preserve original formatting from DOCX */
+        .resume-content p {{
+            margin: 0;
+            padding: 0;
+            line-height: 1.15;
         }}
-        p {{
-            margin-bottom: 1em;
+        .resume-content h1, .resume-content h2, .resume-content h3, 
+        .resume-content h4, .resume-content h5, .resume-content h6 {{
+            margin: 0;
+            padding: 0;
+            font-weight: bold;
         }}
-        ul, ol {{
-            margin-left: 2em;
-            margin-bottom: 1em;
+        .resume-content ul, .resume-content ol {{
+            margin: 0;
+            padding-left: 0.5in;
         }}
-        li {{
-            margin-bottom: 0.5em;
+        .resume-content li {{
+            margin: 0;
+            padding: 0;
         }}
-        strong {{
-            color: #fbbf24;
-        }}
-        table {{
-            width: 100%;
+        .resume-content table {{
             border-collapse: collapse;
-            margin: 1em 0;
+            margin: 0;
+            width: 100%;
         }}
-        table td, table th {{
-            border: 1px solid #4b5563;
-            padding: 8px;
+        .resume-content table td, .resume-content table th {{
+            border: 1px solid #000000;
+            padding: 2pt;
+            vertical-align: top;
         }}
-        table th {{
-            background-color: #4b5563;
-            color: #f3f4f6;
+        /* Preserve inline styles from mammoth */
+        .resume-content [style] {{
+            /* Keep all inline styles as-is */
         }}
     </style>
 </head>
@@ -603,8 +621,18 @@ async def view_resume(candidate_id: str):
                             with open(docx_path, 'rb') as f:
                                 docx_content = f.read()
                             
-                            # Convert DOCX to HTML
-                            result = mammoth.convert_to_html(BytesIO(docx_content))
+                            # Convert DOCX to HTML with minimal formatting changes
+                            result = mammoth.convert_to_html(
+                                BytesIO(docx_content),
+                                style_map=[
+                                    "p[style-name='Heading 1'] => h1:fresh",
+                                    "p[style-name='Heading 2'] => h2:fresh",
+                                    "p[style-name='Heading 3'] => h3:fresh",
+                                    "p[style-name='Heading 4'] => h4:fresh",
+                                    "p[style-name='Heading 5'] => h5:fresh",
+                                    "p[style-name='Heading 6'] => h6:fresh",
+                                ]
+                            )
                             html_content = result.value
                             
                             html_page = f"""<!DOCTYPE html>
@@ -614,51 +642,58 @@ async def view_resume(candidate_id: str):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resume - {filename}</title>
     <style>
+        * {{
+            box-sizing: border-box;
+        }}
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #e5e7eb;
-            background-color: #1f2937;
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.15;
+            color: #000000;
+            background-color: #ffffff;
+            padding: 0;
+            margin: 0;
+            font-size: 11pt;
         }}
         .resume-content {{
-            background-color: #374151;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            background-color: #ffffff;
+            padding: 0.5in;
+            max-width: 8.5in;
+            margin: 0 auto;
+            white-space: pre-wrap;
         }}
-        h1, h2, h3, h4, h5, h6 {{
-            color: #f3f4f6;
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
+        /* Preserve original formatting from DOCX */
+        .resume-content p {{
+            margin: 0;
+            padding: 0;
+            line-height: 1.15;
         }}
-        p {{
-            margin-bottom: 1em;
+        .resume-content h1, .resume-content h2, .resume-content h3, 
+        .resume-content h4, .resume-content h5, .resume-content h6 {{
+            margin: 0;
+            padding: 0;
+            font-weight: bold;
         }}
-        ul, ol {{
-            margin-left: 2em;
-            margin-bottom: 1em;
+        .resume-content ul, .resume-content ol {{
+            margin: 0;
+            padding-left: 0.5in;
         }}
-        li {{
-            margin-bottom: 0.5em;
+        .resume-content li {{
+            margin: 0;
+            padding: 0;
         }}
-        strong {{
-            color: #fbbf24;
-        }}
-        table {{
-            width: 100%;
+        .resume-content table {{
             border-collapse: collapse;
-            margin: 1em 0;
+            margin: 0;
+            width: 100%;
         }}
-        table td, table th {{
-            border: 1px solid #4b5563;
-            padding: 8px;
+        .resume-content table td, .resume-content table th {{
+            border: 1px solid #000000;
+            padding: 2pt;
+            vertical-align: top;
         }}
-        table th {{
-            background-color: #4b5563;
-            color: #f3f4f6;
+        /* Preserve inline styles from mammoth */
+        .resume-content [style] {{
+            /* Keep all inline styles as-is */
         }}
     </style>
 </head>
