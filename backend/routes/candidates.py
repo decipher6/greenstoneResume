@@ -858,16 +858,17 @@ async def download_resume(candidate_id: str):
             
             # Get file extension from GridFS filename
             file_ext = os.path.splitext(filename)[1] if filename else ".pdf"
-            # Ensure file_ext doesn't have leading/trailing underscores
-            file_ext = file_ext.strip('_')
+            # Ensure file_ext is clean (no leading/trailing spaces, dots, or underscores)
+            file_ext = file_ext.strip(' ._')
             
             # Create a better filename
-            if safe_name:
+            if safe_name and safe_name.strip():
                 download_filename = f"{safe_name}_resume{file_ext}"
             else:
                 download_filename = f"resume{file_ext}"
-            # Remove any trailing underscores from the final filename
-            download_filename = download_filename.rstrip('_')
+            
+            # Sanitize filename: remove trailing dots, spaces, and underscores (browsers convert these to underscores)
+            download_filename = download_filename.rstrip(' ._')
             
             return StreamingResponse(
                 BytesIO(file_content),
@@ -904,16 +905,17 @@ async def download_resume(candidate_id: str):
         
         # Get file extension from original filename
         file_ext = os.path.splitext(original_filename)[1] if original_filename else os.path.splitext(filename)[1]
-        # Ensure file_ext doesn't have leading/trailing underscores
-        file_ext = file_ext.strip('_')
+        # Ensure file_ext is clean (no leading/trailing spaces, dots, or underscores)
+        file_ext = file_ext.strip(' ._')
         
         # Create a better filename
-        if safe_name:
+        if safe_name and safe_name.strip():
             download_filename = f"{safe_name}_resume{file_ext}"
         else:
             download_filename = f"resume{file_ext}"
-        # Remove any trailing underscores from the final filename
-        download_filename = download_filename.rstrip('_')
+        
+        # Sanitize filename: remove trailing dots, spaces, and underscores (browsers convert these to underscores)
+        download_filename = download_filename.rstrip(' ._')
         
         return FileResponse(
             path=resume_file_path,
