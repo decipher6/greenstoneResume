@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star } from 'lucide-react'
+import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star, Copy, Check } from 'lucide-react'
 import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, updateCandidate } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
@@ -21,6 +21,9 @@ const CandidateProfile = () => {
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [showInterviewModal, setShowInterviewModal] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
+  const [copiedField, setCopiedField] = useState(null) // Track which field was copied
+  const [notes, setNotes] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
 
   useEffect(() => {
     fetchCandidate()
@@ -33,6 +36,7 @@ const CandidateProfile = () => {
       const response = await getCandidate(candidateId)
       const candidateData = response.data
       setCandidate(candidateData)
+      setNotes(candidateData.notes || '')
       
       // Fetch job data and all candidates for percentile calculation
       if (candidateData.job_id) {
@@ -445,7 +449,6 @@ const CandidateProfile = () => {
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                {tab === 'notes' && ' & Activity'}
               </button>
             ))}
           </div>
@@ -548,11 +551,57 @@ const CandidateProfile = () => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Mail size={20} className="text-gray-400 flex-shrink-0" />
-                      <span className="text-base font-medium text-white">{candidate.contact_info?.email || '-'}</span>
+                      <span className="text-base font-medium text-white flex-1">{candidate.contact_info?.email || '-'}</span>
+                      {candidate.contact_info?.email && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              await navigator.clipboard.writeText(candidate.contact_info.email)
+                              setCopiedField('email')
+                              await showAlert('Copied', 'Email copied to clipboard', 'success')
+                              setTimeout(() => setCopiedField(null), 2000)
+                            } catch (err) {
+                              await showAlert('Error', 'Failed to copy email', 'error')
+                            }
+                          }}
+                          className="p-2 hover:bg-white/10 rounded-lg transition-colors group"
+                          title="Copy email"
+                        >
+                          {copiedField === 'email' ? (
+                            <Check size={16} className="text-green-400" />
+                          ) : (
+                            <Copy size={16} className="text-gray-400 group-hover:text-white transition-colors" />
+                          )}
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <User size={20} className="text-gray-400 flex-shrink-0" />
-                      <span className="text-base font-medium text-white">{candidate.contact_info?.phone || '-'}</span>
+                      <span className="text-base font-medium text-white flex-1">{candidate.contact_info?.phone || '-'}</span>
+                      {candidate.contact_info?.phone && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              await navigator.clipboard.writeText(candidate.contact_info.phone)
+                              setCopiedField('phone')
+                              await showAlert('Copied', 'Phone number copied to clipboard', 'success')
+                              setTimeout(() => setCopiedField(null), 2000)
+                            } catch (err) {
+                              await showAlert('Error', 'Failed to copy phone number', 'error')
+                            }
+                          }}
+                          className="p-2 hover:bg-white/10 rounded-lg transition-colors group"
+                          title="Copy phone number"
+                        >
+                          {copiedField === 'phone' ? (
+                            <Check size={16} className="text-green-400" />
+                          ) : (
+                            <Copy size={16} className="text-gray-400 group-hover:text-white transition-colors" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -739,8 +788,35 @@ const CandidateProfile = () => {
 
           {activeTab === 'notes' && (
             <div className="glass-card p-6">
-              <h3 className="text-lg font-semibold mb-4">Notes & Activity</h3>
-              <p className="text-gray-400 text-sm">Activity log and notes feature coming soon.</p>
+              <h3 className="text-lg font-semibold mb-4">Notes</h3>
+              <textarea
+                value={notes}
+                onChange={(e) => {
+                  setNotes(e.target.value)
+                }}
+                onBlur={async () => {
+                  if (notes !== (candidate?.notes || '')) {
+                    setSavingNotes(true)
+                    try {
+                      await updateCandidate(candidateId, { notes })
+                      setCandidate(prev => prev ? { ...prev, notes } : prev)
+                    } catch (error) {
+                      console.error('Error saving notes:', error)
+                      await showAlert('Error', 'Failed to save notes. Please try again.', 'error')
+                      // Revert to original notes
+                      setNotes(candidate?.notes || '')
+                    } finally {
+                      setSavingNotes(false)
+                    }
+                  }
+                }}
+                placeholder="Add your notes about this candidate..."
+                className="w-full min-h-[300px] glass-input resize-y p-4 text-sm text-white placeholder-gray-500"
+                disabled={savingNotes}
+              />
+              {savingNotes && (
+                <p className="text-xs text-gray-400 mt-2">Saving notes...</p>
+              )}
             </div>
           )}
         </div>

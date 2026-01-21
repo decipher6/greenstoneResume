@@ -87,6 +87,7 @@ class Candidate(BaseModel):
     criterion_scores: Optional[List[CriterionScore]] = None
     personality_profile: Optional[PersonalityTraits] = None
     ai_justification: Optional[str] = None
+    notes: Optional[str] = None  # Hiring manager notes
     created_at: Optional[datetime] = None
     analyzed_at: Optional[datetime] = None
 

@@ -37,7 +37,7 @@ const Signup = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a0a0f] to-[#1a1a2e] p-4">
+    <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-[#0a0a0f] to-[#1a1a2e] p-4 overflow-auto">
       <div className="glass-card w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="flex flex-col items-center gap-3 mb-4">
@@ -47,11 +47,11 @@ const Signup = () => {
               className="w-32 h-32 object-contain"
             />
             <div className="text-center">
-              <p className="text-xs text-gray-400">Talent Management AI</p>
+              <p className="text-xs text-gray-400">AI Resume Checker</p>
             </div>
           </div>
           <h1 className="text-3xl font-bold mb-2">Create Account</h1>
-          <p className="text-gray-400">Sign up for Greenstone Talent AI</p>
+          <p className="text-gray-400">Sign up for Greenstone AI Resume Checker</p>
         </div>
 
         {error && (

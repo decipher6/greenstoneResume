@@ -31,7 +31,7 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a0a0f] to-[#1a1a2e] p-4">
+    <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-[#0a0a0f] to-[#1a1a2e] p-4 overflow-auto">
       <div className="glass-card w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="flex flex-col items-center gap-3 mb-4">
@@ -40,11 +40,8 @@ const Login = () => {
               alt="Greenstone Logo" 
               className="w-32 h-32 object-contain"
             />
-            <div className="text-center">
-              <p className="text-xs text-gray-400">Talent Management AI</p>
-            </div>
           </div>
-          <h1 className="text-3xl font-bold mb-2">Greenstone Talent AI</h1>
+          <h1 className="text-3xl font-bold mb-2">AI Resume Checker</h1>
           <p className="text-gray-400">Sign in to your account</p>
         </div>
 

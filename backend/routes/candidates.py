@@ -415,6 +415,9 @@ async def update_candidate(candidate_id: str, update_data: dict = Body(...), use
             raise HTTPException(status_code=400, detail="Rating must be an integer between 1 and 5")
         update_fields["rating"] = rating
     
+    if "notes" in update_data:
+        update_fields["notes"] = update_data["notes"]
+    
     if not update_fields:
         raise HTTPException(status_code=400, detail="No valid fields to update")
     

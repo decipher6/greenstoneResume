@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Upload, Sparkles, Eye, Trash2, CheckCircle, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw, ArrowUpDown } from 'lucide-react'
+import { Upload, Sparkles, Eye, Trash2, CheckCircle, Search, X, FileText, XCircle, Edit, Save, ArrowLeft, Star, RefreshCw, ArrowUpDown, Copy, Check } from 'lucide-react'
 import { 
   getJob, getCandidates, uploadCandidatesBulk, 
   runAnalysis, deleteCandidate, getTopCandidates, updateCandidate, shortlistCandidate, reAnalyzeCandidate
@@ -43,6 +43,7 @@ const JobDetail = () => {
   })
   const [activeTab, setActiveTab] = useState('candidates') // 'description', 'candidates', or 'shortlist'
   const [shortlistedCandidates, setShortlistedCandidates] = useState([])
+  const [copiedField, setCopiedField] = useState(null) // Track which field was copied: 'candidateId-email' or 'candidateId-phone'
   
   // Use ref to always get the latest nameSearch value
   const nameSearchRef = useRef(nameSearch)
@@ -887,15 +888,15 @@ const JobDetail = () => {
 
       {/* Tab Content */}
       {activeTab === 'description' && (
-        <div className="space-y-6">
-          {/* Job Description */}
-          <div className="glass-card p-6">
+        <div className="flex gap-6">
+          {/* Job Description - 60% width */}
+          <div className="glass-card p-6 flex-[0.6]">
             <h3 className="text-lg font-semibold mb-4">Job Description</h3>
             <p className="text-gray-300 text-sm whitespace-pre-wrap">{job.description}</p>
           </div>
 
-          {/* Evaluation Criteria */}
-          <div className="glass-card p-6">
+          {/* Evaluation Criteria - 40% width */}
+          <div className="glass-card p-6 flex-[0.4]">
             <h3 className="text-lg font-semibold mb-4">Evaluation Criteria</h3>
             <div className="space-y-4">
               {job.evaluation_criteria?.map((criterion, index) => (
@@ -1274,9 +1275,34 @@ const JobDetail = () => {
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <span className="text-gray-400">
-                      {candidate.contact_info?.email || '-'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 flex-1">
+                        {candidate.contact_info?.email || '-'}
+                      </span>
+                      {candidate.contact_info?.email && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              await navigator.clipboard.writeText(candidate.contact_info.email)
+                              setCopiedField(`${candidate.id}-email`)
+                              await showAlert('Copied', 'Email copied to clipboard', 'success')
+                              setTimeout(() => setCopiedField(null), 2000)
+                            } catch (err) {
+                              await showAlert('Error', 'Failed to copy email', 'error')
+                            }
+                          }}
+                          className="p-1.5 hover:bg-white/10 rounded transition-colors group"
+                          title="Copy email"
+                        >
+                          {copiedField === `${candidate.id}-email` ? (
+                            <Check size={14} className="text-green-400" />
+                          ) : (
+                            <Copy size={14} className="text-gray-400 group-hover:text-white transition-colors" />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </td>
                 <td className="px-6 py-4">
@@ -1289,9 +1315,34 @@ const JobDetail = () => {
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <span className="text-gray-400">
-                      {candidate.contact_info?.phone || '-'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 flex-1">
+                        {candidate.contact_info?.phone || '-'}
+                      </span>
+                      {candidate.contact_info?.phone && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              await navigator.clipboard.writeText(candidate.contact_info.phone)
+                              setCopiedField(`${candidate.id}-phone`)
+                              await showAlert('Copied', 'Phone number copied to clipboard', 'success')
+                              setTimeout(() => setCopiedField(null), 2000)
+                            } catch (err) {
+                              await showAlert('Error', 'Failed to copy phone number', 'error')
+                            }
+                          }}
+                          className="p-1.5 hover:bg-white/10 rounded transition-colors group"
+                          title="Copy phone number"
+                        >
+                          {copiedField === `${candidate.id}-phone` ? (
+                            <Check size={14} className="text-green-400" />
+                          ) : (
+                            <Copy size={14} className="text-gray-400 group-hover:text-white transition-colors" />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </td>
                 <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
@@ -1331,7 +1382,10 @@ const JobDetail = () => {
                 </td>
                 <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   {candidate.score_breakdown?.resume_score ? (
-                    <span className="font-semibold">
+                    <span 
+                      className="font-semibold"
+                      title="Maximum score is 10"
+                    >
                       {parseFloat(candidate.score_breakdown.resume_score).toFixed(1)}
                     </span>
                   ) : (
@@ -1435,14 +1489,64 @@ const JobDetail = () => {
                         <span className="font-medium">{candidate.name}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-gray-400">
-                          {candidate.contact_info?.email || '-'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 flex-1">
+                            {candidate.contact_info?.email || '-'}
+                          </span>
+                          {candidate.contact_info?.email && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                try {
+                                  await navigator.clipboard.writeText(candidate.contact_info.email)
+                                  setCopiedField(`${candidate.id}-email`)
+                                  await showAlert('Copied', 'Email copied to clipboard', 'success')
+                                  setTimeout(() => setCopiedField(null), 2000)
+                                } catch (err) {
+                                  await showAlert('Error', 'Failed to copy email', 'error')
+                                }
+                              }}
+                              className="p-1.5 hover:bg-white/10 rounded transition-colors group"
+                              title="Copy email"
+                            >
+                              {copiedField === `${candidate.id}-email` ? (
+                                <Check size={14} className="text-green-400" />
+                              ) : (
+                                <Copy size={14} className="text-gray-400 group-hover:text-white transition-colors" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-gray-400">
-                          {candidate.contact_info?.phone || '-'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 flex-1">
+                            {candidate.contact_info?.phone || '-'}
+                          </span>
+                          {candidate.contact_info?.phone && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                try {
+                                  await navigator.clipboard.writeText(candidate.contact_info.phone)
+                                  setCopiedField(`${candidate.id}-phone`)
+                                  await showAlert('Copied', 'Phone number copied to clipboard', 'success')
+                                  setTimeout(() => setCopiedField(null), 2000)
+                                } catch (err) {
+                                  await showAlert('Error', 'Failed to copy phone number', 'error')
+                                }
+                              }}
+                              className="p-1.5 hover:bg-white/10 rounded transition-colors group"
+                              title="Copy phone number"
+                            >
+                              {copiedField === `${candidate.id}-phone` ? (
+                                <Check size={14} className="text-green-400" />
+                              ) : (
+                                <Copy size={14} className="text-gray-400 group-hover:text-white transition-colors" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-0.5">
@@ -1470,7 +1574,10 @@ const JobDetail = () => {
                       </td>
                       <td className="px-6 py-4">
                         {candidate.score_breakdown?.resume_score ? (
-                          <span className="font-semibold">
+                          <span 
+                            className="font-semibold"
+                            title="Maximum score is 10"
+                          >
                             {parseFloat(candidate.score_breakdown.resume_score).toFixed(1)}
                           </span>
                         ) : (

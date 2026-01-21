@@ -176,78 +176,156 @@ const ActivityLogs = () => {
 
   const getTimelineIcon = (log) => {
     const description = log.description?.toLowerCase() || ''
+    const action = log.action?.toLowerCase() || ''
     const entityType = log.entity_type?.toLowerCase() || ''
     
-    // Check description for specific actions
-    if (description.includes('logged in') || description.includes('login')) {
+    // Email actions
+    if (entityType === 'email' || description.includes('email') || description.includes('sent')) {
+      if (description.includes('interview') || description.includes('invitation') || action.includes('interview')) {
+        return <Mail size={16} className="text-green-400" />
+      }
+      if (description.includes('rejection') || description.includes('reject') || action.includes('rejection')) {
+        return <Mail size={16} className="text-red-400" />
+      }
+      // Default email icon
+      return <Mail size={16} className="text-green-400" />
+    }
+    
+    // Candidate actions
+    if (entityType === 'candidate' || description.includes('candidate')) {
+      if (description.includes('deleted') || description.includes('delete') || action.includes('delete')) {
+        return <Trash2 size={16} className="text-red-400" />
+      }
+      if (description.includes('uploaded') || description.includes('upload') || description.includes('added') || description.includes('update') || action.includes('upload') || action.includes('create') || action.includes('update')) {
+        return <UserPlus size={16} className="text-yellow-400" />
+      }
+      return <UserPlus size={16} className="text-yellow-400" />
+    }
+    
+    // Login actions
+    if (description.includes('logged in') || description.includes('login') || action.includes('login') || entityType === 'login') {
       return <LogIn size={16} className="text-blue-400" />
     }
+    
+    // Job actions
+    if (entityType === 'job' || description.includes('job')) {
+      if (description.includes('deleted') || description.includes('delete') || action.includes('delete')) {
+        return <Trash2 size={16} className="text-red-400" />
+      }
+      if (description.includes('created') || description.includes('create') || action.includes('create')) {
+        return <Briefcase size={16} className="text-green-400" />
+      }
+      return <Briefcase size={16} className="text-green-400" />
+    }
+    
+    // Fallback
     if (description.includes('deleted') || description.includes('delete')) {
       return <Trash2 size={16} className="text-red-400" />
     }
-    if (description.includes('uploaded') || description.includes('upload')) {
-      return <Upload size={16} className="text-green-300" />
-    }
-    if (description.includes('completed') || description.includes('complete')) {
-      return <CheckCircle size={16} className="text-green-300" />
-    }
-    if (description.includes('started') || description.includes('start')) {
-      return <PlayCircle size={16} className="text-blue-400" />
-    }
-    if (description.includes('email') || description.includes('sent')) {
-      return <Mail size={16} className="text-purple-400" />
-    }
     
-    // Fallback to entity type
-    switch (entityType) {
-      case 'job':
-        return <Briefcase size={16} className="text-blue-400" />
-      case 'candidate':
-        return <UserPlus size={16} className="text-green-300" />
-      case 'email':
-        return <Mail size={16} className="text-purple-400" />
-      case 'assessment':
-        return <FileCheck size={16} className="text-orange-400" />
-      default:
-        return <FileText size={16} className="text-gray-400" />
-    }
+    return <FileText size={16} className="text-gray-400" />
   }
 
   const getTimelineIconBg = (log) => {
     const description = log.description?.toLowerCase() || ''
+    const action = log.action?.toLowerCase() || ''
     const entityType = log.entity_type?.toLowerCase() || ''
     
-    if (description.includes('logged in') || description.includes('login')) {
+    // Email actions
+    if (entityType === 'email' || description.includes('email') || description.includes('sent')) {
+      if (description.includes('interview') || description.includes('invitation') || action.includes('interview')) {
+        return 'bg-green-500/20'
+      }
+      if (description.includes('rejection') || description.includes('reject') || action.includes('rejection')) {
+        return 'bg-red-500/20'
+      }
+      return 'bg-green-500/20'
+    }
+    
+    // Candidate actions
+    if (entityType === 'candidate' || description.includes('candidate')) {
+      if (description.includes('deleted') || description.includes('delete') || action.includes('delete')) {
+        return 'bg-red-500/20'
+      }
+      if (description.includes('uploaded') || description.includes('upload') || description.includes('added') || description.includes('update') || action.includes('upload') || action.includes('create') || action.includes('update')) {
+        return 'bg-yellow-500/20'
+      }
+      return 'bg-yellow-500/20'
+    }
+    
+    // Login actions
+    if (description.includes('logged in') || description.includes('login') || action.includes('login') || entityType === 'login') {
       return 'bg-blue-500/20'
     }
+    
+    // Job actions
+    if (entityType === 'job' || description.includes('job')) {
+      if (description.includes('deleted') || description.includes('delete') || action.includes('delete')) {
+        return 'bg-red-500/20'
+      }
+      if (description.includes('created') || description.includes('create') || action.includes('create')) {
+        return 'bg-green-500/20'
+      }
+      return 'bg-green-500/20'
+    }
+    
+    // Fallback
     if (description.includes('deleted') || description.includes('delete')) {
       return 'bg-red-500/20'
     }
-    if (description.includes('uploaded') || description.includes('upload')) {
-      return 'bg-green-400/40'
-    }
-    if (description.includes('completed') || description.includes('complete')) {
-      return 'bg-green-400/40'
-    }
-    if (description.includes('started') || description.includes('start')) {
-      return 'bg-blue-500/20'
-    }
-    if (description.includes('email') || description.includes('sent')) {
-      return 'bg-purple-500/20'
+    
+    return 'bg-gray-500/20'
+  }
+
+  const getCardTintColor = (log) => {
+    const description = log.description?.toLowerCase() || ''
+    const action = log.action?.toLowerCase() || ''
+    const entityType = log.entity_type?.toLowerCase() || ''
+    
+    // Email actions
+    if (entityType === 'email' || description.includes('email') || description.includes('sent')) {
+      if (description.includes('interview') || description.includes('invitation') || action.includes('interview')) {
+        return 'border-green-500/30 bg-green-500/5'
+      }
+      if (description.includes('rejection') || description.includes('reject') || action.includes('rejection')) {
+        return 'border-red-500/30 bg-red-500/5'
+      }
+      return 'border-green-500/30 bg-green-500/5'
     }
     
-    switch (entityType) {
-      case 'job':
-        return 'bg-blue-500/20'
-      case 'candidate':
-        return 'bg-green-400/40'
-      case 'email':
-        return 'bg-purple-500/20'
-      case 'assessment':
-        return 'bg-orange-500/20'
-      default:
-        return 'bg-gray-500/20'
+    // Candidate actions
+    if (entityType === 'candidate' || description.includes('candidate')) {
+      if (description.includes('deleted') || description.includes('delete') || action.includes('delete')) {
+        return 'border-red-500/30 bg-red-500/5'
+      }
+      if (description.includes('uploaded') || description.includes('upload') || description.includes('added') || description.includes('update') || action.includes('upload') || action.includes('create') || action.includes('update')) {
+        return 'border-yellow-500/30 bg-yellow-500/5'
+      }
+      return 'border-yellow-500/30 bg-yellow-500/5'
     }
+    
+    // Login actions
+    if (description.includes('logged in') || description.includes('login') || action.includes('login') || entityType === 'login') {
+      return 'border-blue-500/30 bg-blue-500/5'
+    }
+    
+    // Job actions
+    if (entityType === 'job' || description.includes('job')) {
+      if (description.includes('deleted') || description.includes('delete') || action.includes('delete')) {
+        return 'border-red-500/30 bg-red-500/5'
+      }
+      if (description.includes('created') || description.includes('create') || action.includes('create')) {
+        return 'border-green-500/30 bg-green-500/5'
+      }
+      return 'border-green-500/30 bg-green-500/5'
+    }
+    
+    // Fallback
+    if (description.includes('deleted') || description.includes('delete')) {
+      return 'border-red-500/30 bg-red-500/5'
+    }
+    
+    return 'border-gray-700 bg-white/5'
   }
 
   const getUserInitials = (name) => {
@@ -528,9 +606,13 @@ const ActivityLogs = () => {
                     
                     {/* Card content */}
                     <div className="flex-1">
-                      <div className="bg-white/5 border border-gray-700 rounded-lg p-3 hover:bg-white/10 transition-colors">
+                      <div className={`border rounded-lg p-3 transition-colors ${getCardTintColor(log)} hover:opacity-80`}>
                         {/* User info and description in one row */}
                         <div className="flex items-center gap-3">
+                          {/* Icon */}
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${getTimelineIconBg(log)}`}>
+                            {getTimelineIcon(log)}
+                          </div>
                           {log.user_name ? (
                             <div className="w-7 h-7 rounded-full bg-primary-500 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
                               {getUserInitials(log.user_name)}
