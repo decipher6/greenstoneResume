@@ -163,7 +163,7 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
 async def upload_candidates_bulk(
     job_id: str = Form(...),
     files: List[UploadFile] = File(...),
-    background_tasks: BackgroundTasks,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """Upload multiple candidate CVs (processes in parallel batches for performance)"""
@@ -283,10 +283,13 @@ async def upload_candidates_bulk(
             if batch_candidates:
                 try:
                     insert_results = await db.candidates.insert_many(batch_candidates)
-                    # Add IDs to candidate dicts
+                    # Add IDs to candidate dicts and trigger analysis for each
                     for idx, candidate_dict in enumerate(batch_candidates):
-                        candidate_dict["id"] = str(insert_results.inserted_ids[idx])
+                        candidate_id = str(insert_results.inserted_ids[idx])
+                        candidate_dict["id"] = candidate_id
                         uploaded_candidates.append(Candidate(**candidate_dict))
+                        # Trigger analysis in background for each candidate
+                        background_tasks.add_task(process_candidate_analysis, job_id, candidate_id)
                 except Exception as e:
                     error_msg = str(e)
                     print(f"Error bulk inserting candidates: {error_msg}")
@@ -296,8 +299,11 @@ async def upload_candidates_bulk(
                     for candidate_dict in batch_candidates:
                         try:
                             result = await db.candidates.insert_one(candidate_dict)
-                            candidate_dict["id"] = str(result.inserted_id)
+                            candidate_id = str(result.inserted_id)
+                            candidate_dict["id"] = candidate_id
                             uploaded_candidates.append(Candidate(**candidate_dict))
+                            # Trigger analysis in background for each candidate
+                            background_tasks.add_task(process_candidate_analysis, job_id, candidate_id)
                         except Exception as e2:
                             error_msg2 = str(e2)
                             print(f"Error inserting candidate {candidate_dict.get('name', 'unknown')}: {error_msg2}")
@@ -329,79 +335,6 @@ async def upload_candidates_bulk(
             )
         except Exception as e:
             print(f"Error logging activity: {e}")
-        
-        # Automatically trigger analysis for all uploaded candidates
-        if uploaded_candidates:
-            candidate_ids = [c.id for c in uploaded_candidates if hasattr(c, 'id') and c.id]
-            
-            async def run_auto_analysis():
-                """Run analysis for all uploaded candidates in parallel batches"""
-                db = get_db()
-                
-                if not candidate_ids:
-                    return
-                
-                # Limit concurrent analyses to avoid overwhelming the API
-                semaphore = asyncio.Semaphore(5)
-                BATCH_SIZE = 20
-                total_candidates = len(candidate_ids)
-                processed = 0
-                failed = 0
-                
-                async def analyze_with_semaphore(candidate_id: str):
-                    nonlocal processed, failed
-                    async with semaphore:
-                        try:
-                            await process_candidate_analysis(job_id, candidate_id)
-                            processed += 1
-                            if processed % 10 == 0:
-                                print(f"Auto-analysis progress: {processed}/{total_candidates} candidates analyzed")
-                        except Exception as e:
-                            failed += 1
-                            print(f"Error in auto-analysis for candidate {candidate_id}: {e}")
-                            import traceback
-                            traceback.print_exc()
-                
-                # Process in batches
-                for batch_start in range(0, total_candidates, BATCH_SIZE):
-                    batch = candidate_ids[batch_start:batch_start + BATCH_SIZE]
-                    batch_num = (batch_start // BATCH_SIZE) + 1
-                    total_batches = (total_candidates + BATCH_SIZE - 1) // BATCH_SIZE
-                    
-                    print(f"Auto-analysis batch {batch_num}/{total_batches} ({len(batch)} candidates)")
-                    
-                    tasks = [analyze_with_semaphore(cid) for cid in batch]
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-                    
-                    # Log any exceptions
-                    for i, result in enumerate(results):
-                        if isinstance(result, Exception):
-                            failed += 1
-                            print(f"Auto-analysis exception for candidate {batch[i]}: {result}")
-                    
-                    # Small delay between batches
-                    if batch_start + BATCH_SIZE < total_candidates:
-                        await asyncio.sleep(1)
-                
-                print(f"Auto-analysis complete: {processed} succeeded, {failed} failed out of {total_candidates} total")
-                
-                # Log activity for analysis completion
-                try:
-                    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
-                    await log_activity(
-                        action="auto_analysis_completed",
-                        entity_type="job",
-                        description=f"Auto-analysis completed for {processed} candidate(s) in job: {job.get('title', 'Unknown') if job else 'Unknown'}",
-                        entity_id=job_id,
-                        user_id=user_id,
-                        metadata={"processed": processed, "failed": failed, "total": total_candidates}
-                    )
-                except Exception as e:
-                    print(f"Error logging auto-analysis activity: {e}")
-            
-            # Start analysis in background
-            background_tasks.add_task(run_auto_analysis)
-            print(f"Started auto-analysis for {len(candidate_ids)} uploaded candidate(s)")
         
         response = {
             "uploaded": len(uploaded_candidates),
