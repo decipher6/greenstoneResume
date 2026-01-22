@@ -325,30 +325,34 @@ const JobDetail = () => {
       }
       
       setPendingFiles([])
-      
-      // Refresh data immediately to show uploaded candidates in table
-      await fetchData()
+      fetchData()
       refreshStats() // Refresh dashboard stats
       refreshJobStats() // Refresh job-specific stats
       
-      // Auto-analyze immediately if we have uploaded candidates
-      // Analysis should start as soon as candidates appear in the table
-      if (totalUploaded > 0) {
-        // Start analysis immediately - no delay needed since we just uploaded
+      // Auto-analyze immediately if setting is enabled and we have uploaded candidates
+      if (autoAnalyze && totalUploaded > 0) {
+        // Start analysis immediately - use a small delay only to ensure database has processed the uploads
         const startAnalysis = async (retryCount = 0) => {
           try {
             console.log(`Starting auto-analysis for ${totalUploaded} uploaded candidate(s)... (attempt ${retryCount + 1})`)
-            
-            // Trigger analysis for all uploaded candidates
             await runAnalysis(jobId, false) // false = only analyze new candidates (uploaded status)
             console.log('Auto-analysis started successfully')
             
-            // Start polling immediately to show candidates being analyzed
+            // Show notification that analysis has started (only on first attempt to avoid spam)
+            if (retryCount === 0) {
+              await showAlert(
+                'Analysis Started', 
+                `Auto-analysis started for ${totalUploaded} candidate(s)! Results will appear shortly.`,
+                'info'
+              )
+            }
+            
+            // Poll for updates to show progress
             let pollCount = 0
-            const maxPolls = 40 // Poll for up to 2 minutes (40 * 3s) to catch all analysis completions
+            const maxPolls = 20 // Poll for up to 60 seconds (20 * 3s)
             const refreshInterval = setInterval(async () => {
               pollCount++
-              await fetchData() // Refresh table to show analysis progress
+              await fetchData()
               refreshJobStats() // Refresh job stats during polling
               
               // Stop polling after max time
@@ -359,23 +363,27 @@ const JobDetail = () => {
                 refreshJobStats()
                 console.log('Stopped polling for analysis updates')
               }
-            }, 3000) // Poll every 3 seconds to update table in real-time
+            }, 3000) // Poll every 3 seconds
           } catch (error) {
             console.error(`Error starting auto-analysis (attempt ${retryCount + 1}):`, error)
             
             // Retry once after a short delay if first attempt fails (might be database delay)
             if (retryCount === 0) {
               console.log('Retrying auto-analysis after short delay...')
-              setTimeout(() => startAnalysis(1), 1000) // Retry after 1 second
+              setTimeout(() => startAnalysis(1), 2000) // Retry after 2 seconds
             } else {
-              // Both attempts failed - show error but don't block user
-              console.error('Auto-analysis failed after retries')
+              // Both attempts failed
+              await showAlert(
+                'Analysis Error', 
+                'Failed to start auto-analysis. You can manually trigger analysis using the "Run Analysis" button.',
+                'error'
+              )
             }
           }
         }
         
-        // Start analysis immediately - no delay since upload just completed
-        startAnalysis(0)
+        // Start analysis with a small initial delay to ensure database has processed uploads
+        setTimeout(() => startAnalysis(0), 500)
       }
     } catch (error) {
       console.error('Error uploading files:', error)

@@ -163,7 +163,6 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
 async def upload_candidates_bulk(
     job_id: str = Form(...),
     files: List[UploadFile] = File(...),
-    background_tasks: BackgroundTasks,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """Upload multiple candidate CVs (processes in parallel batches for performance)"""
@@ -329,19 +328,6 @@ async def upload_candidates_bulk(
             )
         except Exception as e:
             print(f"Error logging activity: {e}")
-        
-        # Automatically trigger analysis for all uploaded candidates
-        if uploaded_candidates:
-            print(f"Auto-starting analysis for {len(uploaded_candidates)} uploaded candidate(s)...")
-            for candidate in uploaded_candidates:
-                # Extract candidate ID - Candidate objects have an 'id' attribute
-                candidate_id = candidate.id if hasattr(candidate, 'id') and candidate.id else None
-                if candidate_id:
-                    # Trigger analysis in background for each candidate
-                    background_tasks.add_task(process_candidate_analysis, job_id, candidate_id)
-                    if DEBUG:
-                        print(f"Queued analysis for candidate {candidate.name} (ID: {candidate_id})")
-            print(f"Analysis queued for {len(uploaded_candidates)} candidate(s)")
         
         response = {
             "uploaded": len(uploaded_candidates),

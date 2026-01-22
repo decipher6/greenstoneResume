@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Brain, Mail, Upload, RefreshCw, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star, Copy, Check, Download } from 'lucide-react'
-import { getCandidate, uploadCandidateAssessments, deleteCandidate, getJob, getCandidates, updateCandidate, downloadCandidateResume, viewCandidateResume, getCandidateResumeFileInfo } from '../services/api'
+import { getCandidate, uploadCandidateAssessments, reAnalyzeCandidate, deleteCandidate, getJob, getCandidates, updateCandidate, downloadCandidateResume, viewCandidateResume, getCandidateResumeFileInfo } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
 import SendEmailModal from '../components/SendEmailModal'
@@ -17,6 +17,7 @@ const CandidateProfile = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [reAnalyzing, setReAnalyzing] = useState(false)
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [showInterviewModal, setShowInterviewModal] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
@@ -149,6 +150,53 @@ const CandidateProfile = () => {
     }
   }
 
+  const handleReAnalyze = async () => {
+    const confirmed = await showConfirm({
+      title: 'Re-analyze Candidate',
+      message: 'Re-analyze this candidate with updated AI scoring? This will update all scores and justifications.',
+      type: 'info',
+      confirmText: 'Re-analyze',
+      cancelText: 'Cancel'
+    })
+    
+    if (!confirmed) {
+      return
+    }
+
+    setReAnalyzing(true)
+    try {
+      await reAnalyzeCandidate(candidateId)
+      await showAlert('Re-analysis Started', 'Re-analysis started! The page will auto-refresh to show updated scores.', 'success')
+      
+      // Poll for updates every 2 seconds
+      const refreshInterval = setInterval(async () => {
+        try {
+          await fetchCandidate()
+          // Check if analysis is complete
+          const currentCandidate = await getCandidate(candidateId).then(r => r.data)
+          if (currentCandidate.status === 'analyzed') {
+            clearInterval(refreshInterval)
+            setReAnalyzing(false)
+            // Final refresh to show updated data
+            await fetchCandidate()
+          }
+        } catch (error) {
+          console.error('Error polling for updates:', error)
+        }
+      }, 2000)
+      
+      // Stop polling after 2 minutes
+      setTimeout(() => {
+        clearInterval(refreshInterval)
+        setReAnalyzing(false)
+        fetchCandidate()
+      }, 120000)
+    } catch (error) {
+      console.error('Error re-analyzing candidate:', error)
+      await showAlert('Error', 'Error starting re-analysis. Please try again.', 'error')
+      setReAnalyzing(false)
+    }
+  }
 
   const handleRating = async (rating) => {
     // Optimistic update - update UI immediately
@@ -727,6 +775,14 @@ const CandidateProfile = () => {
                         </div>
                       )}
                     </div>
+                    <button
+                      onClick={handleReAnalyze}
+                      disabled={reAnalyzing}
+                      className="glass-button-secondary w-full flex items-center justify-center gap-2 text-sm text-primary-400 hover:bg-primary-500/20 border-primary-500/30"
+                    >
+                      <RefreshCw size={16} className={reAnalyzing ? 'animate-spin' : ''} />
+                      {reAnalyzing ? 'Re-analyzing...' : 'Re-analyze'}
+                    </button>
                     <button
                       onClick={() => setShowEmailModal(true)}
                       className="glass-button-secondary w-full flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 border-red-500/30"
