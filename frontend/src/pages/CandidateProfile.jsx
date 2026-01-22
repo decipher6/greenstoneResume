@@ -347,6 +347,22 @@ const CandidateProfile = () => {
     }
   }
 
+  // Helper function to get ordinal suffix (st, nd, rd, th)
+  const getOrdinalSuffix = (num) => {
+    const j = num % 10
+    const k = num % 100
+    if (j === 1 && k !== 11) {
+      return 'st'
+    }
+    if (j === 2 && k !== 12) {
+      return 'nd'
+    }
+    if (j === 3 && k !== 13) {
+      return 'rd'
+    }
+    return 'th'
+  }
+
   // Calculate percentile ranking
   const calculatePercentile = () => {
     if (!allCandidates || allCandidates.length === 0 || !candidate?.score_breakdown?.overall_score) {
@@ -608,10 +624,10 @@ const CandidateProfile = () => {
                     <div className="mb-6 pt-6 border-t border-glass-200">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-300">Percentile Ranking</span>
-                        <span className="text-xl font-bold text-green-200">{percentile}th</span>
+                        <span className="text-xl font-bold text-green-200">{percentile}{getOrdinalSuffix(percentile)}</span>
                       </div>
                       <p className="text-xs text-gray-300 mt-1">
-                        This candidate ranks in the {percentile}th percentile among all applicants for this position.
+                        This candidate ranks in the {percentile}{getOrdinalSuffix(percentile)} percentile among all applicants for this position.
                       </p>
                     </div>
                   )}
