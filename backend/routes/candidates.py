@@ -163,6 +163,7 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
 async def upload_candidates_bulk(
     job_id: str = Form(...),
     files: List[UploadFile] = File(...),
+    background_tasks: BackgroundTasks,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """Upload multiple candidate CVs (processes in parallel batches for performance)"""
@@ -185,6 +186,7 @@ async def upload_candidates_bulk(
         # Validate file formats - but don't fail entire upload, just mark invalid files
         allowed_extensions = ['.pdf', '.docx', '.doc']
         uploaded_candidates = []
+        uploaded_candidate_ids = []  # Track IDs for auto-analysis
         failed_files = []
         
         # Filter out invalid files upfront and add to failed_files
@@ -282,9 +284,11 @@ async def upload_candidates_bulk(
             if batch_candidates:
                 try:
                     insert_results = await db.candidates.insert_many(batch_candidates)
-                    # Add IDs to candidate dicts
+                    # Add IDs to candidate dicts and track for auto-analysis
                     for idx, candidate_dict in enumerate(batch_candidates):
-                        candidate_dict["id"] = str(insert_results.inserted_ids[idx])
+                        candidate_id = str(insert_results.inserted_ids[idx])
+                        candidate_dict["id"] = candidate_id
+                        uploaded_candidate_ids.append(candidate_id)
                         uploaded_candidates.append(Candidate(**candidate_dict))
                 except Exception as e:
                     error_msg = str(e)
@@ -295,7 +299,9 @@ async def upload_candidates_bulk(
                     for candidate_dict in batch_candidates:
                         try:
                             result = await db.candidates.insert_one(candidate_dict)
-                            candidate_dict["id"] = str(result.inserted_id)
+                            candidate_id = str(result.inserted_id)
+                            candidate_dict["id"] = candidate_id
+                            uploaded_candidate_ids.append(candidate_id)
                             uploaded_candidates.append(Candidate(**candidate_dict))
                         except Exception as e2:
                             error_msg2 = str(e2)
@@ -346,6 +352,89 @@ async def upload_candidates_bulk(
                     error_summary[error_type] = error_summary.get(error_type, 0) + 1
                 print(f"Upload summary: {len(uploaded_candidates)} succeeded, {len(failed_files)} failed")
                 print(f"Error types: {error_summary}")
+        
+        # Automatically start analysis for uploaded candidates
+        if uploaded_candidate_ids:
+            async def auto_analyze_uploaded_candidates():
+                """Automatically analyze all newly uploaded candidates in parallel batches"""
+                db = get_db()
+                import asyncio
+                from datetime import timedelta
+                
+                # Wait a short moment to ensure database consistency
+                await asyncio.sleep(0.5)
+                
+                # Re-fetch candidates to ensure they exist in DB
+                candidates_to_analyze = []
+                for candidate_id in uploaded_candidate_ids:
+                    try:
+                        candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+                        if candidate and candidate.get("status") == CandidateStatus.uploaded.value:
+                            candidates_to_analyze.append(candidate)
+                    except Exception as e:
+                        print(f"Error fetching candidate {candidate_id} for auto-analysis: {e}")
+                
+                if not candidates_to_analyze:
+                    print("No candidates found for auto-analysis")
+                    return
+                
+                print(f"Auto-starting analysis for {len(candidates_to_analyze)} uploaded candidate(s)")
+                
+                # Use same parallel batch processing as run_ai_analysis
+                semaphore = asyncio.Semaphore(5)  # Limit concurrent analyses
+                BATCH_SIZE = 20
+                total_candidates = len(candidates_to_analyze)
+                processed = 0
+                failed = 0
+                
+                async def analyze_with_semaphore(candidate_id: str, candidate_name: str = "Unknown"):
+                    nonlocal processed, failed
+                    async with semaphore:
+                        try:
+                            await process_candidate_analysis(job_id, candidate_id)
+                            processed += 1
+                            if processed % 10 == 0:
+                                print(f"Auto-analysis progress: {processed}/{total_candidates} candidates analyzed")
+                        except Exception as e:
+                            failed += 1
+                            print(f"Error in auto-analysis for candidate {candidate_name} ({candidate_id}): {e}")
+                            import traceback
+                            traceback.print_exc()
+                
+                # Process in batches
+                for batch_start in range(0, total_candidates, BATCH_SIZE):
+                    batch = candidates_to_analyze[batch_start:batch_start + BATCH_SIZE]
+                    batch_num = (batch_start // BATCH_SIZE) + 1
+                    total_batches = (total_candidates + BATCH_SIZE - 1) // BATCH_SIZE
+                    
+                    print(f"Processing auto-analysis batch {batch_num}/{total_batches} ({len(batch)} candidates)")
+                    
+                    tasks = [
+                        analyze_with_semaphore(
+                            str(candidate["_id"]),
+                            candidate.get("name", "Unknown")
+                        )
+                        for candidate in batch
+                    ]
+                    
+                    # Run batch with error handling
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    
+                    # Log any exceptions
+                    for i, result in enumerate(results):
+                        if isinstance(result, Exception):
+                            failed += 1
+                            print(f"Auto-analysis batch exception for candidate {batch[i].get('name', 'Unknown')}: {result}")
+                    
+                    # Small delay between batches
+                    if batch_start + BATCH_SIZE < total_candidates:
+                        await asyncio.sleep(1)
+                
+                print(f"Auto-analysis complete: {processed} succeeded, {failed} failed out of {total_candidates} total")
+            
+            # Start analysis in background
+            background_tasks.add_task(auto_analyze_uploaded_candidates)
+            print(f"Auto-analysis queued for {len(uploaded_candidate_ids)} candidate(s)")
         
         return response
     
