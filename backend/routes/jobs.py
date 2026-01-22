@@ -44,12 +44,12 @@ async def create_job(job: JobCreate, user_id: Optional[str] = Depends(get_curren
     """Create a new job post"""
     db = get_db()
     
-    # Validate weights sum to ~100
+    # Validate weights sum to ~100 (±1% tolerance)
     total_weight = sum(c.weight for c in job.evaluation_criteria)
-    if abs(total_weight - 100) > 5:  # Allow 5% tolerance
+    if abs(total_weight - 100) > 1:  # Allow 1% tolerance
         raise HTTPException(
             status_code=400, 
-            detail=f"Evaluation criteria weights should sum to approximately 100% (current: {total_weight}%)"
+            detail=f"Evaluation criteria weights should sum to 100% (within ±1% tolerance). Current total: {total_weight}%"
         )
     
     job_dict = job.dict()
