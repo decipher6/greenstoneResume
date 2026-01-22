@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { LayoutDashboard, User, LogOut, Clock, Briefcase, Users, PauseCircle, CheckCircle2, ArrowUpRight, FileText, Brain } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { StatsProvider } from '../context/StatsContext'
 import { getDashboardStats, getCandidates, getJob, getCandidate } from '../services/api'
 
 const Layout = ({ children, pageTitle, pageSubtitle }) => {
@@ -15,9 +16,27 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
 
   const isJobPage = location.pathname.startsWith('/jobs/')
   const isCandidatePage = location.pathname.startsWith('/candidates/')
+  const pollingIntervalRef = useRef(null)
 
+  // Fetch stats on mount and set up polling
   useEffect(() => {
     fetchStats()
+    
+    // Set up periodic polling every 10 seconds to keep stats fresh
+    pollingIntervalRef.current = setInterval(() => {
+      fetchStats()
+      if (isJobPage && params.jobId) {
+        fetchJobStats(params.jobId)
+      } else if (isCandidatePage && params.candidateId) {
+        fetchCandidateJobStats(params.candidateId)
+      }
+    }, 10000) // Poll every 10 seconds
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -112,7 +131,14 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
   const { title, subtitle } = getPageInfo()
 
   return (
-    <div className="flex min-h-screen h-full overflow-hidden">
+    <StatsProvider refreshStats={fetchStats} refreshJobStats={() => {
+      if (isJobPage && params.jobId) {
+        fetchJobStats(params.jobId)
+      } else if (isCandidatePage && params.candidateId) {
+        fetchCandidateJobStats(params.candidateId)
+      }
+    }}>
+      <div className="flex min-h-screen h-full overflow-hidden">
       {/* Sidebar */}
       <div 
         className={`glass-card m-4 rounded-2xl flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
@@ -262,7 +288,8 @@ const Layout = ({ children, pageTitle, pageSubtitle }) => {
           {children}
         </div>
       </div>
-    </div>
+      </div>
+    </StatsProvider>
   )
 }
 

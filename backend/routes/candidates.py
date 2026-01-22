@@ -1137,22 +1137,32 @@ async def delete_candidate(candidate_id: str, user_id: Optional[str] = Depends(g
     
     return {"message": "Candidate deleted successfully"}
 
-async def process_candidate_analysis(job_id: str, candidate_id: str):
-    """Background task to analyze a candidate"""
+async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count: int = 0):
+    """Background task to analyze a candidate with retry support"""
     db = get_db()
+    max_retries = 3
     
     candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
     if not candidate:
         return
     
+    # Skip if already analyzed (unless forced retry)
+    if candidate.get("status") == CandidateStatus.analyzed.value and retry_count == 0:
+        return
+    
     job = await db.jobs.find_one({"_id": ObjectId(job_id)})
     if not job:
+        # Reset status if job doesn't exist
+        await db.candidates.update_one(
+            {"_id": ObjectId(candidate_id)},
+            {"$set": {"status": CandidateStatus.uploaded.value}}
+        )
         return
     
     # Update status to analyzing
     await db.candidates.update_one(
         {"_id": ObjectId(candidate_id)},
-        {"$set": {"status": CandidateStatus.analyzing.value}}
+        {"$set": {"status": CandidateStatus.analyzing.value, "analysis_started_at": datetime.now()}}
     )
     
     try:
@@ -1334,9 +1344,27 @@ async def process_candidate_analysis(job_id: str, candidate_id: str):
         )
         
     except Exception as e:
-        print(f"Error analyzing candidate {candidate_id}: {e}")
-        await db.candidates.update_one(
-            {"_id": ObjectId(candidate_id)},
-            {"$set": {"status": CandidateStatus.uploaded.value}}
-        )
+        error_msg = str(e)
+        print(f"Error analyzing candidate {candidate_id}: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
+        # Retry logic: if we haven't exceeded max retries, reset to uploaded for retry
+        # Otherwise, mark as failed
+        if retry_count < max_retries:
+            print(f"Retrying analysis for candidate {candidate_id} (attempt {retry_count + 1}/{max_retries})")
+            await db.candidates.update_one(
+                {"_id": ObjectId(candidate_id)},
+                {"$set": {"status": CandidateStatus.uploaded.value, "analysis_error": error_msg}}
+            )
+            # Retry after a short delay
+            await asyncio.sleep(2 ** retry_count)  # Exponential backoff
+            await process_candidate_analysis(job_id, candidate_id, retry_count + 1)
+        else:
+            # Max retries exceeded, mark as failed but keep as uploaded so it can be manually retried
+            await db.candidates.update_one(
+                {"_id": ObjectId(candidate_id)},
+                {"$set": {"status": CandidateStatus.uploaded.value, "analysis_error": error_msg, "analysis_failed": True}}
+            )
+            print(f"Max retries exceeded for candidate {candidate_id}. Marked as failed.")
 

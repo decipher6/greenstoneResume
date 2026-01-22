@@ -142,26 +142,107 @@ async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force:
     
     # Process candidates in parallel batches for better performance
     import asyncio
+    from datetime import timedelta
     
     async def run_parallel_analysis():
-        """Run candidate analysis in parallel batches"""
-        # Limit concurrent analyses to avoid overwhelming the API
-        semaphore = asyncio.Semaphore(10)  # Process 10 candidates in parallel
+        """Run candidate analysis in parallel batches with recovery"""
+        db = get_db()
         
-        async def analyze_with_semaphore(candidate_id: str):
+        # First, recover any candidates stuck in "analyzing" status for more than 10 minutes
+        recovery_cutoff = datetime.now() - timedelta(minutes=10)
+        stuck_candidates = []
+        async for candidate in db.candidates.find({
+            "job_id": job_id,
+            "status": "analyzing",
+            "$or": [
+                {"analysis_started_at": {"$lt": recovery_cutoff}},
+                {"analysis_started_at": {"$exists": False}}
+            ]
+        }):
+            stuck_candidates.append(candidate)
+        
+        if stuck_candidates:
+            print(f"Recovering {len(stuck_candidates)} candidates stuck in analyzing status")
+            for stuck_candidate in stuck_candidates:
+                await db.candidates.update_one(
+                    {"_id": stuck_candidate["_id"]},
+                    {"$set": {"status": "uploaded"}, "$unset": {"analysis_started_at": ""}}
+                )
+            # Re-query to include recovered candidates
+            candidates = []
+            async for candidate in db.candidates.find(query):
+                candidates.append(candidate)
+        
+        if not candidates:
+            print("No candidates to analyze")
+            return
+        
+        # Limit concurrent analyses to avoid overwhelming the API
+        # Reduced from 10 to 5 for better stability with large batches
+        semaphore = asyncio.Semaphore(5)
+        
+        # Process in smaller batches to avoid timeouts
+        BATCH_SIZE = 20  # Process 20 candidates at a time
+        total_candidates = len(candidates)
+        processed = 0
+        failed = 0
+        
+        async def analyze_with_semaphore(candidate_id: str, candidate_name: str = "Unknown"):
+            nonlocal processed, failed
             async with semaphore:
                 try:
                     await process_candidate_analysis(job_id, candidate_id)
+                    processed += 1
+                    if processed % 10 == 0:
+                        print(f"Progress: {processed}/{total_candidates} candidates analyzed")
                 except Exception as e:
-                    print(f"Error analyzing candidate {candidate_id}: {e}")
+                    failed += 1
+                    print(f"Error analyzing candidate {candidate_name} ({candidate_id}): {e}")
                     import traceback
                     traceback.print_exc()
         
-        # Create tasks for all candidates
-        tasks = [analyze_with_semaphore(str(candidate["_id"])) for candidate in candidates]
+        # Process in batches to avoid overwhelming the system
+        for batch_start in range(0, total_candidates, BATCH_SIZE):
+            batch = candidates[batch_start:batch_start + BATCH_SIZE]
+            batch_num = (batch_start // BATCH_SIZE) + 1
+            total_batches = (total_candidates + BATCH_SIZE - 1) // BATCH_SIZE
+            
+            print(f"Processing analysis batch {batch_num}/{total_batches} ({len(batch)} candidates)")
+            
+            # Create tasks for this batch
+            tasks = [
+                analyze_with_semaphore(
+                    str(candidate["_id"]), 
+                    candidate.get("name", "Unknown")
+                ) 
+                for candidate in batch
+            ]
+            
+            # Run batch with error handling - continue even if some fail
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Log any exceptions
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    failed += 1
+                    print(f"Batch exception for candidate {batch[i].get('name', 'Unknown')}: {result}")
+            
+            # Small delay between batches to avoid overwhelming the system
+            if batch_start + BATCH_SIZE < total_candidates:
+                await asyncio.sleep(1)
         
-        # Run all tasks in parallel
-        await asyncio.gather(*tasks, return_exceptions=True)
+        print(f"Analysis complete: {processed} succeeded, {failed} failed out of {total_candidates} total")
+        
+        # Final check: find any remaining unanalyzed candidates and log them
+        remaining = []
+        async for candidate in db.candidates.find({
+            "job_id": job_id,
+            "status": {"$in": ["uploaded", "analyzing"]}
+        }):
+            remaining.append(candidate)
+        
+        if remaining:
+            print(f"Warning: {len(remaining)} candidates still need analysis. They may be processed in the next run.")
     
     # Start parallel analysis in background
     # FastAPI BackgroundTasks can handle async functions
@@ -171,6 +252,100 @@ async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force:
         "message": f"Analysis started for {len(candidates)} candidates (processing in parallel)",
         "candidates_queued": len(candidates),
         "force": force
+    }
+
+@router.post("/{job_id}/recover-analysis", response_model=dict)
+async def recover_analysis(job_id: str, background_tasks: BackgroundTasks, user_id: Optional[str] = Depends(get_current_user_id)):
+    """Recover and process any candidates stuck in analyzing status or unanalyzed candidates"""
+    db = get_db()
+    from datetime import timedelta
+    
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Find candidates stuck in analyzing status (more than 10 minutes)
+    recovery_cutoff = datetime.now() - timedelta(minutes=10)
+    stuck_candidates = []
+    async for candidate in db.candidates.find({
+        "job_id": job_id,
+        "status": "analyzing",
+        "$or": [
+            {"analysis_started_at": {"$lt": recovery_cutoff}},
+            {"analysis_started_at": {"$exists": False}}
+        ]
+    }):
+        stuck_candidates.append(candidate)
+    
+    # Find unanalyzed candidates
+    unanalyzed_candidates = []
+    async for candidate in db.candidates.find({
+        "job_id": job_id,
+        "status": "uploaded"
+    }):
+        unanalyzed_candidates.append(candidate)
+    
+    total_to_recover = len(stuck_candidates) + len(unanalyzed_candidates)
+    
+    if total_to_recover == 0:
+        return {
+            "message": "No candidates need recovery",
+            "recovered": 0,
+            "unanalyzed": 0
+        }
+    
+    # Reset stuck candidates to uploaded status
+    if stuck_candidates:
+        stuck_ids = [c["_id"] for c in stuck_candidates]
+        await db.candidates.update_many(
+            {"_id": {"$in": stuck_ids}},
+            {"$set": {"status": "uploaded"}, "$unset": {"analysis_started_at": ""}}
+        )
+    
+    # Log activity
+    await log_activity(
+        action="analysis_recovery",
+        entity_type="job",
+        description=f"Recovered {len(stuck_candidates)} stuck candidates, found {len(unanalyzed_candidates)} unanalyzed candidates for job: {job.get('title', 'Unknown')}",
+        entity_id=job_id,
+        user_id=user_id,
+        metadata={"stuck_count": len(stuck_candidates), "unanalyzed_count": len(unanalyzed_candidates)}
+    )
+    
+    # Trigger analysis for all recovered and unanalyzed candidates
+    all_candidates = stuck_candidates + unanalyzed_candidates
+    
+    async def run_recovery_analysis():
+        """Run analysis for recovered candidates"""
+        import asyncio
+        
+        semaphore = asyncio.Semaphore(5)
+        BATCH_SIZE = 20
+        
+        async def analyze_with_semaphore(candidate_id: str):
+            async with semaphore:
+                try:
+                    await process_candidate_analysis(job_id, candidate_id)
+                except Exception as e:
+                    print(f"Error in recovery analysis for candidate {candidate_id}: {e}")
+        
+        # Process in batches
+        for batch_start in range(0, len(all_candidates), BATCH_SIZE):
+            batch = all_candidates[batch_start:batch_start + BATCH_SIZE]
+            tasks = [analyze_with_semaphore(str(c["_id"])) for c in batch]
+            await asyncio.gather(*tasks, return_exceptions=True)
+            if batch_start + BATCH_SIZE < len(all_candidates):
+                await asyncio.sleep(1)
+        
+        print(f"Recovery analysis complete for {len(all_candidates)} candidates")
+    
+    background_tasks.add_task(run_recovery_analysis)
+    
+    return {
+        "message": f"Recovery started for {total_to_recover} candidates",
+        "recovered": len(stuck_candidates),
+        "unanalyzed": len(unanalyzed_candidates),
+        "total": total_to_recover
     }
 
 @router.patch("/{job_id}/status", response_model=Job)

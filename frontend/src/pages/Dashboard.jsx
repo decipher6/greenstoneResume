@@ -4,6 +4,7 @@ import { Plus, Eye, Calendar, LucideTrash, Search, X, ArrowUpDown, Users, Filter
 import { getJobs, deleteJob, updateJobStatus } from '../services/api'
 import CreateJobModal from '../components/CreateJobModal'
 import { useModal } from '../context/ModalContext'
+import { useStats } from '../context/StatsContext'
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams()
@@ -21,6 +22,7 @@ const Dashboard = () => {
   const [keywordSearch, setKeywordSearch] = useState('')
   const [openDropdown, setOpenDropdown] = useState(null) // 'department' or 'status' or null
   const { showConfirm, showAlert } = useModal()
+  const { refreshStats } = useStats()
 
   useEffect(() => {
     fetchJobs()
@@ -234,6 +236,7 @@ const Dashboard = () => {
       try {
         await deleteJob(jobId)
         fetchJobs()
+        refreshStats() // Refresh stats after deletion
         await showAlert('Success', 'Job post deleted successfully.', 'success')
       } catch (error) {
         console.error('Error deleting job:', error)
@@ -246,6 +249,7 @@ const Dashboard = () => {
     try {
       await updateJobStatus(jobId, newStatus)
       fetchJobs()
+      refreshStats() // Refresh stats after status change
     } catch (error) {
       console.error('Error updating job status:', error)
       await showAlert('Error', 'Failed to update job status. Please try again.', 'error')
@@ -500,6 +504,7 @@ const Dashboard = () => {
           onClose={() => {
             setShowCreateModal(false)
             fetchJobs()
+            refreshStats() // Refresh stats after job creation
           }}
         />
       )}

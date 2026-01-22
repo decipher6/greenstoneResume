@@ -7,11 +7,13 @@ import {
 } from '../services/api'
 import api from '../services/api'
 import { useModal } from '../context/ModalContext'
+import { useStats } from '../context/StatsContext'
 
 const JobDetail = () => {
   const { jobId } = useParams()
   const navigate = useNavigate()
   const { showConfirm, showAlert } = useModal()
+  const { refreshStats, refreshJobStats } = useStats()
   const [job, setJob] = useState(null)
   const [candidates, setCandidates] = useState([])
   const [topCandidates, setTopCandidates] = useState([])
@@ -324,6 +326,8 @@ const JobDetail = () => {
       
       setPendingFiles([])
       fetchData()
+      refreshStats() // Refresh dashboard stats
+      refreshJobStats() // Refresh job-specific stats
       
       // Auto-analyze if setting is enabled
       if (autoAnalyze && totalUploaded > 0) {
@@ -334,8 +338,13 @@ const JobDetail = () => {
             // Poll for updates
             const refreshInterval = setInterval(() => {
               fetchData()
+              refreshJobStats() // Refresh job stats during polling
             }, 3000)
-            setTimeout(() => clearInterval(refreshInterval), 60000)
+            setTimeout(() => {
+              clearInterval(refreshInterval)
+              refreshStats() // Final refresh after polling ends
+              refreshJobStats()
+            }, 60000)
           } catch (error) {
             console.error('Error starting auto-analysis:', error)
           }
@@ -410,8 +419,13 @@ const JobDetail = () => {
       // Poll for updates
       const refreshInterval = setInterval(() => {
         fetchData()
+        refreshJobStats() // Refresh job stats during polling
       }, 3000)
-      setTimeout(() => clearInterval(refreshInterval), 60000) // Stop after 60 seconds
+      setTimeout(() => {
+        clearInterval(refreshInterval)
+        refreshStats() // Final refresh after polling ends
+        refreshJobStats()
+      }, 60000) // Stop after 60 seconds
     } catch (error) {
       console.error('Error running analysis:', error)
       await showAlert('Error', 'Error running analysis. Please try again.', 'error')
@@ -477,6 +491,7 @@ const JobDetail = () => {
       await updateCandidate(candidateId, updateData)
       // Optionally refresh data in background (non-blocking)
       fetchData().catch(err => console.error('Background refresh failed:', err))
+      refreshJobStats() // Refresh job stats after rating update
     } catch (error) {
       console.error('Error updating rating:', error)
       // Revert on error
@@ -498,6 +513,8 @@ const JobDetail = () => {
       try {
         await deleteCandidate(candidateId)
         fetchData()
+        refreshStats() // Refresh dashboard stats
+        refreshJobStats() // Refresh job stats
         await showAlert('Success', 'Candidate deleted successfully.', 'success')
       } catch (error) {
         console.error('Error deleting candidate:', error)
@@ -523,11 +540,15 @@ const JobDetail = () => {
         await Promise.all(selectedCandidates.map(id => deleteCandidate(id)))
         setSelectedCandidates([])
         fetchData()
+        refreshStats() // Refresh dashboard stats
+        refreshJobStats() // Refresh job stats
         await showAlert('Success', `Successfully deleted ${selectedCandidates.length} candidate(s).`, 'success')
       } catch (error) {
         console.error('Error deleting candidates:', error)
         await showAlert('Error', 'Failed to delete some candidates. Please try again.', 'error')
         fetchData() // Refresh to show current state
+        refreshStats() // Refresh stats even on error
+        refreshJobStats()
       }
     }
   }
@@ -754,6 +775,7 @@ const JobDetail = () => {
 
       await updateCandidate(candidateId, updateData)
       await fetchData() // Refresh the data
+      refreshJobStats() // Refresh job stats after candidate update
       setEditingCandidateId(null)
       setEditValues(prev => {
         const newValues = { ...prev }
