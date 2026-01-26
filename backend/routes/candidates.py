@@ -194,6 +194,7 @@ async def upload_candidates_bulk(
         allowed_extensions = ['.pdf', '.docx', '.doc']
         uploaded_candidates = []
         failed_files = []
+        all_candidate_ids_to_analyze = []  # Collect all IDs for parallel analysis
         
         # Filter out invalid files upfront and add to failed_files
         valid_files = []
@@ -290,13 +291,12 @@ async def upload_candidates_bulk(
             if batch_candidates:
                 try:
                     insert_results = await db.candidates.insert_many(batch_candidates)
-                    # Add IDs to candidate dicts and trigger analysis for each
+                    # Add IDs to candidate dicts and collect for parallel analysis
                     for idx, candidate_dict in enumerate(batch_candidates):
                         candidate_id = str(insert_results.inserted_ids[idx])
                         candidate_dict["id"] = candidate_id
                         uploaded_candidates.append(Candidate(**candidate_dict))
-                        # Trigger analysis in background for each candidate
-                        background_tasks.add_task(process_candidate_analysis, job_id, candidate_id)
+                        all_candidate_ids_to_analyze.append(candidate_id)
                 except Exception as e:
                     error_msg = str(e)
                     print(f"Error bulk inserting candidates: {error_msg}")
@@ -309,8 +309,7 @@ async def upload_candidates_bulk(
                             candidate_id = str(result.inserted_id)
                             candidate_dict["id"] = candidate_id
                             uploaded_candidates.append(Candidate(**candidate_dict))
-                            # Trigger analysis in background for each candidate
-                            background_tasks.add_task(process_candidate_analysis, job_id, candidate_id)
+                            all_candidate_ids_to_analyze.append(candidate_id)
                         except Exception as e2:
                             error_msg2 = str(e2)
                             print(f"Error inserting candidate {candidate_dict.get('name', 'unknown')}: {error_msg2}")
@@ -318,6 +317,11 @@ async def upload_candidates_bulk(
                                 "filename": candidate_dict.get('resume_file_path', 'unknown'), 
                                 "error": f"Database insert failed: {error_msg2}"
                             })
+        
+        # Trigger parallel analysis for ALL uploaded candidates (process in chunks of 10)
+        if all_candidate_ids_to_analyze:
+            print(f"Starting parallel analysis for {len(all_candidate_ids_to_analyze)} candidates")
+            background_tasks.add_task(process_candidates_analysis_parallel, job_id, all_candidate_ids_to_analyze)
         
         # Update job candidate count
         if uploaded_candidates:
@@ -1160,6 +1164,36 @@ async def delete_candidate(candidate_id: str, user_id: Optional[str] = Depends(g
     )
     
     return {"message": "Candidate deleted successfully"}
+
+async def process_candidates_analysis_parallel(job_id: str, candidate_ids: List[str]):
+    """
+    Process multiple candidates in parallel batches of 10.
+    If less than 10 candidates, process all in parallel.
+    """
+    if not candidate_ids:
+        return
+    
+    total = len(candidate_ids)
+    batch_size = 10
+    
+    # Process in batches of 10
+    for i in range(0, total, batch_size):
+        batch = candidate_ids[i:i + batch_size]
+        batch_num = i // batch_size + 1
+        total_batches = (total + batch_size - 1) // batch_size
+        
+        print(f"Processing analysis batch {batch_num}/{total_batches} ({len(batch)} candidates in parallel)")
+        
+        # Process this batch in parallel
+        tasks = [process_candidate_analysis(job_id, candidate_id, 0) for candidate_id in batch]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Log any exceptions
+        for idx, result in enumerate(results):
+            if isinstance(result, Exception):
+                print(f"Error in parallel analysis for candidate {batch[idx]}: {result}")
+        
+        print(f"Completed analysis batch {batch_num}/{total_batches} ({len(batch)} candidates)")
 
 async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count: int = 0):
     """Background task to analyze a candidate with retry support"""
