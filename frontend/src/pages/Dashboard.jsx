@@ -14,13 +14,14 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState({
     department: [], // Changed to array for multi-select
-    status: [] // Changed to array for multi-select
+    status: [], // Changed to array for multi-select
+    regions: [] // Multi-select for regions
   })
   const [titleSort, setTitleSort] = useState(null) // null, 'asc', 'desc'
   const [candidatesSort, setCandidatesSort] = useState(null) // null, 'asc', 'desc'
-  const [lastRunSort, setLastRunSort] = useState('latest') // 'latest' or 'oldest'
+  const [createdSort, setCreatedSort] = useState('latest') // 'latest' or 'oldest'
   const [keywordSearch, setKeywordSearch] = useState('')
-  const [openDropdown, setOpenDropdown] = useState(null) // 'department' or 'status' or null
+  const [openDropdown, setOpenDropdown] = useState(null) // 'department', 'status', 'regions' or null
   const { showConfirm, showAlert } = useModal()
   const { refreshStats } = useStats()
 
@@ -48,7 +49,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     applyFilters()
-  }, [searchQuery, filters, jobs, lastRunSort, titleSort, candidatesSort, keywordSearch])
+  }, [searchQuery, filters, jobs, createdSort, titleSort, candidatesSort, keywordSearch])
 
   const applyFilters = () => {
     let filtered = [...jobs]
@@ -76,6 +77,17 @@ const Dashboard = () => {
       filtered = filtered.filter(job => 
         filters.status.includes(job.status || 'active')
       )
+    }
+
+    // Regions filter (multi-select) - check if job has any of the selected regions
+    if (filters.regions && filters.regions.length > 0) {
+      filtered = filtered.filter(job => {
+        const jobRegions = job.regions || []
+        // Check if any of the selected regions match any of the job's regions
+        return filters.regions.some(selectedRegion => 
+          jobRegions.includes(selectedRegion)
+        )
+      })
     }
 
     // Group by status: active, on-hold, filled, cancelled
@@ -128,7 +140,7 @@ const Dashboard = () => {
         }
       })
     }
-    // Sort by last_run within status groups (if no other sorts applied)
+    // Sort by created_at within status groups (if no other sorts applied)
     else {
       filtered.sort((a, b) => {
         const aStatus = a.status || 'active'
@@ -141,11 +153,11 @@ const Dashboard = () => {
           return aStatusIndex - bStatusIndex
         }
         
-        // Then sort by last_run within same status
-        const aDate = a.last_run ? new Date(a.last_run).getTime() : 0
-        const bDate = b.last_run ? new Date(b.last_run).getTime() : 0
+        // Then sort by created_at within same status
+        const aDate = a.created_at ? new Date(a.created_at).getTime() : 0
+        const bDate = b.created_at ? new Date(b.created_at).getTime() : 0
         
-        if (lastRunSort === 'latest') {
+        if (createdSort === 'latest') {
           return bDate - aDate // Latest first (descending)
         } else {
           return aDate - bDate // Oldest first (ascending)
@@ -156,8 +168,8 @@ const Dashboard = () => {
     setFilteredJobs(filtered)
   }
 
-  const toggleLastRunSort = () => {
-    setLastRunSort(prev => prev === 'latest' ? 'oldest' : 'latest')
+  const toggleCreatedSort = () => {
+    setCreatedSort(prev => prev === 'latest' ? 'oldest' : 'latest')
   }
 
   const clearFilters = () => {
@@ -165,11 +177,12 @@ const Dashboard = () => {
     setKeywordSearch('')
     setFilters({
       department: [],
-      status: []
+      status: [],
+      regions: []
     })
     setTitleSort(null)
     setCandidatesSort(null)
-    setLastRunSort('latest')
+    setCreatedSort('latest')
   }
 
   const toggleDepartmentFilter = (dept) => {
@@ -187,6 +200,15 @@ const Dashboard = () => {
       status: prev.status.includes(status)
         ? prev.status.filter(s => s !== status)
         : [...prev.status, status]
+    }))
+  }
+
+  const toggleRegionFilter = (region) => {
+    setFilters(prev => ({
+      ...prev,
+      regions: prev.regions.includes(region)
+        ? prev.regions.filter(r => r !== region)
+        : [...prev.regions, region]
     }))
   }
 
@@ -265,8 +287,46 @@ const Dashboard = () => {
     return `${day} ${month} ${year}`
   }
 
-  // Get unique departments for filter
-  const departments = [...new Set(jobs.map(job => job.department).filter(Boolean))].sort()
+  // Hardcoded list of departments for filter
+  const departments = [
+    'Investor Relations',
+    'Partner Relations',
+    'Investor Development',
+    'IR Research',
+    'Legal',
+    'Compliance',
+    'Technology',
+    'Finance',
+    'HR and Operations'
+  ]
+
+  // Get all unique regions from all jobs (including custom "Other" locations)
+  const allRegions = new Set()
+  jobs.forEach(job => {
+    if (job.regions && Array.isArray(job.regions)) {
+      job.regions.forEach(region => {
+        if (region) {
+          allRegions.add(region)
+        }
+      })
+    }
+  })
+  
+  // Sort regions: GCC first, then alphabetically, then "All" and "Other" at the end
+  const regions = Array.from(allRegions).sort((a, b) => {
+    // GCC always first
+    if (a === 'GCC') return -1
+    if (b === 'GCC') return 1
+    
+    // "All" and "Other" at the end
+    if (a === 'All') return 1
+    if (b === 'All') return -1
+    if (a === 'Other') return 1
+    if (b === 'Other') return -1
+    
+    // Everything else alphabetically
+    return a.localeCompare(b)
+  })
 
   return (
     <div className="space-y-6">
@@ -295,7 +355,7 @@ const Dashboard = () => {
                   />
                 </div>
               </div>
-            {(Object.values(filters).some(f => Array.isArray(f) ? f.length > 0 : f) || keywordSearch || titleSort || candidatesSort) && (
+            {(Object.values(filters).some(f => Array.isArray(f) ? f.length > 0 : f) || keywordSearch || titleSort || candidatesSort || createdSort !== 'latest') && (
               <button
                 onClick={clearFilters}
                 className="glass-button-secondary flex items-center gap-2 text-sm"
@@ -371,17 +431,53 @@ const Dashboard = () => {
                   {candidatesSort === 'desc' && <span className="text-xs text-gray-300">(High-Low)</span>}
                 </div>
               </th>
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white relative">
+                <div className="space-y-2 filter-dropdown-container">
+                  <div 
+                    className="cursor-pointer hover:bg-glass-300 transition-colors px-2 py-1 rounded flex items-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpenDropdown(openDropdown === 'regions' ? null : 'regions')
+                    }}
+                  >
+                    <span>Regions</span>
+                    <Filter size={14} className="text-gray-300" />
+                    {filters.regions.length > 0 && (
+                      <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+                        {filters.regions.length}
+                      </span>
+                    )}
+                  </div>
+                  {openDropdown === 'regions' && (
+                    <div className="absolute top-full left-0 mt-1 z-50 glass-card p-3 min-w-[200px] max-h-64 overflow-y-auto shadow-lg">
+                      <div className="space-y-2">
+                        {regions.map(region => (
+                          <label key={region} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-glass-100 p-2 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.regions.includes(region)}
+                              onChange={() => toggleRegionFilter(region)}
+                              className="rounded"
+                            />
+                            <span>{region}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </th>
               <th 
                 className="px-6 py-5 text-left text-lg font-extrabold text-white cursor-pointer hover:bg-glass-300 transition-colors select-none"
-                onClick={toggleLastRunSort}
+                onClick={toggleCreatedSort}
               >
                 <div className="flex items-center gap-2">
-                  <span>Last Run</span>
+                  <span>Created On</span>
                   <ArrowUpDown size={14} className="text-gray-300" />
-                  {lastRunSort === 'latest' && (
+                  {createdSort === 'latest' && (
                     <span className="text-xs text-gray-300">(Latest first)</span>
                   )}
-                  {lastRunSort === 'oldest' && (
+                  {createdSort === 'oldest' && (
                     <span className="text-xs text-gray-300">(Oldest first)</span>
                   )}
                 </div>
@@ -428,7 +524,7 @@ const Dashboard = () => {
           <tbody>
             {filteredJobs.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
                   No jobs found matching your search criteria.
                 </td>
               </tr>
@@ -448,9 +544,27 @@ const Dashboard = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-gray-400">
+                  {job.regions && job.regions.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {job.regions.slice(0, 3).map((region, idx) => (
+                        <span key={idx} className="px-2 py-0.5 bg-glass-200 rounded text-xs">
+                          {region}
+                        </span>
+                      ))}
+                      {job.regions.length > 3 && (
+                        <span className="px-2 py-0.5 bg-glass-200 rounded text-xs">
+                          +{job.regions.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-gray-500">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-gray-400">
                   <div className="flex items-center gap-2">
                     <Calendar size={16} />
-                    {formatDate(job.last_run)}
+                    {formatDate(job.created_at)}
                   </div>
                 </td>
                 <td className="px-6 py-4">

@@ -11,6 +11,8 @@ const CreateJobModal = ({ onClose }) => {
     title: '',
     department: '',
     description: '',
+    regions: [],
+    otherRegions: '', // For custom "Other" locations
     evaluation_criteria: [
       { name: 'Technical Skills', weight: 30 }
     ]
@@ -67,7 +69,26 @@ const CreateJobModal = ({ onClose }) => {
     }
 
     try {
-      const response = await createJob(formData)
+      // Process regions: if "Other" is selected, add the custom locations
+      let finalRegions = [...formData.regions]
+      if (formData.regions.includes('Other') && formData.otherRegions.trim()) {
+        // Add custom locations from the text input (split by comma or newline)
+        const customLocations = formData.otherRegions
+          .split(/[,\n]/)
+          .map(loc => loc.trim())
+          .filter(loc => loc.length > 0)
+        finalRegions = [...formData.regions.filter(r => r !== 'Other'), ...customLocations]
+      } else if (formData.regions.includes('Other')) {
+        // Remove "Other" if no custom locations provided
+        finalRegions = formData.regions.filter(r => r !== 'Other')
+      }
+      
+      const jobData = {
+        ...formData,
+        regions: finalRegions
+      }
+      
+      const response = await createJob(jobData)
       const jobId = response.data.id
       onClose()
       // Navigate to the newly created job detail page
@@ -174,6 +195,62 @@ const CreateJobModal = ({ onClose }) => {
               <option value="Finance">Finance</option>
               <option value="HR and Operations">HR and Operations</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Regions</label>
+            <div className="glass-input w-full min-h-[100px] p-3">
+              <div className="space-y-2">
+                {/* GCC first, then alphabetically sorted: APAC, EMEA, LATAM, NA, then All and Other */}
+                {['GCC', 'APAC', 'EMEA', 'LATAM', 'NA', 'All', 'Other'].map((region) => (
+                  <label key={region} className="flex items-center gap-2 cursor-pointer hover:bg-glass-100 p-2 rounded">
+                    <input
+                      type="checkbox"
+                      checked={formData.regions.includes(region)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          if (region === 'All') {
+                            setFormData({ ...formData, regions: ['GCC', 'APAC', 'EMEA', 'LATAM', 'NA', 'All'] })
+                          } else {
+                            setFormData({ 
+                              ...formData, 
+                              regions: [...formData.regions.filter(r => r !== 'All'), region] 
+                            })
+                          }
+                        } else {
+                          if (region === 'All') {
+                            setFormData({ ...formData, regions: [], otherRegions: '' })
+                          } else {
+                            setFormData({ 
+                              ...formData, 
+                              regions: formData.regions.filter(r => r !== region),
+                              otherRegions: region === 'Other' ? '' : formData.otherRegions
+                            })
+                          }
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span>{region}</span>
+                  </label>
+                ))}
+              </div>
+              {/* Show text input when "Other" is selected */}
+              {formData.regions.includes('Other') && (
+                <div className="mt-3 pt-3 border-t border-glass-200">
+                  <label className="block text-xs font-medium mb-2 text-gray-300">
+                    Specify other locations (comma or newline separated)
+                  </label>
+                  <textarea
+                    placeholder="e.g. Middle East, Africa, Europe"
+                    className="glass-input w-full text-sm resize-none"
+                    rows={3}
+                    value={formData.otherRegions}
+                    onChange={(e) => setFormData({ ...formData, otherRegions: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div>

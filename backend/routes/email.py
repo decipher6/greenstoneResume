@@ -128,7 +128,7 @@ async def get_interview_mailto_links(
     request: InterviewLinksRequest,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
-    """Generate mailto links for interview invitations"""
+    """Generate mailto links for interview invitations and update candidate status to interview"""
     db = get_db()
     
     # Verify job exists
@@ -169,6 +169,12 @@ async def get_interview_mailto_links(
         
         if params:
             mailto_url += "?" + "&".join(params)
+        
+        # Update candidate status to interview
+        await db.candidates.update_one(
+            {"_id": ObjectId(candidate_id)},
+            {"$set": {"status": "interview"}}
+        )
         
         mailto_links.append({
             "candidate_id": candidate_id,
@@ -239,6 +245,12 @@ async def get_rejection_mailto_links(
         
         if params:
             mailto_url += "?" + "&".join(params)
+        
+        # Update candidate status to rejected when rejection links are generated
+        await db.candidates.update_one(
+            {"_id": ObjectId(candidate_id)},
+            {"$set": {"status": "rejected"}}
+        )
         
         mailto_links.append({
             "candidate_id": candidate_id,

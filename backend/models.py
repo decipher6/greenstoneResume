@@ -34,6 +34,7 @@ class JobCreate(BaseModel):
     department: str
     description: str
     evaluation_criteria: List[EvaluationCriterion]
+    regions: Optional[List[str]] = []
 
 class Job(JobCreate):
     id: Optional[str] = None
@@ -41,6 +42,7 @@ class Job(JobCreate):
     created_at: Optional[datetime] = None
     last_run: Optional[datetime] = None
     candidate_count: int = 0
+    regions: Optional[List[str]] = []
 
 class ContactInfo(BaseModel):
     email: Optional[str] = None
@@ -48,11 +50,13 @@ class ContactInfo(BaseModel):
     linkedin: Optional[str] = None
 
 class CandidateStatus(str, Enum):
-    uploaded = "uploaded"
+    new = "new"
     analyzing = "analyzing"
     analyzed = "analyzed"
+    reviewed = "reviewed"
     shortlisted = "shortlisted"
     rejected = "rejected"
+    interview = "interview"
 
 class ScoreBreakdown(BaseModel):
     resume_score: float
@@ -78,11 +82,12 @@ class Candidate(BaseModel):
     job_id: str
     name: str
     contact_info: ContactInfo
+    location: Optional[str] = None
     resume_text: Optional[str] = None
     resume_file_path: Optional[str] = None  # Legacy: disk storage path
     resume_file_id: Optional[str] = None  # MongoDB GridFS file ID
     linkedin_url: Optional[str] = None
-    status: CandidateStatus = CandidateStatus.uploaded
+    status: CandidateStatus = CandidateStatus.new
     rating: Optional[int] = None  # 1-5 star rating
     score_breakdown: Optional[ScoreBreakdown] = None
     criterion_scores: Optional[List[CriterionScore]] = None

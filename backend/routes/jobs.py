@@ -117,8 +117,8 @@ async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force:
         # Re-analyze all candidates (including already analyzed ones)
         query = {"job_id": job_id}
     else:
-        # Only analyze new/uploaded candidates
-        query = {"job_id": job_id, "status": {"$in": ["uploaded", "analyzing"]}}
+        # Only analyze new candidates
+        query = {"job_id": job_id, "status": {"$in": ["new", "analyzing"]}}
     
     candidates = []
     async for candidate in db.candidates.find(query):
@@ -237,7 +237,7 @@ async def run_ai_analysis(job_id: str, background_tasks: BackgroundTasks, force:
         remaining = []
         async for candidate in db.candidates.find({
             "job_id": job_id,
-            "status": {"$in": ["uploaded", "analyzing"]}
+            "status": {"$in": ["new", "analyzing"]}
         }):
             remaining.append(candidate)
         
@@ -277,11 +277,11 @@ async def recover_analysis(job_id: str, background_tasks: BackgroundTasks, user_
     }):
         stuck_candidates.append(candidate)
     
-    # Find unanalyzed candidates
+        # Find unanalyzed candidates
     unanalyzed_candidates = []
     async for candidate in db.candidates.find({
         "job_id": job_id,
-        "status": "uploaded"
+        "status": "new"
     }):
         unanalyzed_candidates.append(candidate)
     
@@ -294,12 +294,12 @@ async def recover_analysis(job_id: str, background_tasks: BackgroundTasks, user_
             "unanalyzed": 0
         }
     
-    # Reset stuck candidates to uploaded status
+        # Reset stuck candidates to new status
     if stuck_candidates:
         stuck_ids = [c["_id"] for c in stuck_candidates]
         await db.candidates.update_many(
             {"_id": {"$in": stuck_ids}},
-            {"$set": {"status": "uploaded"}, "$unset": {"analysis_started_at": ""}}
+            {"$set": {"status": "new"}, "$unset": {"analysis_started_at": ""}}
         )
     
     # Log activity

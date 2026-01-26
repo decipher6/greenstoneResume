@@ -431,7 +431,10 @@ const CandidateProfile = () => {
   const jobTitle = candidate.job_title || job?.title || 'Senior Software Engineer'
   const statusBadge = candidate.status === 'shortlisted' ? 'Shortlisted' : 
                      candidate.status === 'rejected' ? 'Rejected' : 
-                     candidate.status === 'analyzed' ? 'Analyzed' : 'Uploaded'
+                     candidate.status === 'interview' ? 'Interview' :
+                     candidate.status === 'reviewed' ? 'Reviewed' :
+                     candidate.status === 'analyzed' ? 'Analyzed' : 
+                     candidate.status === 'analyzing' ? 'Analyzing' : 'New'
   
   const aiSummary = parseAISummary(candidate.ai_justification)
   const percentile = calculatePercentile()
@@ -457,7 +460,11 @@ const CandidateProfile = () => {
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 candidate.status === 'shortlisted' ? 'bg-green-400/40 text-green-300 border border-green-400/60' :
                 candidate.status === 'rejected' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                candidate.status === 'interview' ? 'bg-purple-400/40 text-purple-300 border border-purple-400/60' :
+                candidate.status === 'reviewed' ? 'bg-blue-400/40 text-blue-300 border border-blue-400/60' :
+                candidate.status === 'analyzed' ? 'bg-cyan-400/40 text-cyan-300 border border-cyan-400/60' :
+                candidate.status === 'analyzing' ? 'bg-yellow-400/40 text-yellow-300 border border-yellow-400/60' :
+                'bg-gray-400/40 text-gray-300 border border-gray-400/60'
               }`}>
                 {statusBadge}
               </span>
@@ -534,7 +541,6 @@ const CandidateProfile = () => {
                   {/* Overall Score */}
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-300">Software Core</span>
                       <span className="text-2xl font-bold text-green-200">{overallScore.toFixed(1)}/10</span>
                     </div>
                     <div className="space-y-2 text-sm mb-4">
@@ -631,6 +637,12 @@ const CandidateProfile = () => {
                 <div className="glass-card p-6">
                   <h3 className="text-lg font-semibold mb-4">Contact Information</h3>
                   <div className="space-y-4">
+                    {candidate.location && (
+                      <div className="flex items-center gap-3">
+                        <User size={20} className="text-gray-400 flex-shrink-0" />
+                        <span className="text-base font-medium text-white flex-1">{candidate.location}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3">
                       <Mail size={20} className="text-gray-400 flex-shrink-0" />
                       <span className="text-base font-medium text-white flex-1">{candidate.contact_info?.email || '-'}</span>

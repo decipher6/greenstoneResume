@@ -651,7 +651,7 @@ const JobDetail = () => {
     // Status filter (multi-select)
     if (filters.status && filters.status.length > 0) {
       filtered = filtered.filter(c => 
-        filters.status.includes(c.status || 'analyzed')
+        filters.status.includes(c.status || 'new')
       )
     }
 
@@ -663,46 +663,75 @@ const JobDetail = () => {
       })
     }
 
-    // Sort by name
-    if (nameSort) {
-      filtered.sort((a, b) => {
-        const aName = (a.name || '').toLowerCase()
-        const bName = (b.name || '').toLowerCase()
-        if (nameSort === 'asc') {
-          return aName.localeCompare(bName)
-        } else {
-          return bName.localeCompare(aName)
-        }
-      })
+    // Group by status first (new, interview, reviewed, rejected, then others)
+    const statusOrder = ['new', 'interview', 'reviewed', 'rejected', 'shortlisted', 'analyzed', 'analyzing']
+    const groupedByStatus = {}
+    
+    filtered.forEach(candidate => {
+      const status = candidate.status || 'new'
+      if (!groupedByStatus[status]) {
+        groupedByStatus[status] = []
+      }
+      groupedByStatus[status].push(candidate)
+    })
+
+    // Sort within each status group
+    const sortWithinGroup = (group) => {
+      // Sort by name
+      if (nameSort) {
+        group.sort((a, b) => {
+          const aName = (a.name || '').toLowerCase()
+          const bName = (b.name || '').toLowerCase()
+          if (nameSort === 'asc') {
+            return aName.localeCompare(bName)
+          } else {
+            return bName.localeCompare(aName)
+          }
+        })
+      }
+      // Sort by rating
+      else if (ratingSort) {
+        group.sort((a, b) => {
+          const aRating = a.rating || 0
+          const bRating = b.rating || 0
+          if (ratingSort === 'asc') {
+            return aRating - bRating
+          } else {
+            return bRating - aRating
+          }
+        })
+      }
+      // Sort by score
+      else if (scoreSort) {
+        group.sort((a, b) => {
+          const aScore = parseFloat(a.score_breakdown?.resume_score || 0)
+          const bScore = parseFloat(b.score_breakdown?.resume_score || 0)
+          if (scoreSort === 'asc') {
+            return aScore - bScore
+          } else {
+            return bScore - aScore
+          }
+        })
+      }
+      return group
     }
 
-    // Sort by rating
-    if (ratingSort) {
-      filtered.sort((a, b) => {
-        const aRating = a.rating || 0
-        const bRating = b.rating || 0
-        if (ratingSort === 'asc') {
-          return aRating - bRating
-        } else {
-          return bRating - aRating
-        }
-      })
-    }
+    // Combine groups in status order
+    const result = []
+    statusOrder.forEach(status => {
+      if (groupedByStatus[status]) {
+        result.push(...sortWithinGroup(groupedByStatus[status]))
+      }
+    })
+    
+    // Add any remaining statuses not in the order list
+    Object.keys(groupedByStatus).forEach(status => {
+      if (!statusOrder.includes(status)) {
+        result.push(...sortWithinGroup(groupedByStatus[status]))
+      }
+    })
 
-    // Sort by score
-    if (scoreSort) {
-      filtered.sort((a, b) => {
-        const aScore = parseFloat(a.score_breakdown?.resume_score || 0)
-        const bScore = parseFloat(b.score_breakdown?.resume_score || 0)
-        if (scoreSort === 'asc') {
-          return aScore - bScore
-        } else {
-          return bScore - aScore
-        }
-      })
-    }
-
-    return filtered
+    return result
   }
 
   const toggleStatusFilter = (status) => {
@@ -805,7 +834,8 @@ const JobDetail = () => {
           ...candidate.contact_info,
           email: edited.email !== undefined ? edited.email : (candidate.contact_info?.email || ''),
           phone: edited.phone !== undefined ? edited.phone : (candidate.contact_info?.phone || '')
-        }
+        },
+        location: edited.location !== undefined ? edited.location : (candidate.location || '')
       }
 
       await updateCandidate(candidateId, updateData)
@@ -843,19 +873,33 @@ const JobDetail = () => {
       [candidateId]: {
         name: candidate.name,
         email: candidate.contact_info?.email || '',
-        phone: candidate.contact_info?.phone || ''
+        phone: candidate.contact_info?.phone || '',
+        location: candidate.location || ''
       }
     }))
   }
 
+  const handleStatusChange = async (candidateId, newStatus, e) => {
+    e.stopPropagation()
+    try {
+      await updateCandidate(candidateId, { status: newStatus })
+      await fetchData() // Refresh the data
+      refreshJobStats() // Refresh job stats after candidate update
+    } catch (error) {
+      console.error('Error updating candidate status:', error)
+      await showAlert('Error', 'Failed to update candidate status. Please try again.', 'error')
+    }
+  }
+
   const handleRowClick = (candidateId, e) => {
-    // Don't navigate if clicking on checkbox, edit button, delete button, or if editing
+    // Don't navigate if clicking on checkbox, edit button, delete button, status dropdown, or if editing
     if (
       e.target.closest('input[type="checkbox"]') ||
       e.target.closest('button') ||
       e.target.closest('input[type="text"]') ||
       e.target.closest('input[type="email"]') ||
       e.target.closest('input[type="tel"]') ||
+      e.target.closest('select') ||
       editingCandidateId === candidateId
     ) {
       return
@@ -1180,6 +1224,9 @@ const JobDetail = () => {
               <th className="px-6 py-5 text-left text-lg font-extrabold text-white">
                 <div>Phone</div>
               </th>
+              <th className="px-6 py-5 text-left text-lg font-extrabold text-white">
+                <div>Location</div>
+              </th>
               <th className="px-6 py-5 text-left text-lg font-extrabold text-white relative">
                 <div className="space-y-2 filter-dropdown-container">
                   <div 
@@ -1199,7 +1246,7 @@ const JobDetail = () => {
                   {openDropdown === 'status' && (
                     <div className="absolute top-full left-0 mt-1 z-50 glass-card p-3 min-w-[200px] shadow-lg">
                       <div className="space-y-2">
-                        {['analyzed', 'shortlisted', 'interview', 'rejected'].map(status => (
+                        {['new', 'analyzing', 'analyzed', 'reviewed', 'shortlisted', 'interview', 'rejected'].map(status => (
                           <label key={status} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-glass-100 p-2 rounded">
                             <input
                               type="checkbox"
@@ -1281,7 +1328,7 @@ const JobDetail = () => {
           <tbody>
             {getFilteredCandidates().length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-gray-400">
+                <td colSpan={10} className="px-6 py-12 text-center text-gray-400">
                   No candidates found matching your filters.
                 </td>
               </tr>
@@ -1400,16 +1447,51 @@ const JobDetail = () => {
                     </div>
                   )}
                 </td>
+                <td className="px-6 py-4">
+                  {editingCandidateId === candidate.id ? (
+                    <input
+                      type="text"
+                      className="glass-input text-sm w-full"
+                      value={editValues[candidate.id]?.location || candidate.location || ''}
+                      onChange={(e) => handleFieldEdit(candidate.id, 'location', e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span className="text-gray-400">
+                      {candidate.location || '-'}
+                    </span>
+                  )}
+                </td>
                 <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    candidate.status === 'analyzed' 
-                      ? 'bg-green-400/40 text-green-300 border border-green-400/60'
-                      : candidate.status === 'analyzing'
-                      ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                      : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-                  }`}>
-                    {candidate.status}
-                  </span>
+                  <select
+                    value={candidate.status || 'new'}
+                    onChange={(e) => handleStatusChange(candidate.id, e.target.value, e)}
+                    className={`glass-input text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer ${
+                      candidate.status === 'new'
+                        ? 'bg-gray-400/40 text-gray-300 border-gray-400/60'
+                        : candidate.status === 'interview'
+                        ? 'bg-purple-400/40 text-purple-300 border-purple-400/60'
+                        : candidate.status === 'reviewed'
+                        ? 'bg-blue-400/40 text-blue-300 border-blue-400/60'
+                        : candidate.status === 'rejected'
+                        ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                        : candidate.status === 'shortlisted'
+                        ? 'bg-green-400/40 text-green-300 border-green-400/60'
+                        : candidate.status === 'analyzed'
+                        ? 'bg-cyan-400/40 text-cyan-300 border-cyan-400/60'
+                        : candidate.status === 'analyzing'
+                        ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                        : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                    }`}
+                  >
+                    <option value="new">New</option>
+                    <option value="analyzing">Analyzing</option>
+                    <option value="analyzed">Analyzed</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="shortlisted">Shortlisted</option>
+                    <option value="interview">Interview</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
                 </td>
                 <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-0.5">

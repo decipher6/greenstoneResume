@@ -17,7 +17,7 @@ from database import get_db
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 from models import Candidate, CandidateStatus, ContactInfo, ScoreBreakdown, CriterionScore
 from utils.cv_parser import parse_resume
-from utils.entity_extraction import extract_contact_info, extract_name
+from utils.entity_extraction import extract_contact_info, extract_name, extract_location
 from utils.ai_scoring import score_resume_with_llm, calculate_composite_score
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
@@ -85,7 +85,7 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
                 resume_text = f"Resume: {filename}\nNote: Text extraction had issues: {error_msg}"
                 print(f"Warning: Parsing error for {filename}, using fallback text: {error_msg}")
         
-        # Extract contact info and name
+        # Extract contact info, name, and location
         try:
             # Use OCR contact info if available, otherwise extract from text
             if ocr_contact_info and (ocr_contact_info.get('email') or ocr_contact_info.get('phone') or ocr_contact_info.get('name')):
@@ -99,6 +99,9 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
                 contact_info_dict = await extract_contact_info(resume_text)
                 # Pass contact_info to extract_name so it can use email as fallback
                 name = await extract_name(resume_text, contact_info_dict)
+            
+            # Extract location
+            location = await extract_location(resume_text)
         except Exception as extract_error:
             # Continue even if extraction fails, use defaults
             contact_info_dict = ocr_contact_info if ocr_contact_info else {}
@@ -107,6 +110,7 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
                 name = filename.split('.')[0]  # Use filename as fallback
             else:
                 name = contact_info_dict.get('name')
+            location = None
             print(f"Warning: Extraction failed for {filename}: {extract_error}")
         
         # Store file in MongoDB GridFS
@@ -144,10 +148,11 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
             "job_id": job_id,
             "name": name,
             "contact_info": contact_info_dict,
+            "location": location,
             "resume_text": resume_text,
             "resume_file_path": resume_file_path,  # Keep for backward compatibility
             "resume_file_id": resume_file_id,  # New: MongoDB GridFS file ID
-            "status": CandidateStatus.uploaded.value,
+            "status": CandidateStatus.new.value,
             "created_at": datetime.now()
         }
         
@@ -428,7 +433,7 @@ async def get_candidates_by_job(
 
 @router.get("/{candidate_id}", response_model=Candidate)
 async def get_candidate(candidate_id: str):
-    """Get a specific candidate"""
+    """Get a specific candidate and update status to reviewed if it's new"""
     db = get_db()
     try:
         candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
@@ -436,6 +441,15 @@ async def get_candidate(candidate_id: str):
         raise HTTPException(status_code=400, detail="Invalid candidate ID")
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    # Update status to reviewed if it's new
+    if candidate.get("status") == CandidateStatus.new.value:
+        await db.candidates.update_one(
+            {"_id": ObjectId(candidate_id)},
+            {"$set": {"status": CandidateStatus.reviewed.value}}
+        )
+        candidate["status"] = CandidateStatus.reviewed.value
+    
     candidate["id"] = str(candidate["_id"])
     # Fix nested ObjectId if present in score_breakdown
     if candidate.get("score_breakdown"):
@@ -1023,6 +1037,9 @@ async def update_candidate(candidate_id: str, update_data: dict = Body(...), use
     if "notes" in update_data:
         update_fields["notes"] = update_data["notes"]
     
+    if "location" in update_data:
+        update_fields["location"] = update_data["location"]
+    
     if not update_fields:
         raise HTTPException(status_code=400, detail="No valid fields to update")
     
@@ -1154,6 +1171,7 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
         return
     
     # Skip if already analyzed (unless forced retry)
+    # Allow re-analysis if status is new, analyzing, or analyzed
     if candidate.get("status") == CandidateStatus.analyzed.value and retry_count == 0:
         return
     
@@ -1162,7 +1180,7 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
         # Reset status if job doesn't exist
         await db.candidates.update_one(
             {"_id": ObjectId(candidate_id)},
-            {"$set": {"status": CandidateStatus.uploaded.value}}
+            {"$set": {"status": CandidateStatus.new.value}}
         )
         return
     
@@ -1362,16 +1380,16 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
             print(f"Retrying analysis for candidate {candidate_id} (attempt {retry_count + 1}/{max_retries})")
             await db.candidates.update_one(
                 {"_id": ObjectId(candidate_id)},
-                {"$set": {"status": CandidateStatus.uploaded.value, "analysis_error": error_msg}}
+                {"$set": {"status": CandidateStatus.new.value, "analysis_error": error_msg}}
             )
             # Retry after a short delay
             await asyncio.sleep(2 ** retry_count)  # Exponential backoff
             await process_candidate_analysis(job_id, candidate_id, retry_count + 1)
         else:
-            # Max retries exceeded, mark as failed but keep as uploaded so it can be manually retried
+            # Max retries exceeded, mark as failed but keep as new so it can be manually retried
             await db.candidates.update_one(
                 {"_id": ObjectId(candidate_id)},
-                {"$set": {"status": CandidateStatus.uploaded.value, "analysis_error": error_msg, "analysis_failed": True}}
+                {"$set": {"status": CandidateStatus.new.value, "analysis_error": error_msg, "analysis_failed": True}}
             )
             print(f"Max retries exceeded for candidate {candidate_id}. Marked as failed.")
 

@@ -63,3 +63,67 @@ async def extract_name(text: str, contact_info: Optional[Dict[str, Optional[str]
         return words[0]
     return "Unknown Candidate"
 
+async def extract_location(text: str) -> Optional[str]:
+    """Extract location information from resume text"""
+    if not text:
+        return None
+    
+    # Common location patterns
+    # Look for patterns like: "City, State", "City, Country", "City, State, Country"
+    # Also look for standalone cities or countries
+    
+    lines = text.split('\n')
+    
+    # Check first 20 lines for location information
+    for line in lines[:20]:
+        line = line.strip()
+        if not line or len(line) < 3:
+            continue
+        
+        # Skip lines that are clearly not locations
+        if '@' in line or 'http' in line.lower() or 'www.' in line.lower():
+            continue
+        if re.search(r'\d{4,}', line):  # Skip lines with long numbers (likely phone/ID)
+            continue
+        
+        # Look for common location patterns
+        # Pattern: City, State/Country (e.g., "New York, NY", "London, UK", "Dubai, UAE")
+        location_pattern = r'^[A-Z][a-zA-Z\s]+,\s*[A-Z]{2,}(?:\s*,\s*[A-Z][a-zA-Z\s]+)?$'
+        if re.match(location_pattern, line):
+            return line
+        
+        # Pattern: City - State/Country (e.g., "New York - NY")
+        location_pattern2 = r'^[A-Z][a-zA-Z\s]+\s*-\s*[A-Z]{2,}$'
+        if re.match(location_pattern2, line):
+            return line.replace(' - ', ', ')
+        
+        # Pattern: Standalone major cities or countries (common ones)
+        major_locations = [
+            'New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia',
+            'San Antonio', 'San Diego', 'Dallas', 'San Jose', 'Austin', 'Jacksonville',
+            'London', 'Paris', 'Tokyo', 'Sydney', 'Singapore', 'Dubai', 'Mumbai',
+            'Bangalore', 'Toronto', 'Vancouver', 'Mexico City', 'São Paulo', 'Buenos Aires',
+            'United States', 'USA', 'United Kingdom', 'UK', 'Canada', 'Australia',
+            'India', 'UAE', 'Singapore', 'Japan', 'Germany', 'France'
+        ]
+        
+        line_upper = line.upper()
+        for location in major_locations:
+            if location.upper() in line_upper:
+                return line
+    
+    # If no clear location found, try to find country codes or country names in the text
+    country_pattern = r'\b(?:USA|UK|UAE|CA|AU|IN|SG|JP|DE|FR|BR|MX|AR)\b'
+    country_match = re.search(country_pattern, text, re.IGNORECASE)
+    if country_match:
+        country_map = {
+            'USA': 'United States', 'UK': 'United Kingdom', 'UAE': 'United Arab Emirates',
+            'CA': 'Canada', 'AU': 'Australia', 'IN': 'India', 'SG': 'Singapore',
+            'JP': 'Japan', 'DE': 'Germany', 'FR': 'France', 'BR': 'Brazil',
+            'MX': 'Mexico', 'AR': 'Argentina'
+        }
+        code = country_match.group().upper()
+        return country_map.get(code, code)
+    
+    return None
+
