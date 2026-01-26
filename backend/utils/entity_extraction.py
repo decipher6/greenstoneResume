@@ -32,30 +32,29 @@ async def extract_entities_with_llm(resume_text: str) -> Dict[str, Optional[str]
             "location": None
         }
     
-    system_message = """You are an expert at extracting structured information from resumes. 
-Your task is to extract the candidate's name, email address, phone number, and location from the resume text.
+    system_message = """Extract candidate information from resume text. Return JSON only.
 
-Extract the following information:
-1. **Name**: The candidate's full name (first name and last name). This is typically at the top of the resume.
-2. **Email**: The candidate's email address (format: user@domain.com)
-3. **Phone**: The candidate's phone number (can be in various formats: +971-xxx-xxx-xxx, (xxx) xxx-xxxx, etc.)
-4. **Location**: The candidate's current location (city, state/country format preferred, e.g., "Dubai, UAE" or "London, UK")
+Format requirements:
+- Name: Title Case (e.g., "John Smith" not "JOHN SMITH" or "john smith")
+- Phone: International format with + and spaces (e.g., "+971 50 123 4567")
+- Email: lowercase
+- Location: "City, Country" format
 
-Return ONLY a valid JSON object with this exact structure:
+Return JSON:
 {
-    "name": "Full Name Here",
+    "name": "Title Case Name",
     "email": "email@example.com",
-    "phone": "+1-xxx-xxx-xxxx",
-    "location": "City, State/Country"
+    "phone": "+971 50 123 4567",
+    "location": "City, Country"
 }
 
-If any information is not found, use null for that field. Do not include any additional text, explanations, or markdown formatting."""
+Use null if not found. No markdown or explanations."""
 
-    user_prompt = f"""Extract the candidate's information from this resume:
+    user_prompt = f"""Extract from resume:
 
-{resume_text[:]}
+{resume_text[:5000]}
 
-Return the information as a JSON object with name, email, phone, and location fields."""
+Return JSON with name (Title Case), email, phone (international format), location."""
 
     try:
         if DEBUG:
@@ -116,10 +115,13 @@ Return the information as a JSON object with name, email, phone, and location fi
                 name = str(name).strip()
                 if not name or name.lower() in ["null", "none", "n/a", "unknown"]:
                     name = None
+                else:
+                    # Format name to Title Case (capital first letter, rest lowercase)
+                    name = ' '.join(word.capitalize() if word else '' for word in name.split())
             
             email = result.get("email")
             if email:
-                email = str(email).strip()
+                email = str(email).strip().lower()
                 # Basic email validation
                 if "@" not in email or email.lower() in ["null", "none", "n/a"]:
                     email = None
@@ -129,11 +131,25 @@ Return the information as a JSON object with name, email, phone, and location fi
                 phone = str(phone).strip()
                 if phone.lower() in ["null", "none", "n/a"]:
                     phone = None
-                # Clean phone number - keep digits and + only
-                if phone:
+                else:
+                    # Format phone to uniform international format: +[country][number with spaces]
+                    # Remove all non-digit characters except +
                     cleaned_phone = re.sub(r'[^\d+]', '', phone)
                     if len(cleaned_phone) >= 7:  # Minimum 7 digits for valid phone
-                        phone = cleaned_phone
+                        # Ensure it starts with +
+                        if not cleaned_phone.startswith('+'):
+                            cleaned_phone = '+' + cleaned_phone
+                        # Format: +[country code] [rest of number with spaces every 2-3 digits]
+                        # Extract country code (1-4 digits after +)
+                        match = re.match(r'^\+(\d{1,4})(\d+)$', cleaned_phone)
+                        if match:
+                            country_code = match.group(1)
+                            number = match.group(2)
+                            # Format number with spaces every 2-3 digits
+                            formatted_number = ' '.join([number[i:i+3] if len(number[i:]) >= 3 else number[i:] for i in range(0, len(number), 3)])
+                            phone = f"+{country_code} {formatted_number}"
+                        else:
+                            phone = cleaned_phone
                     else:
                         phone = None
             
@@ -166,10 +182,26 @@ Return the information as a JSON object with name, email, phone, and location fi
             phone = phone_match.group(1) if phone_match else None
             location = location_match.group(1) if location_match else None
             
-            # Clean phone if found
+            # Format name to Title Case
+            if name:
+                name = ' '.join(word.capitalize() if word else '' for word in name.split())
+            
+            # Format phone to uniform format
             if phone:
                 cleaned_phone = re.sub(r'[^\d+]', '', phone)
-                phone = cleaned_phone if len(cleaned_phone) >= 7 else None
+                if len(cleaned_phone) >= 7:
+                    if not cleaned_phone.startswith('+'):
+                        cleaned_phone = '+' + cleaned_phone
+                    match = re.match(r'^\+(\d{1,4})(\d+)$', cleaned_phone)
+                    if match:
+                        country_code = match.group(1)
+                        number = match.group(2)
+                        formatted_number = ' '.join([number[i:i+3] if len(number[i:]) >= 3 else number[i:] for i in range(0, len(number), 3)])
+                        phone = f"+{country_code} {formatted_number}"
+                    else:
+                        phone = cleaned_phone
+                else:
+                    phone = None
             
             return {
                 "name": name or "Unknown Candidate",

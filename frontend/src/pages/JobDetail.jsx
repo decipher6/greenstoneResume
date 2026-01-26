@@ -1030,7 +1030,6 @@ const JobDetail = () => {
               </h3>
               <p className="text-sm text-gray-400 mb-4">
                 Drop PDF, DOCX, or DOC files here, or click to browse<br />
-                <span className="text-xs text-gray-500">Supports bulk uploads of 100+ CVs with automatic retry and fallback</span>
               </p>
               <label className="glass-button cursor-pointer flex items-center gap-2 inline-flex">
                 <FileText size={18} />

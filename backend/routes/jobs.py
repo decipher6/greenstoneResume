@@ -69,13 +69,14 @@ async def generate_evaluation_criteria(
     if not job_description or not job_description.strip():
         raise HTTPException(status_code=400, detail="Job description is required")
     
-    system_message = """You are an expert HR professional and talent acquisition specialist. Your task is to analyze a job description and generate appropriate evaluation criteria for candidate assessment.
+    system_message = """You are an expert HR professional at Greenstone Equity Partners and talent acquisition specialist. Your task is to analyze a job description and generate appropriate evaluation criteria for candidate assessment.
 
 Generate 4-7 evaluation criteria that are:
 1. Relevant to the job requirements
 2. Measurable and specific
 3. Cover different aspects (technical skills, experience, soft skills, education, etc.)
 4. Have weights that sum to exactly 100%
+5. Intern roles should have a weight of visa status.
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -103,7 +104,7 @@ Do not include any additional text, explanations, or markdown formatting."""
     
     user_prompt = f"""{context_info}
 Job Description:
-{job_description[:3000]}
+{job_description[:5000]}
 
 Generate evaluation criteria for this position. Return the criteria as a JSON object."""
 
