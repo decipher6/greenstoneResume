@@ -290,31 +290,27 @@ async def upload_candidates_bulk(
             if batch_candidates:
                 try:
                     insert_results = await db.candidates.insert_many(batch_candidates)
-                    # Add IDs to candidate dicts and collect candidate IDs for immediate analysis
-                    candidate_ids_for_analysis = []
+                    # Add IDs to candidate dicts and trigger analysis for each
                     for idx, candidate_dict in enumerate(batch_candidates):
                         candidate_id = str(insert_results.inserted_ids[idx])
                         candidate_dict["id"] = candidate_id
                         uploaded_candidates.append(Candidate(**candidate_dict))
-                        candidate_ids_for_analysis.append(candidate_id)
-                    
-                    # Trigger immediate parallel analysis (not in background)
-                    if candidate_ids_for_analysis:
-                        asyncio.create_task(run_immediate_analysis_batch(job_id, candidate_ids_for_analysis))
+                        # Trigger analysis in background for each candidate
+                        background_tasks.add_task(process_candidate_analysis, job_id, candidate_id)
                 except Exception as e:
                     error_msg = str(e)
                     print(f"Error bulk inserting candidates: {error_msg}")
                     import traceback
                     traceback.print_exc()
                     # Fallback to individual inserts if bulk insert fails
-                    candidate_ids_for_analysis = []
                     for candidate_dict in batch_candidates:
                         try:
                             result = await db.candidates.insert_one(candidate_dict)
                             candidate_id = str(result.inserted_id)
                             candidate_dict["id"] = candidate_id
                             uploaded_candidates.append(Candidate(**candidate_dict))
-                            candidate_ids_for_analysis.append(candidate_id)
+                            # Trigger analysis in background for each candidate
+                            background_tasks.add_task(process_candidate_analysis, job_id, candidate_id)
                         except Exception as e2:
                             error_msg2 = str(e2)
                             print(f"Error inserting candidate {candidate_dict.get('name', 'unknown')}: {error_msg2}")
@@ -322,10 +318,6 @@ async def upload_candidates_bulk(
                                 "filename": candidate_dict.get('resume_file_path', 'unknown'), 
                                 "error": f"Database insert failed: {error_msg2}"
                             })
-                    
-                    # Trigger immediate parallel analysis for successfully inserted candidates
-                    if candidate_ids_for_analysis:
-                        asyncio.create_task(run_immediate_analysis_batch(job_id, candidate_ids_for_analysis))
         
         # Update job candidate count
         if uploaded_candidates:
@@ -1168,26 +1160,6 @@ async def delete_candidate(candidate_id: str, user_id: Optional[str] = Depends(g
     )
     
     return {"message": "Candidate deleted successfully"}
-
-async def run_immediate_analysis_batch(job_id: str, candidate_ids: List[str]):
-    """Run analysis immediately for a batch of candidates in parallel"""
-    import asyncio
-    
-    # Limit concurrent analyses to avoid overwhelming the API
-    semaphore = asyncio.Semaphore(10)  # Process up to 10 candidates simultaneously
-    
-    async def analyze_with_semaphore(candidate_id: str):
-        async with semaphore:
-            try:
-                await process_candidate_analysis(job_id, candidate_id, retry_count=0)
-            except Exception as e:
-                print(f"Error in immediate analysis for candidate {candidate_id}: {e}")
-    
-    # Start all analyses in parallel
-    tasks = [analyze_with_semaphore(cid) for cid in candidate_ids]
-    await asyncio.gather(*tasks, return_exceptions=True)
-    
-    print(f"Completed immediate analysis for {len(candidate_ids)} candidates")
 
 async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count: int = 0):
     """Background task to analyze a candidate with retry support"""
