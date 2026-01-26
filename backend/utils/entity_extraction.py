@@ -38,8 +38,8 @@ Your task is to extract the candidate's name, email address, phone number, and l
 Extract the following information:
 1. **Name**: The candidate's full name (first name and last name). This is typically at the top of the resume.
 2. **Email**: The candidate's email address (format: user@domain.com)
-3. **Phone**: The candidate's phone number (can be in various formats: +1-xxx-xxx-xxxx, (xxx) xxx-xxxx, etc.)
-4. **Location**: The candidate's current location (city, state/country format preferred, e.g., "New York, NY" or "London, UK")
+3. **Phone**: The candidate's phone number (can be in various formats: +971-xxx-xxx-xxx, (xxx) xxx-xxxx, etc.)
+4. **Location**: The candidate's current location (city, state/country format preferred, e.g., "Dubai, UAE" or "London, UK")
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -53,7 +53,7 @@ If any information is not found, use null for that field. Do not include any add
 
     user_prompt = f"""Extract the candidate's information from this resume:
 
-{resume_text[:5000]}
+{resume_text[:]}
 
 Return the information as a JSON object with name, email, phone, and location fields."""
 

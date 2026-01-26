@@ -21,7 +21,7 @@ const JobDetail = () => {
   const [selectedCandidates, setSelectedCandidates] = useState([])
   const [nameSearch, setNameSearch] = useState('')
   const [filters, setFilters] = useState({
-    status: [], // Multi-select: analyzed, shortlisted, interview, rejected
+    status: [], // Multi-select: new, analyzing, reviewed, interview, rejected
     rating: [], // Multi-select: 1-5 stars
     sort_by: 'overall_score'
   })
@@ -71,9 +71,9 @@ const JobDetail = () => {
       setJob(jobRes.data)
       setCandidates(candidatesRes.data)
       setTopCandidates(topRes.data)
-      // Filter candidates with ratings (3+ stars)
+      // Filter candidates with ratings (4+ stars)
       const shortlisted = shortlistedRes.data.filter(c => 
-        c.rating && c.rating >= 3
+        c.rating && c.rating >= 4
       )
       setShortlistedCandidates(shortlisted)
     } catch (error) {
@@ -478,12 +478,7 @@ const JobDetail = () => {
     // Prepare update data
     const updateData = { rating: newRating }
     
-    // Auto-shortlist if highly rated (4 or 5 stars), otherwise revert to analyzed
-    if (newRating >= 4) {
-      updateData.status = 'shortlisted'
-    } else {
-      updateData.status = 'analyzed'
-    }
+    // Rating doesn't change status anymore - status is managed separately
     
     // Update UI immediately (optimistic update)
     setCandidates(prevCandidates => 
@@ -505,7 +500,7 @@ const JobDetail = () => {
     
     // Also update shortlistedCandidates if needed
     setShortlistedCandidates(prevShort => {
-      if (newRating >= 3) {
+      if (newRating >= 4) {
         // Add or update in shortlisted
         const exists = prevShort.find(c => c.id === candidateId)
         if (exists) {
@@ -516,7 +511,7 @@ const JobDetail = () => {
           return [...prevShort, { ...candidate, ...updateData }]
         }
       } else {
-        // Remove from shortlisted if rating < 3
+        // Remove from shortlisted if rating < 4
         return prevShort.filter(c => c.id !== candidateId)
       }
     })
@@ -664,7 +659,7 @@ const JobDetail = () => {
     }
 
     // Group by status first (new, interview, reviewed, rejected, then others)
-    const statusOrder = ['new', 'interview', 'reviewed', 'rejected', 'shortlisted', 'analyzed', 'analyzing']
+    const statusOrder = ['new', 'interview', 'reviewed', 'rejected', 'analyzing']
     const groupedByStatus = {}
     
     filtered.forEach(candidate => {
@@ -1246,7 +1241,7 @@ const JobDetail = () => {
                   {openDropdown === 'status' && (
                     <div className="absolute top-full left-0 mt-1 z-50 glass-card p-3 min-w-[200px] shadow-lg">
                       <div className="space-y-2">
-                        {['new', 'analyzing', 'analyzed', 'reviewed', 'shortlisted', 'interview', 'rejected'].map(status => (
+                        {['new', 'analyzing', 'reviewed', 'interview', 'rejected'].map(status => (
                           <label key={status} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-glass-100 p-2 rounded">
                             <input
                               type="checkbox"
@@ -1339,6 +1334,8 @@ const JobDetail = () => {
                 className={`border-b border-glass-200 transition-colors ${
                   editingCandidateId === candidate.id 
                     ? 'bg-primary-500/5' 
+                    : (candidate.rating && candidate.rating >= 4)
+                    ? index % 2 === 0 ? 'bg-green-500/10 hover:bg-green-500/15 cursor-pointer' : 'bg-green-500/5 hover:bg-green-500/10 cursor-pointer'
                     : index % 2 === 0 ? 'bg-glass-100/50 hover:bg-glass-100 cursor-pointer' : 'bg-transparent hover:bg-glass-100 cursor-pointer'
                 }`}
                 onClick={(e) => handleRowClick(candidate.id, e)}
@@ -1475,10 +1472,6 @@ const JobDetail = () => {
                         ? 'bg-blue-400/40 text-blue-300 border-blue-400/60'
                         : candidate.status === 'rejected'
                         ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                        : candidate.status === 'shortlisted'
-                        ? 'bg-green-400/40 text-green-300 border-green-400/60'
-                        : candidate.status === 'analyzed'
-                        ? 'bg-cyan-400/40 text-cyan-300 border-cyan-400/60'
                         : candidate.status === 'analyzing'
                         ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
                         : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
@@ -1486,9 +1479,7 @@ const JobDetail = () => {
                   >
                     <option value="new">New</option>
                     <option value="analyzing">Analyzing</option>
-                    <option value="analyzed">Analyzed</option>
                     <option value="reviewed">Reviewed</option>
-                    <option value="shortlisted">Shortlisted</option>
                     <option value="interview">Interview</option>
                     <option value="rejected">Rejected</option>
                   </select>
@@ -1599,6 +1590,7 @@ const JobDetail = () => {
                   <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Name</th>
                   <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Email</th>
                   <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Phone</th>
+                  <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Status</th>
                   <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Rating</th>
                   <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Score</th>
                   <th className="px-6 py-5 text-left text-lg font-extrabold text-white">Actions</th>
@@ -1607,8 +1599,8 @@ const JobDetail = () => {
               <tbody>
                 {shortlistedCandidates.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                      No rated candidates yet. Rate candidates with 3+ stars to see them here.
+                    <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                      No rated candidates yet. Rate candidates with 4+ stars to see them here.
                     </td>
                   </tr>
                 ) : (
@@ -1682,6 +1674,31 @@ const JobDetail = () => {
                             </button>
                           )}
                         </div>
+                      </td>
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={candidate.status || 'new'}
+                          onChange={(e) => handleStatusChange(candidate.id, e.target.value, e)}
+                          className={`glass-input text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer ${
+                            candidate.status === 'new'
+                              ? 'bg-gray-400/40 text-gray-300 border-gray-400/60'
+                              : candidate.status === 'interview'
+                              ? 'bg-purple-400/40 text-purple-300 border-purple-400/60'
+                              : candidate.status === 'reviewed'
+                              ? 'bg-blue-400/40 text-blue-300 border-blue-400/60'
+                              : candidate.status === 'rejected'
+                              ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                              : candidate.status === 'analyzing'
+                              ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                              : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                          }`}
+                        >
+                          <option value="new">New</option>
+                          <option value="analyzing">Analyzing</option>
+                          <option value="reviewed">Reviewed</option>
+                          <option value="interview">Interview</option>
+                          <option value="rejected">Rejected</option>
+                        </select>
                       </td>
                       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-0.5">

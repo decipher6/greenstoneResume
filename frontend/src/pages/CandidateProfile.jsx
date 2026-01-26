@@ -157,12 +157,7 @@ const CandidateProfile = () => {
     // Prepare update data
     const updateData = { rating: newRating }
     
-    // Auto-shortlist if highly rated (4 or 5 stars), otherwise revert to analyzed
-    if (newRating >= 4) {
-      updateData.status = 'shortlisted'
-    } else {
-      updateData.status = 'analyzed'
-    }
+    // Rating doesn't change status anymore - status is managed separately
     
     // Update UI immediately (optimistic update)
     setCandidate(prev => prev ? { ...prev, ...updateData } : prev)
@@ -429,11 +424,9 @@ const CandidateProfile = () => {
 
   // Get job title from candidate data or use default
   const jobTitle = candidate.job_title || job?.title || 'Senior Software Engineer'
-  const statusBadge = candidate.status === 'shortlisted' ? 'Shortlisted' : 
-                     candidate.status === 'rejected' ? 'Rejected' : 
+  const statusBadge = candidate.status === 'rejected' ? 'Rejected' : 
                      candidate.status === 'interview' ? 'Interview' :
                      candidate.status === 'reviewed' ? 'Reviewed' :
-                     candidate.status === 'analyzed' ? 'Analyzed' : 
                      candidate.status === 'analyzing' ? 'Analyzing' : 'New'
   
   const aiSummary = parseAISummary(candidate.ai_justification)
@@ -458,11 +451,9 @@ const CandidateProfile = () => {
             <div className="flex items-center gap-3 mb-2">
               <h2 className="text-3xl font-bold">{candidate.name || 'Unknown Candidate'}</h2>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                candidate.status === 'shortlisted' ? 'bg-green-400/40 text-green-300 border border-green-400/60' :
                 candidate.status === 'rejected' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
                 candidate.status === 'interview' ? 'bg-purple-400/40 text-purple-300 border border-purple-400/60' :
                 candidate.status === 'reviewed' ? 'bg-blue-400/40 text-blue-300 border border-blue-400/60' :
-                candidate.status === 'analyzed' ? 'bg-cyan-400/40 text-cyan-300 border border-cyan-400/60' :
                 candidate.status === 'analyzing' ? 'bg-yellow-400/40 text-yellow-300 border border-yellow-400/60' :
                 'bg-gray-400/40 text-gray-300 border border-gray-400/60'
               }`}>

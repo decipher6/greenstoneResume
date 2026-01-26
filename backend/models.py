@@ -52,9 +52,7 @@ class ContactInfo(BaseModel):
 class CandidateStatus(str, Enum):
     new = "new"
     analyzing = "analyzing"
-    analyzed = "analyzed"
     reviewed = "reviewed"
-    shortlisted = "shortlisted"
     rejected = "rejected"
     interview = "interview"
 

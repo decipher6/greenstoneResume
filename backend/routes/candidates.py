@@ -1054,9 +1054,7 @@ async def update_candidate(candidate_id: str, update_data: dict = Body(...), use
     # Log activity
     action_type = "candidate_updated"
     if "status" in update_fields:
-        if update_fields["status"] == "shortlisted":
-            action_type = "candidate_shortlisted"
-        elif update_fields["status"] == "rejected":
+        if update_fields["status"] == "rejected":
             action_type = "candidate_rejected"
     
     await log_activity(
@@ -1173,8 +1171,8 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
         return
     
     # Skip if already analyzed (unless forced retry)
-    # Allow re-analysis if status is new, analyzing, or analyzed
-    if candidate.get("status") == CandidateStatus.analyzed.value and retry_count == 0:
+    # Allow re-analysis if status is new or analyzing
+    if candidate.get("status") not in [CandidateStatus.new.value, CandidateStatus.analyzing.value] and retry_count == 0:
         return
     
     job = await db.jobs.find_one({"_id": ObjectId(job_id)})
@@ -1343,12 +1341,12 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
             # Optionally include personality in overall if desired
             # For now, overall = resume_score only
         
-        # Update candidate
+        # Update candidate - set status to 'new' after analysis completes
         await db.candidates.update_one(
             {"_id": ObjectId(candidate_id)},
             {
                 "$set": {
-                    "status": CandidateStatus.analyzed.value,
+                    "status": CandidateStatus.new.value,
                     "score_breakdown": score_breakdown,
                     "criterion_scores": criterion_scores,
                     "ai_justification": scoring_result["justification"],
