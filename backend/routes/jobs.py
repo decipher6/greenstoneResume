@@ -2,6 +2,12 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Query, Body, Depe
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
+import os
+import json
+import re
+import asyncio
+from dotenv import load_dotenv
+from google import genai
 
 from database import get_db
 from models import Job, JobCreate, JobStatus
@@ -9,6 +15,18 @@ from utils.ai_scoring import score_resume_with_llm
 from routes.candidates import process_candidate_analysis
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
+
+load_dotenv()
+
+# Debug mode
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY missing in .env")
+
+# Initialize Gemini client
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 router = APIRouter()
 
@@ -38,6 +56,168 @@ async def get_job(job_id: str):
     if "created_at" in job and job["created_at"]:
         pass  # Keep datetime as is
     return Job(**job)
+
+@router.post("/generate-criteria")
+async def generate_evaluation_criteria(
+    job_description: str = Body(..., embed=True),
+    job_title: Optional[str] = Body(None, embed=True),
+    department: Optional[str] = Body(None, embed=True)
+):
+    """
+    Generate evaluation criteria from job description using AI
+    """
+    if not job_description or not job_description.strip():
+        raise HTTPException(status_code=400, detail="Job description is required")
+    
+    system_message = """You are an expert HR professional and talent acquisition specialist. Your task is to analyze a job description and generate appropriate evaluation criteria for candidate assessment.
+
+Generate 4-7 evaluation criteria that are:
+1. Relevant to the job requirements
+2. Measurable and specific
+3. Cover different aspects (technical skills, experience, soft skills, education, etc.)
+4. Have weights that sum to exactly 100%
+
+Return ONLY a valid JSON object with this exact structure:
+{
+    "criteria": [
+        {
+            "name": "Criterion Name Here",
+            "weight": 25.0
+        }
+    ]
+}
+
+The weights MUST sum to exactly 100.0. Distribute weights based on importance:
+- Most critical requirements: 25-35%
+- Important requirements: 15-25%
+- Nice-to-have requirements: 10-15%
+- Supporting requirements: 5-10%
+
+Do not include any additional text, explanations, or markdown formatting."""
+
+    context_info = ""
+    if job_title:
+        context_info += f"Job Title: {job_title}\n"
+    if department:
+        context_info += f"Department: {department}\n"
+    
+    user_prompt = f"""{context_info}
+Job Description:
+{job_description[:3000]}
+
+Generate evaluation criteria for this position. Return the criteria as a JSON object."""
+
+    try:
+        if DEBUG:
+            print(f"DEBUG: Calling Gemini API to generate evaluation criteria")
+        
+        # Combine system message and user prompt
+        full_prompt = f"{system_message}\n\n{user_prompt}"
+        
+        # Run Gemini API call in thread pool since it's synchronous
+        response = await asyncio.to_thread(
+            gemini_client.models.generate_content,
+            model="gemini-3-flash-preview",
+            contents=full_prompt
+        )
+        
+        if not response:
+            raise Exception("Empty response from Gemini API")
+        
+        content = response.text
+        
+        if not content:
+            raise Exception("No content in Gemini API response")
+        
+        if DEBUG:
+            print(f"DEBUG: Received criteria generation response (length: {len(content)} chars)")
+        
+        # Extract JSON from response
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
+        if json_match:
+            content = json_match.group(0)
+        
+        # Remove markdown code blocks if present
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        
+        # Clean up the content
+        content = content.strip()
+        if not content.startswith('{'):
+            start_idx = content.find('{')
+            if start_idx != -1:
+                content = content[start_idx:]
+        if not content.endswith('}'):
+            end_idx = content.rfind('}')
+            if end_idx != -1:
+                content = content[:end_idx + 1]
+        
+        try:
+            result = json.loads(content)
+            
+            # Validate and normalize criteria
+            criteria = result.get("criteria", [])
+            if not criteria or len(criteria) < 3:
+                raise Exception("Generated criteria must have at least 3 items")
+            
+            # Normalize weights to sum to 100
+            total_weight = sum(c.get("weight", 0) for c in criteria)
+            if total_weight == 0:
+                # Distribute evenly if no weights
+                weight_per_criterion = 100.0 / len(criteria)
+                criteria = [{**c, "weight": round(weight_per_criterion, 1)} for c in criteria]
+            else:
+                # Normalize to 100
+                criteria = [
+                    {**c, "weight": round((c.get("weight", 0) / total_weight) * 100, 1)}
+                    for c in criteria
+                ]
+                # Adjust last item to ensure exact 100
+                current_total = sum(c["weight"] for c in criteria)
+                if abs(current_total - 100) > 0.1:
+                    criteria[-1]["weight"] = round(criteria[-1]["weight"] + (100 - current_total), 1)
+            
+            # Validate each criterion
+            validated_criteria = []
+            for c in criteria:
+                name = str(c.get("name", "")).strip()
+                weight = float(c.get("weight", 0))
+                if name and 0 < weight <= 100:
+                    validated_criteria.append({
+                        "name": name,
+                        "weight": weight
+                    })
+            
+            if len(validated_criteria) < 3:
+                raise Exception("Not enough valid criteria generated")
+            
+            return {"criteria": validated_criteria}
+            
+        except json.JSONDecodeError as e:
+            if DEBUG:
+                print(f"JSON decode error: {e}")
+                print(f"Content received (first 500 chars): {content[:500]}")
+            raise Exception(f"Failed to parse AI response: {str(e)}")
+            
+    except Exception as e:
+        error_msg = str(e)
+        if DEBUG:
+            print(f"ERROR in criteria generation: {error_msg}")
+            import traceback
+            traceback.print_exc()
+        
+        # Fallback to default criteria
+        return {
+            "criteria": [
+                {"name": "Technical Skills", "weight": 30.0},
+                {"name": "Relevant Experience", "weight": 25.0},
+                {"name": "Education & Certifications", "weight": 20.0},
+                {"name": "Communication Skills", "weight": 15.0},
+                {"name": "Cultural Fit", "weight": 10.0}
+            ]
+        }
 
 @router.post("/", response_model=Job)
 async def create_job(job: JobCreate, user_id: Optional[str] = Depends(get_current_user_id)):
