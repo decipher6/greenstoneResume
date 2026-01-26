@@ -17,7 +17,7 @@ from database import get_db
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 from models import Candidate, CandidateStatus, ContactInfo, ScoreBreakdown, CriterionScore
 from utils.cv_parser import parse_resume
-from utils.entity_extraction import extract_contact_info, extract_name, extract_location
+from utils.entity_extraction import extract_entities_with_llm, extract_contact_info, extract_name, extract_location
 from utils.ai_scoring import score_resume_with_llm, calculate_composite_score
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
@@ -85,33 +85,35 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
                 resume_text = f"Resume: {filename}\nNote: Text extraction had issues: {error_msg}"
                 print(f"Warning: Parsing error for {filename}, using fallback text: {error_msg}")
         
-        # Extract contact info, name, and location
+        # Extract contact info, name, and location using LLM
         try:
-            # Use OCR contact info if available, otherwise extract from text
-            if ocr_contact_info and (ocr_contact_info.get('email') or ocr_contact_info.get('phone') or ocr_contact_info.get('name')):
-                contact_info_dict = ocr_contact_info
-                # Use OCR name if available, otherwise try to extract from text
-                if ocr_contact_info.get('name'):
-                    name = ocr_contact_info['name']
-                else:
-                    name = await extract_name(resume_text, contact_info_dict)
-            else:
-                contact_info_dict = await extract_contact_info(resume_text)
-                # Pass contact_info to extract_name so it can use email as fallback
-                name = await extract_name(resume_text, contact_info_dict)
+            # Always use LLM for extraction (more accurate than regex)
+            # If OCR provided some info, we'll still use LLM but can prefer OCR data if LLM fails
+            entities = await extract_entities_with_llm(resume_text)
             
-            # Extract location
-            location = await extract_location(resume_text)
+            # Use LLM extracted data, but prefer OCR data if available and LLM didn't find it
+            name = entities.get("name") or ocr_contact_info.get('name') or filename.split('.')[0]
+            email = entities.get("email") or ocr_contact_info.get('email')
+            phone = entities.get("phone") or ocr_contact_info.get('phone')
+            location = entities.get("location")
+            
+            contact_info_dict = {
+                "email": email,
+                "phone": phone
+            }
         except Exception as extract_error:
-            # Continue even if extraction fails, use defaults
-            contact_info_dict = ocr_contact_info if ocr_contact_info else {}
-            # Try to extract email from filename or use filename as fallback
-            if not contact_info_dict.get('name'):
-                name = filename.split('.')[0]  # Use filename as fallback
+            # Continue even if LLM extraction fails, use OCR or defaults
+            if ocr_contact_info:
+                contact_info_dict = {
+                    "email": ocr_contact_info.get('email'),
+                    "phone": ocr_contact_info.get('phone')
+                }
+                name = ocr_contact_info.get('name') or filename.split('.')[0]
             else:
-                name = contact_info_dict.get('name')
+                contact_info_dict = {}
+                name = filename.split('.')[0]
             location = None
-            print(f"Warning: Extraction failed for {filename}: {extract_error}")
+            print(f"Warning: LLM extraction failed for {filename}: {extract_error}")
         
         # Store file in MongoDB GridFS
         db = get_db()

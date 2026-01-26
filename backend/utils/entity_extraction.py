@@ -1,129 +1,274 @@
+import os
+import json
 import re
+import asyncio
 from typing import Dict, Optional
+from dotenv import load_dotenv
+from google import genai
 
-async def extract_contact_info(text: str) -> Dict[str, Optional[str]]:
-    """Extract email and phone from resume text"""
-    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-    # More flexible phone pattern to handle various formats:
-    # +33 6 31 23 36 43, (+971) 52-719-3918, +971 58 225 5450, +971 52 532 3344, etc.
-    # Pattern matches: optional +, optional parentheses around country code, 
-    # then multiple groups of digits (1-6 digits each) separated by spaces, dashes, dots, or parentheses
-    phone_pattern = r'[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,6}(?:[-\s\.\(\)]?[0-9]{1,6}){2,8}'
-    
-    emails = re.findall(email_pattern, text)
-    phones = re.findall(phone_pattern, text)
-    
-    # Clean phone numbers
-    cleaned_phones = []
-    for phone in phones:
-        # Remove common separators and keep digits and +
-        cleaned = re.sub(r'[^\d+]', '', phone)
-        if len(cleaned) >= 7:  # Minimum 7 digits (reduced from 10 for international numbers)
-            cleaned_phones.append(cleaned)
-    
-    return {
-        "email": emails[0] if emails else None,
-        "phone": cleaned_phones[0] if cleaned_phones else None
-    }
+load_dotenv()
 
-async def extract_name(text: str, contact_info: Optional[Dict[str, Optional[str]]] = None) -> str:
-    """Extract candidate name from resume (simplified - first 2-3 words of first line)
-    
-    If name extraction fails, falls back to:
-    1. Email username (part before @) if email is available
-    2. First 2 words of text
-    3. First word of text
-    4. "Unknown Candidate"
+# Debug mode - set DEBUG=true in environment to enable debug prints
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY missing in .env")
+
+# Initialize Gemini client
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+
+async def extract_entities_with_llm(resume_text: str) -> Dict[str, Optional[str]]:
     """
-    lines = text.split('\n')
-    for line in lines[:5]:  # Check first 5 lines
-        line = line.strip()
-        if len(line) > 0 and len(line.split()) >= 2 and len(line.split()) <= 4:
-            # Basic name validation - contains letters, not all caps, not too long
-            if line.replace(' ', '').isalpha() or (line.replace(' ', '').isalnum() and len(line) < 50):
-                return line
+    Extract candidate information (name, email, phone, location) from resume text using LLM.
+    Uses the same Gemini Flash model as scoring.
+    """
+    if not resume_text or len(resume_text.strip()) == 0:
+        return {
+            "name": "Unknown Candidate",
+            "email": None,
+            "phone": None,
+            "location": None
+        }
     
-    # If no name found, try email username as fallback
-    if contact_info and contact_info.get("email"):
-        email = contact_info["email"]
-        email_username = email.split('@')[0]
-        # Clean up common email patterns (e.g., firstname.lastname -> Firstname Lastname)
-        # Replace dots and underscores with spaces, then capitalize
-        name_from_email = email_username.replace('.', ' ').replace('_', ' ').replace('-', ' ')
-        # Capitalize first letter of each word
-        name_from_email = ' '.join(word.capitalize() for word in name_from_email.split() if word)
-        if name_from_email and len(name_from_email) > 1:
-            return name_from_email
-    
-    # If no email or email extraction didn't work, return first 2 words of the text
-    words = text.split()
-    if len(words) >= 2:
-        return ' '.join(words[:2])
-    elif len(words) == 1:
-        return words[0]
-    return "Unknown Candidate"
+    system_message = """You are an expert at extracting structured information from resumes. 
+Your task is to extract the candidate's name, email address, phone number, and location from the resume text.
 
-async def extract_location(text: str) -> Optional[str]:
-    """Extract location information from resume text"""
-    if not text:
-        return None
+Extract the following information:
+1. **Name**: The candidate's full name (first name and last name). This is typically at the top of the resume.
+2. **Email**: The candidate's email address (format: user@domain.com)
+3. **Phone**: The candidate's phone number (can be in various formats: +1-xxx-xxx-xxxx, (xxx) xxx-xxxx, etc.)
+4. **Location**: The candidate's current location (city, state/country format preferred, e.g., "New York, NY" or "London, UK")
+
+Return ONLY a valid JSON object with this exact structure:
+{
+    "name": "Full Name Here",
+    "email": "email@example.com",
+    "phone": "+1-xxx-xxx-xxxx",
+    "location": "City, State/Country"
+}
+
+If any information is not found, use null for that field. Do not include any additional text, explanations, or markdown formatting."""
+
+    user_prompt = f"""Extract the candidate's information from this resume:
+
+{resume_text[:5000]}
+
+Return the information as a JSON object with name, email, phone, and location fields."""
+
+    try:
+        if DEBUG:
+            print(f"DEBUG: Calling Gemini API for entity extraction with model gemini-3-flash-preview")
+        
+        # Combine system message and user prompt
+        full_prompt = f"{system_message}\n\n{user_prompt}"
+        
+        # Run Gemini API call in thread pool since it's synchronous
+        response = await asyncio.to_thread(
+            gemini_client.models.generate_content,
+            model="gemini-3-flash-preview",
+            contents=full_prompt
+        )
+        
+        if not response:
+            raise Exception("Empty response from Gemini API")
+        
+        content = response.text
+        
+        if not content:
+            raise Exception("No content in Gemini API response")
+        
+        if DEBUG:
+            print(f"DEBUG: Received entity extraction response (length: {len(content)} chars)")
+        
+        # Extract JSON from response (handle markdown code blocks and other formats)
+        # Try to find JSON in the response
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
+        if json_match:
+            content = json_match.group(0)
+        
+        # Remove markdown code blocks if present
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        
+        # Clean up the content - remove any leading/trailing text
+        content = content.strip()
+        if not content.startswith('{'):
+            # Try to find the first {
+            start_idx = content.find('{')
+            if start_idx != -1:
+                content = content[start_idx:]
+        if not content.endswith('}'):
+            # Try to find the last }
+            end_idx = content.rfind('}')
+            if end_idx != -1:
+                content = content[:end_idx + 1]
+        
+        try:
+            result = json.loads(content)
+            
+            # Validate and clean the extracted data
+            name = result.get("name")
+            if name:
+                name = str(name).strip()
+                if not name or name.lower() in ["null", "none", "n/a", "unknown"]:
+                    name = None
+            
+            email = result.get("email")
+            if email:
+                email = str(email).strip()
+                # Basic email validation
+                if "@" not in email or email.lower() in ["null", "none", "n/a"]:
+                    email = None
+            
+            phone = result.get("phone")
+            if phone:
+                phone = str(phone).strip()
+                if phone.lower() in ["null", "none", "n/a"]:
+                    phone = None
+                # Clean phone number - keep digits and + only
+                if phone:
+                    cleaned_phone = re.sub(r'[^\d+]', '', phone)
+                    if len(cleaned_phone) >= 7:  # Minimum 7 digits for valid phone
+                        phone = cleaned_phone
+                    else:
+                        phone = None
+            
+            location = result.get("location")
+            if location:
+                location = str(location).strip()
+                if not location or location.lower() in ["null", "none", "n/a", "unknown"]:
+                    location = None
+            
+            return {
+                "name": name or "Unknown Candidate",
+                "email": email,
+                "phone": phone,
+                "location": location
+            }
+            
+        except json.JSONDecodeError as e:
+            if DEBUG:
+                print(f"JSON decode error in entity extraction: {e}")
+                print(f"Content received (first 500 chars): {content[:500]}")
+            
+            # Fallback: try to extract fields using regex patterns
+            name_match = re.search(r'"name"\s*:\s*"([^"]+)"', content)
+            email_match = re.search(r'"email"\s*:\s*"([^"]+)"', content)
+            phone_match = re.search(r'"phone"\s*:\s*"([^"]+)"', content)
+            location_match = re.search(r'"location"\s*:\s*"([^"]+)"', content)
+            
+            name = name_match.group(1) if name_match else None
+            email = email_match.group(1) if email_match else None
+            phone = phone_match.group(1) if phone_match else None
+            location = location_match.group(1) if location_match else None
+            
+            # Clean phone if found
+            if phone:
+                cleaned_phone = re.sub(r'[^\d+]', '', phone)
+                phone = cleaned_phone if len(cleaned_phone) >= 7 else None
+            
+            return {
+                "name": name or "Unknown Candidate",
+                "email": email,
+                "phone": phone,
+                "location": location
+            }
+            
+    except Exception as e:
+        error_msg = str(e)
+        if DEBUG:
+            print(f"ERROR in LLM entity extraction: {error_msg}")
+            import traceback
+            traceback.print_exc()
+        
+        # Fallback to basic extraction on error
+        return await _fallback_extraction(resume_text)
+
+async def _fallback_extraction(text: str) -> Dict[str, Optional[str]]:
+    """Fallback extraction using regex patterns if LLM fails"""
+    # Basic email extraction
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    emails = re.findall(email_pattern, text)
+    email = emails[0] if emails else None
     
-    # Common location patterns
-    # Look for patterns like: "City, State", "City, Country", "City, State, Country"
-    # Also look for standalone cities or countries
+    # Basic phone extraction
+    phone_pattern = r'[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,6}(?:[-\s\.\(\)]?[0-9]{1,6}){2,8}'
+    phones = re.findall(phone_pattern, text)
+    phone = None
+    if phones:
+        cleaned = re.sub(r'[^\d+]', '', phones[0])
+        if len(cleaned) >= 7:
+            phone = cleaned
     
+    # Basic name extraction (first line that looks like a name)
     lines = text.split('\n')
+    name = "Unknown Candidate"
+    for line in lines[:5]:
+        line = line.strip()
+        if len(line) > 0 and 2 <= len(line.split()) <= 4:
+            if line.replace(' ', '').isalpha() or (line.replace(' ', '').isalnum() and len(line) < 50):
+                name = line
+                break
     
-    # Check first 20 lines for location information
+    # Basic location extraction
+    location = None
     for line in lines[:20]:
         line = line.strip()
         if not line or len(line) < 3:
             continue
-        
-        # Skip lines that are clearly not locations
-        if '@' in line or 'http' in line.lower() or 'www.' in line.lower():
+        if '@' in line or 'http' in line.lower():
             continue
-        if re.search(r'\d{4,}', line):  # Skip lines with long numbers (likely phone/ID)
-            continue
-        
-        # Look for common location patterns
-        # Pattern: City, State/Country (e.g., "New York, NY", "London, UK", "Dubai, UAE")
-        location_pattern = r'^[A-Z][a-zA-Z\s]+,\s*[A-Z]{2,}(?:\s*,\s*[A-Z][a-zA-Z\s]+)?$'
+        location_pattern = r'^[A-Z][a-zA-Z\s]+,\s*[A-Z]{2,}'
         if re.match(location_pattern, line):
-            return line
-        
-        # Pattern: City - State/Country (e.g., "New York - NY")
-        location_pattern2 = r'^[A-Z][a-zA-Z\s]+\s*-\s*[A-Z]{2,}$'
-        if re.match(location_pattern2, line):
-            return line.replace(' - ', ', ')
-        
-        # Pattern: Standalone major cities or countries (common ones)
-        major_locations = [
-            'New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia',
-            'San Antonio', 'San Diego', 'Dallas', 'San Jose', 'Austin', 'Jacksonville',
-            'London', 'Paris', 'Tokyo', 'Sydney', 'Singapore', 'Dubai', 'Mumbai',
-            'Bangalore', 'Toronto', 'Vancouver', 'Mexico City', 'São Paulo', 'Buenos Aires',
-            'United States', 'USA', 'United Kingdom', 'UK', 'Canada', 'Australia',
-            'India', 'UAE', 'Singapore', 'Japan', 'Germany', 'France'
-        ]
-        
-        line_upper = line.upper()
-        for location in major_locations:
-            if location.upper() in line_upper:
-                return line
+            location = line
+            break
     
-    # If no clear location found, try to find country codes or country names in the text
-    country_pattern = r'\b(?:USA|UK|UAE|CA|AU|IN|SG|JP|DE|FR|BR|MX|AR)\b'
-    country_match = re.search(country_pattern, text, re.IGNORECASE)
-    if country_match:
-        country_map = {
-            'USA': 'United States', 'UK': 'United Kingdom', 'UAE': 'United Arab Emirates',
-            'CA': 'Canada', 'AU': 'Australia', 'IN': 'India', 'SG': 'Singapore',
-            'JP': 'Japan', 'DE': 'Germany', 'FR': 'France', 'BR': 'Brazil',
-            'MX': 'Mexico', 'AR': 'Argentina'
-        }
-        code = country_match.group().upper()
-        return country_map.get(code, code)
+    return {
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "location": location
+    }
+
+async def extract_contact_info(text: str) -> Dict[str, Optional[str]]:
+    """Extract email and phone from resume text using LLM"""
+    entities = await extract_entities_with_llm(text)
+    return {
+        "email": entities.get("email"),
+        "phone": entities.get("phone")
+    }
+
+async def extract_name(text: str, contact_info: Optional[Dict[str, Optional[str]]] = None) -> str:
+    """Extract candidate name from resume using LLM"""
+    entities = await extract_entities_with_llm(text)
+    name = entities.get("name")
     
-    return None
+    # Fallback if LLM didn't extract name
+    if not name or name == "Unknown Candidate":
+        # Try email username as fallback
+        if contact_info and contact_info.get("email"):
+            email = contact_info["email"]
+            email_username = email.split('@')[0]
+            name_from_email = email_username.replace('.', ' ').replace('_', ' ').replace('-', ' ')
+            name_from_email = ' '.join(word.capitalize() for word in name_from_email.split() if word)
+            if name_from_email and len(name_from_email) > 1:
+                return name_from_email
+        
+        # Last resort: first 2 words of text
+        words = text.split()
+        if len(words) >= 2:
+            return ' '.join(words[:2])
+        elif len(words) == 1:
+            return words[0]
+    
+    return name or "Unknown Candidate"
+
+async def extract_location(text: str) -> Optional[str]:
+    """Extract location information from resume text using LLM"""
+    entities = await extract_entities_with_llm(text)
+    return entities.get("location")
 
