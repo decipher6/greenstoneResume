@@ -154,7 +154,7 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
             "resume_text": resume_text,
             "resume_file_path": resume_file_path,  # Keep for backward compatibility
             "resume_file_id": resume_file_id,  # New: MongoDB GridFS file ID
-            "status": CandidateStatus.new.value,
+            "status": CandidateStatus.analyzing.value,  # Set to analyzing immediately so candidates are visible
             "created_at": datetime.now()
         }
         
@@ -218,8 +218,8 @@ async def upload_candidates_bulk(
             }
     
         # Process files in parallel batches (optimized for 100+ file uploads)
-        # Batch size of 15 provides good balance between throughput and resource usage
-        BATCH_SIZE = 15
+        # Increased batch size to 25 for faster processing
+        BATCH_SIZE = 25
         total_files = len(valid_files)
         
         if DEBUG or total_files >= 10:
@@ -1185,14 +1185,14 @@ async def delete_candidate(candidate_id: str, user_id: Optional[str] = Depends(g
 
 async def process_candidates_analysis_parallel(job_id: str, candidate_ids: List[str]):
     """
-    Process multiple candidates in parallel batches of 10.
-    If less than 10 candidates, process all in parallel.
+    Process multiple candidates in parallel batches of 25 for faster processing.
+    If less than 25 candidates, process all in parallel.
     """
     if not candidate_ids:
         return
-    
+
     total = len(candidate_ids)
-    batch_size = 10
+    batch_size = 25  # Increased from 10 to 25 for faster analysis
     
     # Process in batches of 10
     for i in range(0, total, batch_size):

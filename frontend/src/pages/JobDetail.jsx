@@ -148,10 +148,11 @@ const JobDetail = () => {
     if (pendingFiles.length === 0) return
 
     setIsUploading(true)
+    let uploadPollInterval = null
     try {
-      // Upload files in small chunks to avoid network errors
-      // Smaller chunks = more reliable uploads
-      const CHUNK_SIZE = 5 // Upload 5 files at a time for reliability
+      // Upload files in larger chunks for faster processing
+      // Increased chunk size to 25 for better performance with 100+ files
+      const CHUNK_SIZE = 25 // Upload 25 files at a time for speed
       const chunks = []
       for (let i = 0; i < pendingFiles.length; i += CHUNK_SIZE) {
         chunks.push(pendingFiles.slice(i, i + CHUNK_SIZE))
@@ -162,6 +163,12 @@ const JobDetail = () => {
       const allFailedFiles = []
       const totalFiles = pendingFiles.length
       const filesToRetry = [] // Files that failed due to network errors
+
+      // Start polling for new candidates while upload is in progress
+      // This allows users to see candidates as they're being uploaded
+      uploadPollInterval = setInterval(() => {
+        fetchData().catch(err => console.error('Error polling during upload:', err))
+      }, 2000) // Poll every 2 seconds during upload
 
       // Upload chunks sequentially to avoid overwhelming the server
       setUploadProgress({ current: 0, total: chunks.length, filesProcessed: 0, totalFiles })
@@ -195,6 +202,10 @@ const JobDetail = () => {
             if (data.failed_files && data.failed_files.length > 0) {
               allFailedFiles.push(...data.failed_files)
             }
+            
+            // Refresh candidates immediately after each chunk to show uploaded candidates
+            // This allows users to see candidates as they're being uploaded
+            await fetchData()
             
             chunkSuccess = true
           } catch (error) {
@@ -324,6 +335,9 @@ const JobDetail = () => {
         await showAlert('Success', message, 'success')
       }
       
+      // Stop polling during upload
+      clearInterval(uploadPollInterval)
+      
       setPendingFiles([])
       fetchData()
       refreshStats() // Refresh dashboard stats
@@ -398,6 +412,10 @@ const JobDetail = () => {
       }
       await showAlert('Error', errorMessage, 'error')
     } finally {
+      // Make sure to clear polling interval if it exists
+      if (uploadPollInterval) {
+        clearInterval(uploadPollInterval)
+      }
       setIsUploading(false)
       setUploadProgress({ current: 0, total: 0, filesProcessed: 0, totalFiles: 0, currentChunk: 0, retrying: false })
     }
