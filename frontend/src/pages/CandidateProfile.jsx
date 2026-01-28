@@ -822,20 +822,25 @@ const CandidateProfile = () => {
                       {candidate.criterion_scores.map((criterion, index) => {
                         const score = parseFloat(criterion.score || 0)
                         const criterionName = criterion.criterion_name || ''
-                        const wordCount = criterionName.split(/\s+/).filter(w => w).length
                         
-                        // For criteria > 5 words: display shorter alias, show full name on hover
-                        // For criteria <= 5 words: display full name
-                        const displayText = wordCount > 5 && criterion.criterion_title 
-                          ? criterion.criterion_title 
-                          : criterionName
+                        // Get alias from job's evaluation_criteria (stored during job creation)
+                        // Find matching criterion in job data
+                        const jobCriterion = job?.evaluation_criteria?.find(
+                          c => c.name === criterionName || c.name?.toLowerCase() === criterionName?.toLowerCase()
+                        )
+                        const alias = jobCriterion?.alias
+                        
+                        // Use alias for display if available, otherwise use full name
+                        const displayText = alias || criterionName
+                        // Always show full criterion name in tooltip
+                        const tooltipText = criterionName
                         
                         return (
                           <div key={index}>
                             <div className="flex items-center justify-between mb-2">
                               <span 
                                 className="text-sm font-medium" 
-                                title={criterionName}
+                                title={tooltipText}
                               >
                                 {displayText}
                               </span>

@@ -20,7 +20,6 @@ from utils.cv_parser import parse_resume
 from utils.entity_extraction import extract_entities_with_llm, extract_contact_info, extract_name, extract_location
 from utils.ai_scoring import score_resume_with_llm, calculate_composite_score
 from utils.location_match import check_location_match
-from utils.criterion_title import generate_criterion_title
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
 
@@ -1461,24 +1460,10 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
                 if DEBUG:
                     print(f"Matched '{criterion_name}' with score {score:.1f} using {match_method} matching")
             
-            # Generate shorter alias for criteria longer than 5 words
-            word_count = len(criterion_name.split())
-            criterion_title = criterion_name
-            
-            if word_count > 5:
-                try:
-                    criterion_title = await generate_criterion_title(criterion_name)
-                    if DEBUG:
-                        print(f"DEBUG: Generated alias '{criterion_title}' for criterion '{criterion_name}' ({word_count} words)")
-                except Exception as e:
-                    print(f"Error generating alias for criterion '{criterion_name}': {e}")
-                    # Fallback: take first 4 words
-                    words = criterion_name.split()[:4]
-                    criterion_title = ' '.join(words)
-            
+            # Use alias from job's evaluation_criteria if available (generated during job creation)
+            # No need to generate here - aliases are created during job creation
             criterion_scores.append({
                 "criterion_name": criterion_name,
-                "criterion_title": criterion_title,  # Short title for hover tooltip
                 "score": float(score),
                 "weight": criterion["weight"]
             })

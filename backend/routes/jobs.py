@@ -12,6 +12,7 @@ from google import genai
 from database import get_db
 from models import Job, JobCreate, JobStatus
 from utils.ai_scoring import score_resume_with_llm
+from utils.criterion_title import generate_criterion_title
 from routes.candidates import process_candidate_analysis
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
@@ -180,16 +181,37 @@ Generate evaluation criteria for this position. Return the criteria as a JSON ob
                 if abs(current_total - 100) > 0.1:
                     criteria[-1]["weight"] = round(criteria[-1]["weight"] + (100 - current_total), 1)
             
-            # Validate each criterion
+            # Validate each criterion and generate aliases for long names (>5 words)
             validated_criteria = []
+            import re
             for c in criteria:
                 name = str(c.get("name", "")).strip()
                 weight = float(c.get("weight", 0))
                 if name and 0 < weight <= 100:
-                    validated_criteria.append({
+                    criterion_dict = {
                         "name": name,
                         "weight": weight
-                    })
+                    }
+                    
+                    # Generate alias for criteria > 5 words (count all words including parentheses)
+                    word_count = len(name.split())
+                    
+                    if word_count > 5:
+                        try:
+                            alias = await generate_criterion_title(name)
+                            criterion_dict["alias"] = alias
+                            if DEBUG:
+                                print(f"DEBUG: Generated alias '{alias}' for criterion '{name}' ({word_count} words)")
+                        except Exception as e:
+                            if DEBUG:
+                                print(f"DEBUG: Error generating alias for '{name}': {e}")
+                            # Fallback: use first 2-3 words
+                            words = name.split()
+                            skip_words = {'and', 'or', 'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for'}
+                            meaningful_words = [w for w in words if w.lower() not in skip_words][:3]
+                            criterion_dict["alias"] = ' '.join(meaningful_words) if meaningful_words else ' '.join(words[:3])
+                    
+                    validated_criteria.append(criterion_dict)
             
             if len(validated_criteria) < 3:
                 raise Exception("Not enough valid criteria generated")
@@ -239,6 +261,29 @@ async def create_job(job: JobCreate, user_id: Optional[str] = Depends(get_curren
     job_dict["last_run"] = now  # Set last_run to creation time
     job_dict["status"] = "active"
     job_dict["candidate_count"] = 0
+    
+    # Generate aliases for criteria > 5 words if not already present
+    import re
+    for criterion in job_dict.get("evaluation_criteria", []):
+        if "alias" not in criterion or not criterion.get("alias"):
+            name = criterion.get("name", "")
+            # Count all words including those in parentheses
+            word_count = len(name.split())
+            
+            if word_count > 5:
+                try:
+                    alias = await generate_criterion_title(name)
+                    criterion["alias"] = alias
+                    if DEBUG:
+                        print(f"DEBUG: Generated alias '{alias}' for criterion '{name}' during job creation")
+                except Exception as e:
+                    if DEBUG:
+                        print(f"DEBUG: Error generating alias for '{name}': {e}")
+                    # Fallback: use first 2-3 words
+                    words = name.split()
+                    skip_words = {'and', 'or', 'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for'}
+                    meaningful_words = [w for w in words if w.lower() not in skip_words][:3]
+                    criterion["alias"] = ' '.join(meaningful_words) if meaningful_words else ' '.join(words[:3])
     
     result = await db.jobs.insert_one(job_dict)
     job_dict["id"] = str(result.inserted_id)
