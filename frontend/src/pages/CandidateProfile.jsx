@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Brain, Mail, Upload, Calendar, Send, Trash2, CheckCircle, XCircle, HelpCircle, Star, Copy, Check, Download } from 'lucide-react'
-import { getCandidate, uploadCandidateAssessments, deleteCandidate, getJob, getCandidates, updateCandidate, downloadCandidateResume, viewCandidateResume, getCandidateResumeFileInfo } from '../services/api'
+import { getCandidate, uploadCandidateAssessments, deleteCandidate, getJob, getCandidates, updateCandidate, downloadCandidateResume, viewCandidateResume, getCandidateResumeFileInfo, calculateLocationMatch } from '../services/api'
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useModal } from '../context/ModalContext'
 import SendEmailModal from '../components/SendEmailModal'
@@ -76,6 +76,22 @@ const CandidateProfile = () => {
         ])
         setJob(jobResponse.data)
         setAllCandidates(candidatesResponse.data || [])
+      }
+      
+      // Calculate location match if missing
+      if (!candidateData.location_match || !candidateData.location_match.status) {
+        try {
+          const locationMatchResponse = await calculateLocationMatch(candidateId)
+          if (locationMatchResponse.data && locationMatchResponse.data.location_match) {
+            setCandidate(prev => ({
+              ...prev,
+              location_match: locationMatchResponse.data.location_match
+            }))
+          }
+        } catch (error) {
+          console.error('Error calculating location match:', error)
+          // Don't show error to user, just log it
+        }
       }
     } catch (error) {
       console.error('Error fetching candidate:', error)

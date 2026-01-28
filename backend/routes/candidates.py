@@ -18,7 +18,8 @@ DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 from models import Candidate, CandidateStatus, ContactInfo, ScoreBreakdown, CriterionScore
 from utils.cv_parser import parse_resume
 from utils.entity_extraction import extract_entities_with_llm, extract_contact_info, extract_name, extract_location
-from utils.ai_scoring import score_resume_with_llm, calculate_composite_score, check_location_match
+from utils.ai_scoring import score_resume_with_llm, calculate_composite_score
+from utils.location_match import check_location_match
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
 
@@ -225,7 +226,7 @@ async def upload_candidates_bulk(
         # Process files in parallel batches (optimized for 100+ file uploads)
         # Batch size of 15 balances speed with memory/processing limits
         # Processing 15 files in parallel is optimal for most servers
-        BATCH_SIZE = 15
+        BATCH_SIZE = 10
         total_files = len(valid_files)
         
         if DEBUG or total_files >= 10:
@@ -1152,6 +1153,50 @@ async def update_candidate(candidate_id: str, update_data: dict = Body(...), use
     updated_candidate["id"] = str(updated_candidate["_id"])
     return Candidate(**updated_candidate)
 
+@router.post("/{candidate_id}/calculate-location-match")
+async def calculate_location_match_endpoint(candidate_id: str, user_id: Optional[str] = Depends(get_current_user_id)):
+    """Calculate location match for a candidate"""
+    db = get_db()
+    
+    try:
+        candidate = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid candidate ID")
+    
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    job_id = candidate.get("job_id")
+    if not job_id:
+        raise HTTPException(status_code=400, detail="Candidate has no associated job")
+    
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    candidate_location = candidate.get("location")
+    job_regions = job.get("regions", [])
+    
+    print(f"DEBUG: Calculating location match for candidate {candidate_id}")
+    print(f"DEBUG: Candidate location: {candidate_location}")
+    print(f"DEBUG: Job regions: {job_regions}")
+    
+    location_match = await check_location_match(candidate_location, job_regions)
+    
+    print(f"DEBUG: Location match result: {location_match}")
+    
+    # Update candidate with location match
+    await db.candidates.update_one(
+        {"_id": ObjectId(candidate_id)},
+        {"$set": {"location_match": location_match}}
+    )
+    
+    return {
+        "message": "Location match calculated",
+        "location_match": location_match,
+        "candidate_id": candidate_id
+    }
+
 @router.post("/{candidate_id}/re-analyze")
 async def re_analyze_candidate(candidate_id: str, background_tasks: BackgroundTasks, user_id: Optional[str] = Depends(get_current_user_id)):
     """Re-analyze a specific candidate with updated LLM scoring"""
@@ -1251,7 +1296,7 @@ async def process_candidates_analysis_parallel(job_id: str, candidate_ids: List[
         return
 
     total = len(candidate_ids)
-    batch_size = 20  # Optimal batch size for parallel analysis (balances speed and resource usage)
+    batch_size = 10  # Reduced batch size for better reliability
     
     # Process in batches
     for i in range(0, total, batch_size):
@@ -1452,16 +1497,8 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
             # Optionally include personality in overall if desired
             # For now, overall = resume_score only
         
-        # Check location match
-        candidate_location = candidate.get("location")
-        job_regions = job.get("regions", [])
-        print(f"DEBUG: Calculating location match for candidate {candidate_id}")
-        print(f"DEBUG: Candidate location: {candidate_location}")
-        print(f"DEBUG: Job regions: {job_regions}")
-        location_match = await check_location_match(candidate_location, job_regions)
-        print(f"DEBUG: Location match result: {location_match}")
-        
         # Update candidate - set status to 'new' after analysis completes
+        # Location match will be calculated separately via endpoint
         await db.candidates.update_one(
             {"_id": ObjectId(candidate_id)},
             {
@@ -1470,11 +1507,24 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
                     "score_breakdown": score_breakdown,
                     "criterion_scores": criterion_scores,
                     "ai_justification": scoring_result["justification"],
-                    "location_match": location_match,
                     "analyzed_at": datetime.now()
                 }
             }
         )
+        
+        # Calculate location match separately in background
+        try:
+            candidate_location = candidate.get("location")
+            job_regions = job.get("regions", [])
+            if candidate_location and job_regions:
+                location_match = await check_location_match(candidate_location, job_regions)
+                await db.candidates.update_one(
+                    {"_id": ObjectId(candidate_id)},
+                    {"$set": {"location_match": location_match}}
+                )
+        except Exception as e:
+            print(f"Error calculating location match for candidate {candidate_id}: {e}")
+            # Don't fail the whole analysis if location match fails
         
         # Log activity
         await log_activity(

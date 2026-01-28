@@ -153,7 +153,7 @@ const JobDetail = () => {
       // Upload files in optimized chunks for faster processing
       // Reduced to 15 files per chunk to avoid request size limits and timeout issues
       // 15 files balances speed with reliability (each PDF ~1-3MB = ~15-45MB per request)
-      const CHUNK_SIZE = 15 // Upload 15 files at a time for optimal balance
+      const CHUNK_SIZE = 10 // Reduced chunk size for better reliability
       const chunks = []
       for (let i = 0; i < pendingFiles.length; i += CHUNK_SIZE) {
         chunks.push(pendingFiles.slice(i, i + CHUNK_SIZE))

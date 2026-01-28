@@ -36,6 +36,7 @@ export const recoverAnalysis = (jobId) => api.post(`/jobs/${jobId}/recover-analy
 export const generateEvaluationCriteria = (jobDescription, jobTitle, department) => 
   api.post('/jobs/generate-criteria', { job_description: jobDescription, job_title: jobTitle, department })
 export const reAnalyzeCandidate = (candidateId) => api.post(`/candidates/${candidateId}/re-analyze`)
+export const calculateLocationMatch = (candidateId) => api.post(`/candidates/${candidateId}/calculate-location-match`)
 
 // Candidates
 export const getCandidates = (jobId) => api.get(`/candidates/job/${jobId}`)
