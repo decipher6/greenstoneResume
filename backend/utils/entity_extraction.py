@@ -36,7 +36,7 @@ async def extract_entities_with_llm(resume_text: str) -> Dict[str, Optional[str]
 
 Format requirements:
 - Name: Title Case (e.g., "John Smith" not "JOHN SMITH" or "john smith")
-- Phone: International format with + and spaces (e.g., "+971 50 123 4567")
+- Phone: International format with + and no spaces (e.g., "+971507888888" or "+15123333333")
 - Email: lowercase
 - Location: "City, Country" format
 
@@ -44,7 +44,7 @@ Return JSON:
 {
     "name": "Title Case Name",
     "email": "email@example.com",
-    "phone": "+971 50 123 4567",
+    "phone": "+971507888888",
     "location": "City, Country"
 }
 
@@ -54,7 +54,7 @@ Use null if not found. No markdown or explanations."""
 
 {resume_text[:5000]}
 
-Return JSON with name (Title Case), email, phone (international format), location."""
+Return JSON with name (Title Case), email, phone (international format with + and no spaces), location."""
 
     try:
         if DEBUG:
@@ -132,22 +132,21 @@ Return JSON with name (Title Case), email, phone (international format), locatio
                 if phone.lower() in ["null", "none", "n/a"]:
                     phone = None
                 else:
-                    # Format phone to uniform international format: +[country][number with spaces]
+                    # Format phone to uniform international format: +[country][number] (no spaces)
                     # Remove all non-digit characters except +
                     cleaned_phone = re.sub(r'[^\d+]', '', phone)
                     if len(cleaned_phone) >= 7:  # Minimum 7 digits for valid phone
                         # Ensure it starts with +
                         if not cleaned_phone.startswith('+'):
                             cleaned_phone = '+' + cleaned_phone
-                        # Format: +[country code] [rest of number with spaces every 2-3 digits]
+                        # Format: +[country code][number] (no spaces)
                         # Extract country code (1-4 digits after +)
                         match = re.match(r'^\+(\d{1,4})(\d+)$', cleaned_phone)
                         if match:
                             country_code = match.group(1)
                             number = match.group(2)
-                            # Format number with spaces every 2-3 digits
-                            formatted_number = ' '.join([number[i:i+3] if len(number[i:]) >= 3 else number[i:] for i in range(0, len(number), 3)])
-                            phone = f"+{country_code} {formatted_number}"
+                            # Format: +country_code + number (no spaces)
+                            phone = f"+{country_code}{number}"
                         else:
                             phone = cleaned_phone
                     else:
@@ -186,7 +185,7 @@ Return JSON with name (Title Case), email, phone (international format), locatio
             if name:
                 name = ' '.join(word.capitalize() if word else '' for word in name.split())
             
-            # Format phone to uniform format
+            # Format phone to uniform format (no spaces)
             if phone:
                 cleaned_phone = re.sub(r'[^\d+]', '', phone)
                 if len(cleaned_phone) >= 7:
@@ -196,8 +195,8 @@ Return JSON with name (Title Case), email, phone (international format), locatio
                     if match:
                         country_code = match.group(1)
                         number = match.group(2)
-                        formatted_number = ' '.join([number[i:i+3] if len(number[i:]) >= 3 else number[i:] for i in range(0, len(number), 3)])
-                        phone = f"+{country_code} {formatted_number}"
+                        # Format: +country_code + number (no spaces)
+                        phone = f"+{country_code}{number}"
                     else:
                         phone = cleaned_phone
                 else:
@@ -234,7 +233,11 @@ async def _fallback_extraction(text: str) -> Dict[str, Optional[str]]:
     if phones:
         cleaned = re.sub(r'[^\d+]', '', phones[0])
         if len(cleaned) >= 7:
-            phone = cleaned
+            # Ensure it starts with + and has no spaces
+            if not cleaned.startswith('+'):
+                phone = '+' + cleaned
+            else:
+                phone = cleaned
     
     # Basic name extraction (first line that looks like a name)
     lines = text.split('\n')
