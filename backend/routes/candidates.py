@@ -20,6 +20,7 @@ from utils.cv_parser import parse_resume
 from utils.entity_extraction import extract_entities_with_llm, extract_contact_info, extract_name, extract_location
 from utils.ai_scoring import score_resume_with_llm, calculate_composite_score
 from utils.location_match import check_location_match
+from utils.criterion_title import generate_criterion_title
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
 
@@ -1460,8 +1461,21 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
                 if DEBUG:
                     print(f"Matched '{criterion_name}' with score {score:.1f} using {match_method} matching")
             
+            # Generate short title for long criterion names (>8 words)
+            criterion_title = criterion_name
+            word_count = len(criterion_name.split())
+            if word_count > 8:
+                try:
+                    criterion_title = await generate_criterion_title(criterion_name)
+                except Exception as e:
+                    print(f"Error generating title for criterion '{criterion_name}': {e}")
+                    # Fallback: use truncated version
+                    words = criterion_name.split()[:8]
+                    criterion_title = ' '.join(words)
+            
             criterion_scores.append({
                 "criterion_name": criterion_name,
+                "criterion_title": criterion_title,  # Short title for hover tooltip
                 "score": float(score),
                 "weight": criterion["weight"]
             })

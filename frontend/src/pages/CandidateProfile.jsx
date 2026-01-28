@@ -821,10 +821,25 @@ const CandidateProfile = () => {
                     <div className="space-y-4">
                       {candidate.criterion_scores.map((criterion, index) => {
                         const score = parseFloat(criterion.score || 0)
+                        const criterionName = criterion.criterion_name || ''
+                        const wordCount = criterionName.split().length
+                        // For criteria > 8 words: display short title, show full name on hover
+                        // For criteria <= 8 words: display full name, no special title needed
+                        const displayText = wordCount > 8 && criterion.criterion_title 
+                          ? criterion.criterion_title 
+                          : criterionName
+                        // Always show full criterion name in tooltip for detailed view
+                        const tooltipText = criterionName
+                        
                         return (
                           <div key={index}>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium">{criterion.criterion_name}</span>
+                              <span 
+                                className="text-sm font-medium" 
+                                title={tooltipText}
+                              >
+                                {displayText}
+                              </span>
                               <span className="text-sm font-semibold text-emerald-400">{score.toFixed(1)}/10</span>
                             </div>
                             <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
