@@ -491,11 +491,11 @@ async def get_candidate(candidate_id: str):
             if job:
                 candidate_location = candidate.get("location")
                 job_regions = job.get("regions", [])
-                if DEBUG:
-                    print(f"Calculating location match for candidate {candidate_id}: location={candidate_location}, regions={job_regions}")
+                print(f"DEBUG: Fallback - Calculating location match for candidate {candidate_id}")
+                print(f"DEBUG: Fallback - Candidate location: {candidate_location}")
+                print(f"DEBUG: Fallback - Job regions: {job_regions}")
                 location_match = await check_location_match(candidate_location, job_regions)
-                if DEBUG:
-                    print(f"Location match result: {location_match}")
+                print(f"DEBUG: Fallback - Location match result: {location_match}")
                 # Validate location_match structure
                 if not location_match or not isinstance(location_match, dict):
                     location_match = {"status": "uncertain", "reason": "Unable to determine location match"}
@@ -1455,7 +1455,11 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
         # Check location match
         candidate_location = candidate.get("location")
         job_regions = job.get("regions", [])
+        print(f"DEBUG: Calculating location match for candidate {candidate_id}")
+        print(f"DEBUG: Candidate location: {candidate_location}")
+        print(f"DEBUG: Job regions: {job_regions}")
         location_match = await check_location_match(candidate_location, job_regions)
+        print(f"DEBUG: Location match result: {location_match}")
         
         # Update candidate - set status to 'new' after analysis completes
         await db.candidates.update_one(

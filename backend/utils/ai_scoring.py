@@ -370,74 +370,69 @@ async def check_location_match(candidate_location: Optional[str], job_regions: L
     Check if candidate location matches job regions using LLM.
     Returns: {"status": "match"|"mismatch"|"uncertain", "reason": "brief explanation"}
     """
-    if not candidate_location or not job_regions:
-        return {"status": "uncertain", "reason": "Location information not available"}
-    
-    # Filter out "All" from job regions as it means all regions are acceptable
-    filtered_regions = [r for r in job_regions if r and r.lower() != "all"]
-    if not filtered_regions:
-        # If only "All" is selected, it matches any location
-        return {"status": "match", "reason": "Job accepts candidates from all regions"}
-    
-    # Clean candidate location
-    candidate_location = candidate_location.strip()
-    if not candidate_location or candidate_location.lower() in ["unknown", "n/a", "none", "null"]:
-        return {"status": "uncertain", "reason": "Candidate location not specified"}
-    
-    system_message = """Determine if candidate location matches job regions. Consider cities, countries, and regional groupings.
+    try:
+        # Handle missing data
+        if not candidate_location:
+            return {"status": "uncertain", "reason": "Candidate location not available"}
+        
+        if not job_regions or len(job_regions) == 0:
+            return {"status": "uncertain", "reason": "Job regions not specified"}
+        
+        # Filter out "All" from job regions
+        filtered_regions = [r for r in job_regions if r and str(r).strip().lower() != "all"]
+        if not filtered_regions:
+            return {"status": "match", "reason": "Job accepts candidates from all regions"}
+        
+        # Clean candidate location
+        candidate_location = str(candidate_location).strip()
+        if not candidate_location or candidate_location.lower() in ["unknown", "n/a", "none", "null", ""]:
+            return {"status": "uncertain", "reason": "Candidate location not specified"}
+        
+        # Simple, direct prompt
+        prompt = f"""Compare these locations and determine if they match:
+
+Candidate Location: {candidate_location}
+Job Regions: {', '.join(filtered_regions)}
 
 Regional groupings:
-- GCC: UAE, Saudi Arabia, Qatar, Kuwait, Bahrain, Oman (Dubai, Abu Dhabi, Riyadh, Doha, etc.)
-- APAC: Asia-Pacific (Singapore, Hong Kong, Tokyo, Sydney, Mumbai, Shanghai, etc.)
-- EMEA: Europe, Middle East, Africa (London, Paris, Frankfurt, Dubai, Johannesburg, etc.)
-- LATAM: Latin America (Mexico City, São Paulo, Buenos Aires, Bogotá, etc.)
-- NA: North America (New York, Toronto, Los Angeles, Chicago, etc.)
+- GCC: UAE, Saudi Arabia, Qatar, Kuwait, Bahrain, Oman (cities: Dubai, Abu Dhabi, Riyadh, Doha, etc.)
+- APAC: Asia-Pacific (cities: Singapore, Hong Kong, Tokyo, Sydney, Mumbai, Shanghai, etc.)
+- EMEA: Europe, Middle East, Africa (cities: London, Paris, Frankfurt, Dubai, Johannesburg, etc.)
+- LATAM: Latin America (cities: Mexico City, São Paulo, Buenos Aires, Bogotá, etc.)
+- NA: North America (cities: New York, Toronto, Los Angeles, Chicago, etc.)
 
-Return JSON:
-{
+Return ONLY valid JSON (no markdown, no explanations):
+{{
     "status": "match" or "mismatch" or "uncertain",
-    "reason": "Brief explanation"
-}
+    "reason": "Brief one-sentence explanation"
+}}"""
 
-Examples:
-- Candidate: "Dubai, UAE", Job: ["GCC"] → "match"
-- Candidate: "New York, USA", Job: ["NA"] → "match"
-- Candidate: "London, UK", Job: ["GCC"] → "mismatch"
-- Candidate: "Singapore", Job: ["APAC"] → "match"
-- Candidate: "Dubai, UAE", Job: ["EMEA"] → "match" (Dubai is in both GCC and EMEA)
-- Candidate: "Unknown", Job: ["GCC"] → "uncertain"
-- Candidate: "Dubai", Job: ["Dubai", "Abu Dhabi"] → "match" (exact city match)
-
-Be concise. Return JSON only."""
-
-    job_regions_str = ", ".join(filtered_regions)
-    user_prompt = f"""Candidate location: {candidate_location}
-Job regions: {job_regions_str}
-
-Determine match status. Consider:
-1. If candidate location is a city/country that belongs to any of the job regions → "match"
-2. If candidate location clearly doesn't match any region → "mismatch"
-3. If location is ambiguous or unclear → "uncertain"
-4. If job regions include specific cities/locations, check for exact or partial matches"""
-
-    try:
-        full_prompt = f"{system_message}\n\n{user_prompt}"
+        if DEBUG:
+            print(f"DEBUG: Checking location match - Candidate: '{candidate_location}', Job Regions: {filtered_regions}")
+        
+        # Call LLM
         response = await asyncio.to_thread(
             gemini_client.models.generate_content,
             model="gemini-3-flash-preview",
-            contents=full_prompt
+            contents=prompt
         )
         
         if not response or not response.text:
-            return {"status": "uncertain", "reason": "Unable to determine"}
+            if DEBUG:
+                print("DEBUG: Empty response from LLM")
+            return {"status": "uncertain", "reason": "Unable to determine location match"}
         
         content = response.text.strip()
-        # Extract JSON - improved regex to handle nested objects
+        
+        if DEBUG:
+            print(f"DEBUG: LLM response: {content[:500]}")
+        
+        # Extract JSON
         json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
         if json_match:
             content = json_match.group(0)
         
-        # Remove markdown code blocks
+        # Remove markdown
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
@@ -445,32 +440,39 @@ Determine match status. Consider:
         
         # Parse JSON
         result = json.loads(content)
-        status = result.get("status", "uncertain").lower().strip()
+        status = str(result.get("status", "uncertain")).lower().strip()
         
         # Validate status
         if status not in ["match", "mismatch", "uncertain"]:
             if DEBUG:
-                print(f"Invalid status '{status}' from LLM, defaulting to 'uncertain'")
+                print(f"DEBUG: Invalid status '{status}', defaulting to 'uncertain'")
             status = "uncertain"
         
-        reason = result.get("reason", "Location comparison completed")
-        if not reason or len(reason.strip()) == 0:
+        reason = str(result.get("reason", "Location comparison completed")).strip()
+        if not reason:
             reason = "Location comparison completed"
         
-        return {
+        result_dict = {
             "status": status,
-            "reason": reason[:200]  # Limit reason length
+            "reason": reason[:200]
         }
+        
+        if DEBUG:
+            print(f"DEBUG: Location match result: {result_dict}")
+        
+        return result_dict
+        
     except json.JSONDecodeError as e:
         if DEBUG:
-            print(f"JSON decode error in location match: {e}, content: {content[:200]}")
+            print(f"DEBUG: JSON decode error: {e}")
+            print(f"DEBUG: Content: {content[:500] if 'content' in locals() else 'N/A'}")
         return {"status": "uncertain", "reason": "Unable to parse location match result"}
     except Exception as e:
         if DEBUG:
-            print(f"Error in location match: {e}")
+            print(f"DEBUG: Error in location match: {e}")
             import traceback
             traceback.print_exc()
-        return {"status": "uncertain", "reason": "Unable to determine location match"}
+        return {"status": "uncertain", "reason": f"Error: {str(e)[:100]}"}
 
 async def calculate_composite_score(score_breakdown: Dict, weights: Dict) -> float:
     """Calculate composite score from multiple components"""
