@@ -824,13 +824,57 @@ const CandidateProfile = () => {
                         const criterionName = criterion.criterion_name || ''
                         
                         // Find matching criterion in job to get alias (only for display in candidate profile)
-                        // Use case-insensitive matching and trim whitespace
-                        const jobCriterion = job?.evaluation_criteria?.find(
-                          jc => jc.name?.trim().toLowerCase() === criterionName.trim().toLowerCase()
-                        )
+                        let displayText = criterionName
+                        let jobCriterion = null
                         
-                        // Use alias if available (only in candidate profile), otherwise use full name
-                        const displayText = jobCriterion?.alias || criterionName
+                        if (job?.evaluation_criteria && Array.isArray(job.evaluation_criteria)) {
+                          // Try exact match first
+                          jobCriterion = job.evaluation_criteria.find(
+                            jc => jc.name?.trim().toLowerCase() === criterionName.trim().toLowerCase()
+                          )
+                          
+                          // If no exact match, try partial match (in case of slight differences)
+                          if (!jobCriterion) {
+                            jobCriterion = job.evaluation_criteria.find(
+                              jc => {
+                                const jcName = (jc.name || '').trim().toLowerCase()
+                                const critName = criterionName.trim().toLowerCase()
+                                return jcName.includes(critName) || critName.includes(jcName)
+                              }
+                            )
+                          }
+                          
+                          // Use alias if available
+                          if (jobCriterion?.alias) {
+                            displayText = jobCriterion.alias
+                          } else {
+                            // Fallback: generate a simple alias from the criterion name (> 5 words)
+                            const mainText = criterionName.replace(/\([^)]*\)/g, '').trim()
+                            const wordCount = mainText ? mainText.split(/\s+/).filter(w => w).length : criterionName.split(/\s+/).filter(w => w).length
+                            if (wordCount > 5) {
+                              // Extract first 2-3 meaningful words
+                              const words = criterionName.split(/\s+/)
+                              const skipWords = new Set(['and', 'or', 'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'with'])
+                              const meaningfulWords = words.filter(w => !skipWords.has(w.toLowerCase())).slice(0, 3)
+                              if (meaningfulWords.length >= 2) {
+                                displayText = meaningfulWords.join(' ')
+                              }
+                            }
+                          }
+                        } else {
+                          // Job not loaded or no criteria - generate fallback alias
+                          const mainText = criterionName.replace(/\([^)]*\)/g, '').trim()
+                          const wordCount = mainText ? mainText.split(/\s+/).filter(w => w).length : criterionName.split(/\s+/).filter(w => w).length
+                          if (wordCount > 5) {
+                            const words = criterionName.split(/\s+/)
+                            const skipWords = new Set(['and', 'or', 'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'with'])
+                            const meaningfulWords = words.filter(w => !skipWords.has(w.toLowerCase())).slice(0, 3)
+                            if (meaningfulWords.length >= 2) {
+                              displayText = meaningfulWords.join(' ')
+                            }
+                          }
+                        }
+                        
                         // Always show full criterion name in tooltip
                         const tooltipText = criterionName
                         

@@ -22,6 +22,7 @@ class User(BaseModel):
 class EvaluationCriterion(BaseModel):
     name: str
     weight: float  # 0-100
+    alias: Optional[str] = None  # Short alias for display (2-3 words for criteria > 5 words)
 
 class JobStatus(str, Enum):
     active = "active"
