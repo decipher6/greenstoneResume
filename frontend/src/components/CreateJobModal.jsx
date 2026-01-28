@@ -220,12 +220,13 @@ const CreateJobModal = ({ onClose }) => {
   const autoResizeTextarea = (textarea) => {
     if (!textarea) return
     const lineHeight = 24
-    const maxHeight = lineHeight * 4
+    const maxHeight = lineHeight * 3 // Max 3 lines (72px)
     
     textarea.style.height = 'auto'
     const newHeight = Math.min(textarea.scrollHeight, maxHeight)
     textarea.style.height = `${newHeight}px`
     
+    // Enable scrolling if content exceeds 3 lines
     if (textarea.scrollHeight > maxHeight) {
       textarea.style.overflowY = 'auto'
     } else {
@@ -403,6 +404,7 @@ const CreateJobModal = ({ onClose }) => {
                     <div className="flex-1 relative">
                       <textarea
                         placeholder="Criterion name"
+                        title={criterion.name || ''}
                         className={`glass-input w-full resize-none ${fieldErrors[`name-${index}`] ? 'border-red-400' : ''}`}
                         value={criterion.name}
                         onChange={(e) => {
@@ -411,7 +413,7 @@ const CreateJobModal = ({ onClose }) => {
                         }}
                         onInput={(e) => autoResizeTextarea(e.target)}
                         rows={1}
-                        style={{ minHeight: '40px', maxHeight: '96px', overflowY: 'auto' }}
+                        style={{ minHeight: '40px', maxHeight: '72px', overflowY: 'auto' }}
                       />
                       {fieldErrors[`name-${index}`] && (
                         <p className="text-red-400 text-xs mt-1">{fieldErrors[`name-${index}`]}</p>
@@ -504,9 +506,21 @@ const CreateJobModal = ({ onClose }) => {
               <h3 className="text-lg font-semibold mb-2">Evaluation Criteria</h3>
               <div className="space-y-2">
                 {formData.evaluation_criteria.map((criterion, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-glass-100 rounded-lg">
-                    <span className="text-gray-300">{criterion.name}</span>
-                    <span className="text-primary-400 font-semibold">{criterion.weight}%</span>
+                  <div key={index} className="flex items-start gap-3 p-3 bg-glass-100 rounded-lg">
+                    <div 
+                      className="text-gray-300 flex-1"
+                      title={criterion.name}
+                      style={{ 
+                        maxHeight: '72px', // 3 lines * 24px line height
+                        overflowY: 'auto',
+                        overflowX: 'hidden',
+                        wordWrap: 'break-word',
+                        lineHeight: '24px'
+                      }}
+                    >
+                      {criterion.name}
+                    </div>
+                    <span className="text-primary-400 font-semibold flex-shrink-0">{criterion.weight}%</span>
                   </div>
                 ))}
                 <div className="flex items-center justify-between p-3 bg-glass-200 rounded-lg mt-2">

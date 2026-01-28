@@ -177,6 +177,11 @@ async def upload_candidates_bulk(
     try:
         db = get_db()
         
+        # Log upload start
+        num_files = len(files)
+        if DEBUG or num_files >= 10:
+            print(f"Starting bulk upload: {num_files} files for job {job_id}")
+        
         # Verify job exists
         try:
             job = await db.jobs.find_one({"_id": ObjectId(job_id)})
@@ -218,8 +223,9 @@ async def upload_candidates_bulk(
             }
     
         # Process files in parallel batches (optimized for 100+ file uploads)
-        # Increased batch size to 25 for faster processing
-        BATCH_SIZE = 25
+        # Batch size of 15 balances speed with memory/processing limits
+        # Processing 15 files in parallel is optimal for most servers
+        BATCH_SIZE = 15
         total_files = len(valid_files)
         
         if DEBUG or total_files >= 10:
@@ -227,12 +233,19 @@ async def upload_candidates_bulk(
         
         # Read all file contents first (to avoid issues with parallel file reading)
         file_data = []
+        total_size = 0
         for file in valid_files:
             try:
                 await file.seek(0)  # Reset to beginning
                 content = await file.read()
-                if not content or len(content) == 0:
+                file_size = len(content)
+                total_size += file_size
+                
+                if not content or file_size == 0:
                     failed_files.append({"filename": file.filename or "unknown", "error": "File is empty"})
+                    file_data.append(None)
+                elif file_size > 10 * 1024 * 1024:  # 10MB per file limit
+                    failed_files.append({"filename": file.filename or "unknown", "error": f"File too large ({file_size / 1024 / 1024:.1f}MB). Maximum size: 10MB"})
                     file_data.append(None)
                 else:
                     filename = file.filename or "unknown"
@@ -240,8 +253,14 @@ async def upload_candidates_bulk(
             except Exception as e:
                 error_msg = str(e)
                 print(f"Error reading file {file.filename}: {error_msg}")
+                import traceback
+                if DEBUG:
+                    traceback.print_exc()
                 failed_files.append({"filename": file.filename or "unknown", "error": f"Failed to read file: {error_msg}"})
                 file_data.append(None)
+        
+        if DEBUG or num_files >= 10:
+            print(f"Total upload size: {total_size / 1024 / 1024:.2f}MB for {len(valid_files)} files")
     
         # Process files in batches
         total_batches = (len(file_data) + BATCH_SIZE - 1) // BATCH_SIZE
@@ -1185,16 +1204,16 @@ async def delete_candidate(candidate_id: str, user_id: Optional[str] = Depends(g
 
 async def process_candidates_analysis_parallel(job_id: str, candidate_ids: List[str]):
     """
-    Process multiple candidates in parallel batches of 25 for faster processing.
-    If less than 25 candidates, process all in parallel.
+    Process multiple candidates in parallel batches of 20 for faster processing.
+    If less than 20 candidates, process all in parallel.
     """
     if not candidate_ids:
         return
 
     total = len(candidate_ids)
-    batch_size = 25  # Increased from 10 to 25 for faster analysis
+    batch_size = 20  # Optimal batch size for parallel analysis (balances speed and resource usage)
     
-    # Process in batches of 10
+    # Process in batches
     for i in range(0, total, batch_size):
         batch = candidate_ids[i:i + batch_size]
         batch_num = i // batch_size + 1

@@ -89,5 +89,6 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Increase max request body size to 100MB for bulk file uploads
+    uvicorn.run(app, host="0.0.0.0", port=8000, limit_max_requests=1000, limit_concurrency=100)
 

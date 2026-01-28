@@ -373,7 +373,25 @@ async def check_location_match(candidate_location: Optional[str], job_regions: L
     if not candidate_location or not job_regions:
         return {"status": "uncertain", "reason": "Location information not available"}
     
-    system_message = """Determine if candidate location matches job regions. Consider cities, countries, and regional groupings (GCC, APAC, EMEA, LATAM, NA).
+    # Filter out "All" from job regions as it means all regions are acceptable
+    filtered_regions = [r for r in job_regions if r and r.lower() != "all"]
+    if not filtered_regions:
+        # If only "All" is selected, it matches any location
+        return {"status": "match", "reason": "Job accepts candidates from all regions"}
+    
+    # Clean candidate location
+    candidate_location = candidate_location.strip()
+    if not candidate_location or candidate_location.lower() in ["unknown", "n/a", "none", "null"]:
+        return {"status": "uncertain", "reason": "Candidate location not specified"}
+    
+    system_message = """Determine if candidate location matches job regions. Consider cities, countries, and regional groupings.
+
+Regional groupings:
+- GCC: UAE, Saudi Arabia, Qatar, Kuwait, Bahrain, Oman (Dubai, Abu Dhabi, Riyadh, Doha, etc.)
+- APAC: Asia-Pacific (Singapore, Hong Kong, Tokyo, Sydney, Mumbai, Shanghai, etc.)
+- EMEA: Europe, Middle East, Africa (London, Paris, Frankfurt, Dubai, Johannesburg, etc.)
+- LATAM: Latin America (Mexico City, São Paulo, Buenos Aires, Bogotá, etc.)
+- NA: North America (New York, Toronto, Los Angeles, Chicago, etc.)
 
 Return JSON:
 {
@@ -386,15 +404,21 @@ Examples:
 - Candidate: "New York, USA", Job: ["NA"] → "match"
 - Candidate: "London, UK", Job: ["GCC"] → "mismatch"
 - Candidate: "Singapore", Job: ["APAC"] → "match"
+- Candidate: "Dubai, UAE", Job: ["EMEA"] → "match" (Dubai is in both GCC and EMEA)
 - Candidate: "Unknown", Job: ["GCC"] → "uncertain"
+- Candidate: "Dubai", Job: ["Dubai", "Abu Dhabi"] → "match" (exact city match)
 
 Be concise. Return JSON only."""
 
-    job_regions_str = ", ".join(job_regions)
+    job_regions_str = ", ".join(filtered_regions)
     user_prompt = f"""Candidate location: {candidate_location}
 Job regions: {job_regions_str}
 
-Determine match status."""
+Determine match status. Consider:
+1. If candidate location is a city/country that belongs to any of the job regions → "match"
+2. If candidate location clearly doesn't match any region → "mismatch"
+3. If location is ambiguous or unclear → "uncertain"
+4. If job regions include specific cities/locations, check for exact or partial matches"""
 
     try:
         full_prompt = f"{system_message}\n\n{user_prompt}"
@@ -408,28 +432,44 @@ Determine match status."""
             return {"status": "uncertain", "reason": "Unable to determine"}
         
         content = response.text.strip()
-        # Extract JSON
+        # Extract JSON - improved regex to handle nested objects
         json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
         if json_match:
             content = json_match.group(0)
         
+        # Remove markdown code blocks
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
             content = content.split("```")[1].split("```")[0].strip()
         
+        # Parse JSON
         result = json.loads(content)
-        status = result.get("status", "uncertain").lower()
+        status = result.get("status", "uncertain").lower().strip()
+        
+        # Validate status
         if status not in ["match", "mismatch", "uncertain"]:
+            if DEBUG:
+                print(f"Invalid status '{status}' from LLM, defaulting to 'uncertain'")
             status = "uncertain"
+        
+        reason = result.get("reason", "Location comparison completed")
+        if not reason or len(reason.strip()) == 0:
+            reason = "Location comparison completed"
         
         return {
             "status": status,
-            "reason": result.get("reason", "Location comparison completed")
+            "reason": reason[:200]  # Limit reason length
         }
+    except json.JSONDecodeError as e:
+        if DEBUG:
+            print(f"JSON decode error in location match: {e}, content: {content[:200]}")
+        return {"status": "uncertain", "reason": "Unable to parse location match result"}
     except Exception as e:
         if DEBUG:
             print(f"Error in location match: {e}")
+            import traceback
+            traceback.print_exc()
         return {"status": "uncertain", "reason": "Unable to determine location match"}
 
 async def calculate_composite_score(score_breakdown: Dict, weights: Dict) -> float:

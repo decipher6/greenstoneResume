@@ -150,9 +150,10 @@ const JobDetail = () => {
     setIsUploading(true)
     let uploadPollInterval = null
     try {
-      // Upload files in larger chunks for faster processing
-      // Increased chunk size to 25 for better performance with 100+ files
-      const CHUNK_SIZE = 25 // Upload 25 files at a time for speed
+      // Upload files in optimized chunks for faster processing
+      // Reduced to 15 files per chunk to avoid request size limits and timeout issues
+      // 15 files balances speed with reliability (each PDF ~1-3MB = ~15-45MB per request)
+      const CHUNK_SIZE = 15 // Upload 15 files at a time for optimal balance
       const chunks = []
       for (let i = 0; i < pendingFiles.length; i += CHUNK_SIZE) {
         chunks.push(pendingFiles.slice(i, i + CHUNK_SIZE))
@@ -176,9 +177,9 @@ const JobDetail = () => {
         const chunk = chunks[chunkIndex]
         let chunkSuccess = false
         let retries = 0
-        const MAX_RETRIES = 2
+        const MAX_RETRIES = 1 // Reduced retries to avoid delays - bulk uploads should work on first try
 
-        // Retry logic for network errors
+        // Retry logic for network errors (only retry once to maintain speed)
         while (!chunkSuccess && retries <= MAX_RETRIES) {
           try {
             const filesProcessed = chunkIndex * CHUNK_SIZE
@@ -210,27 +211,28 @@ const JobDetail = () => {
             chunkSuccess = true
           } catch (error) {
             const isNetworkError = error.code === 'ECONNABORTED' || 
-                                   error.code === 'ERR_NETWORK' ||
-                                   error.message?.includes('timeout') ||
-                                   error.message?.includes('Network Error') ||
-                                   !error.response
+                                 error.code === 'ERR_NETWORK' ||
+                                 error.message?.includes('timeout') ||
+                                 error.message?.includes('Network Error') ||
+                                 !error.response
             
             if (isNetworkError && retries < MAX_RETRIES) {
               retries++
               console.log(`Network error on chunk ${chunkIndex + 1}, retrying (${retries}/${MAX_RETRIES})...`)
-              // Wait a bit before retrying
-              await new Promise(resolve => setTimeout(resolve, 1000 * retries))
+              // Wait briefly before retrying (reduced delay for speed)
+              await new Promise(resolve => setTimeout(resolve, 500 * retries))
               continue
             }
             
-            // If it's a network error and we've exhausted retries, try individual uploads
+            // If it's a network error and we've exhausted retries, add to retry queue as bulk chunk
             if (isNetworkError && retries >= MAX_RETRIES) {
-              console.log(`Chunk ${chunkIndex + 1} failed after retries, will try individual uploads`)
-              filesToRetry.push(...chunk)
+              console.log(`Chunk ${chunkIndex + 1} failed after retries, will retry as bulk chunk at end`)
+              filesToRetry.push(chunk) // Keep as chunk, not individual files - maintains bulk processing
+              chunkSuccess = true // Move to next chunk, retry failed ones at end
               break
             }
             
-            // Non-network error or final failure
+            // Non-network error - don't retry, just mark as failed
             console.error(`Error uploading chunk ${chunkIndex + 1}:`, error)
             totalFailed += chunk.length
             chunk.forEach(file => {
@@ -244,51 +246,50 @@ const JobDetail = () => {
         }
       }
 
-      // Try uploading failed files individually as fallback
+      // Retry failed chunks as bulk uploads (maintain bulk processing)
       if (filesToRetry.length > 0) {
-        console.log(`Attempting individual uploads for ${filesToRetry.length} files...`)
-        setUploadProgress({ 
-          current: chunks.length, 
-          total: chunks.length + filesToRetry.length,
-          filesProcessed: totalUploaded,
-          totalFiles,
-          currentChunk: 1,
-          retrying: true
-        })
+        console.log(`Retrying ${filesToRetry.length} failed chunk(s) as bulk uploads...`)
+        const totalRetryChunks = filesToRetry.length
         
-        for (let fileIndex = 0; fileIndex < filesToRetry.length; fileIndex++) {
-          const file = filesToRetry[fileIndex]
+        for (let retryChunkIndex = 0; retryChunkIndex < filesToRetry.length; retryChunkIndex++) {
+          const retryChunk = filesToRetry[retryChunkIndex]
+          // Ensure retryChunk is an array (it should be a chunk, not a single file)
+          const chunkArray = Array.isArray(retryChunk) ? retryChunk : [retryChunk]
+          
           try {
             setUploadProgress({ 
-              current: chunks.length + fileIndex + 1, 
-              total: chunks.length + filesToRetry.length,
-              filesProcessed: totalUploaded + fileIndex,
+              current: chunks.length + retryChunkIndex + 1, 
+              total: chunks.length + totalRetryChunks,
+              filesProcessed: totalUploaded,
               totalFiles,
-              currentChunk: 1,
+              currentChunk: chunkArray.length,
               retrying: true
             })
             
-            const response = await uploadCandidatesBulk(jobId, [file])
+            // Retry as bulk upload (maintains bulk processing speed)
+            const response = await uploadCandidatesBulk(jobId, chunkArray)
             const data = response.data || {}
-            if (data.uploaded > 0) {
-              totalUploaded += data.uploaded
-            } else {
-              totalFailed++
-              if (data.failed_files && data.failed_files.length > 0) {
-                allFailedFiles.push(...data.failed_files)
-              } else {
-                allFailedFiles.push({
-                  filename: file.name || 'Unknown',
-                  error: 'Upload failed after retries'
-                })
-              }
+            const uploaded = data.uploaded || 0
+            const failed = data.failed || 0
+            
+            totalUploaded += uploaded
+            totalFailed += failed
+            
+            if (data.failed_files && data.failed_files.length > 0) {
+              allFailedFiles.push(...data.failed_files)
             }
+            
+            // Refresh after retry chunk
+            await fetchData()
           } catch (error) {
-            console.error(`Error uploading individual file ${file.name}:`, error)
-            totalFailed++
-            allFailedFiles.push({
-              filename: file.name || 'Unknown',
-              error: error.response?.data?.detail || error.message || 'Upload failed'
+            console.error(`Error retrying chunk ${retryChunkIndex + 1}:`, error)
+            // Mark all files in this chunk as failed
+            chunkArray.forEach(file => {
+              totalFailed++
+              allFailedFiles.push({
+                filename: file.name || 'Unknown',
+                error: error.response?.data?.detail || error.message || 'Upload failed after retries'
+              })
             })
           }
         }
