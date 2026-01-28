@@ -822,24 +822,20 @@ const CandidateProfile = () => {
                       {candidate.criterion_scores.map((criterion, index) => {
                         const score = parseFloat(criterion.score || 0)
                         const criterionName = criterion.criterion_name || ''
-                        // Count words excluding parentheses content (like the backend does)
-                        const mainText = criterionName.replace(/\([^)]*\)/g, '').trim()
-                        const wordCount = mainText ? mainText.split(/\s+/).filter(w => w).length : criterionName.split(/\s+/).filter(w => w).length
+                        const wordCount = criterionName.split(/\s+/).filter(w => w).length
                         
-                        // For criteria > 8 words: display 2-3 word short title, show full name on hover
-                        // For criteria <= 8 words: display full name
-                        const displayText = wordCount > 8 && criterion.criterion_title 
+                        // For criteria > 5 words: display shorter alias, show full name on hover
+                        // For criteria <= 5 words: display full name
+                        const displayText = wordCount > 5 && criterion.criterion_title 
                           ? criterion.criterion_title 
                           : criterionName
-                        // Always show full criterion name in tooltip for detailed view
-                        const tooltipText = criterionName
                         
                         return (
                           <div key={index}>
                             <div className="flex items-center justify-between mb-2">
                               <span 
                                 className="text-sm font-medium" 
-                                title={tooltipText}
+                                title={criterionName}
                               >
                                 {displayText}
                               </span>

@@ -1461,25 +1461,20 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
                 if DEBUG:
                     print(f"Matched '{criterion_name}' with score {score:.1f} using {match_method} matching")
             
-            # Generate short 2-3 word title for long criterion names (>8 words)
-            # Count words excluding parentheses content
-            import re
-            main_text = re.sub(r'\([^)]*\)', '', criterion_name).strip()
-            word_count = len(main_text.split()) if main_text else len(criterion_name.split())
-            
+            # Generate shorter alias for criteria longer than 5 words
+            word_count = len(criterion_name.split())
             criterion_title = criterion_name
-            if word_count > 8:
+            
+            if word_count > 5:
                 try:
                     criterion_title = await generate_criterion_title(criterion_name)
                     if DEBUG:
-                        print(f"DEBUG: Generated title '{criterion_title}' for criterion '{criterion_name}'")
+                        print(f"DEBUG: Generated alias '{criterion_title}' for criterion '{criterion_name}' ({word_count} words)")
                 except Exception as e:
-                    print(f"Error generating title for criterion '{criterion_name}': {e}")
-                    # Fallback: extract first 2-3 meaningful words
-                    words = criterion_name.split()
-                    skip_words = {'and', 'or', 'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for'}
-                    meaningful_words = [w for w in words if w.lower() not in skip_words][:3]
-                    criterion_title = ' '.join(meaningful_words) if meaningful_words else ' '.join(words[:3])
+                    print(f"Error generating alias for criterion '{criterion_name}': {e}")
+                    # Fallback: take first 4 words
+                    words = criterion_name.split()[:4]
+                    criterion_title = ' '.join(words)
             
             criterion_scores.append({
                 "criterion_name": criterion_name,
