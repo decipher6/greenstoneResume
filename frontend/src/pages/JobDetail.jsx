@@ -1011,12 +1011,7 @@ const JobDetail = () => {
               {job.evaluation_criteria?.map((criterion, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span 
-                      className="text-sm font-medium text-white" 
-                      title={criterion.name}
-                    >
-                      {criterion.alias || criterion.name}
-                    </span>
+                    <span className="text-sm font-medium text-white">{criterion.name}</span>
                     <span className="text-primary-400 font-semibold text-sm">{criterion.weight}%</span>
                   </div>
                   <div className="h-2 bg-glass-200 rounded-full overflow-hidden">

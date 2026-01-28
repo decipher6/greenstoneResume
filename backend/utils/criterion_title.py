@@ -19,10 +19,10 @@ if not GEMINI_API_KEY:
 # Initialize Gemini client
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
-async def generate_criterion_title(criterion_name: str) -> str:
+async def generate_criterion_alias(criterion_name: str) -> str:
     """
-    Generate a concise 2-3 word title for a long criterion name using LLM.
-    Returns the original name if it's already 8 words or less.
+    Generate a concise 2-3 word alias for a long criterion name using LLM.
+    Returns the original name if it's already 5 words or less.
     """
     # Count words (excluding content in parentheses for counting)
     # Extract main text without parentheses
@@ -30,8 +30,8 @@ async def generate_criterion_title(criterion_name: str) -> str:
     main_text = re.sub(r'\([^)]*\)', '', criterion_name).strip()
     word_count = len(main_text.split()) if main_text else len(criterion_name.split())
     
-    # If 8 words or less, return as-is
-    if word_count <= 8:
+    # If 5 words or less, return as-is
+    if word_count <= 5:
         return criterion_name
     
     try:
@@ -50,7 +50,7 @@ Examples:
 Return ONLY the 2-3 word title (no quotes, no explanations, just the title):"""
 
         if DEBUG:
-            print(f"DEBUG: Generating 2-3 word title for criterion: '{criterion_name}' ({word_count} words)")
+            print(f"DEBUG: Generating 2-3 word alias for criterion: '{criterion_name}' ({word_count} words)")
         
         # Call LLM
         response = await asyncio.to_thread(

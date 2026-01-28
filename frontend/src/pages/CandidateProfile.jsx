@@ -823,15 +823,14 @@ const CandidateProfile = () => {
                         const score = parseFloat(criterion.score || 0)
                         const criterionName = criterion.criterion_name || ''
                         
-                        // Get alias from job's evaluation_criteria (stored during job creation)
-                        // Find matching criterion in job data
+                        // Find matching criterion in job to get alias (only for display in candidate profile)
+                        // Use case-insensitive matching and trim whitespace
                         const jobCriterion = job?.evaluation_criteria?.find(
-                          c => c.name === criterionName || c.name?.toLowerCase() === criterionName?.toLowerCase()
+                          jc => jc.name?.trim().toLowerCase() === criterionName.trim().toLowerCase()
                         )
-                        const alias = jobCriterion?.alias
                         
-                        // Use alias for display if available, otherwise use full name
-                        const displayText = alias || criterionName
+                        // Use alias if available (only in candidate profile), otherwise use full name
+                        const displayText = jobCriterion?.alias || criterionName
                         // Always show full criterion name in tooltip
                         const tooltipText = criterionName
                         

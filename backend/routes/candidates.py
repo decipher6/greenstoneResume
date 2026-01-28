@@ -1460,8 +1460,6 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
                 if DEBUG:
                     print(f"Matched '{criterion_name}' with score {score:.1f} using {match_method} matching")
             
-            # Use alias from job's evaluation_criteria if available (generated during job creation)
-            # No need to generate here - aliases are created during job creation
             criterion_scores.append({
                 "criterion_name": criterion_name,
                 "score": float(score),
