@@ -1461,17 +1461,25 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
                 if DEBUG:
                     print(f"Matched '{criterion_name}' with score {score:.1f} using {match_method} matching")
             
-            # Generate short title for long criterion names (>5 words)
+            # Generate short 2-3 word title for long criterion names (>8 words)
+            # Count words excluding parentheses content
+            import re
+            main_text = re.sub(r'\([^)]*\)', '', criterion_name).strip()
+            word_count = len(main_text.split()) if main_text else len(criterion_name.split())
+            
             criterion_title = criterion_name
-            word_count = len(criterion_name.split())
-            if word_count > 5:
+            if word_count > 8:
                 try:
                     criterion_title = await generate_criterion_title(criterion_name)
+                    if DEBUG:
+                        print(f"DEBUG: Generated title '{criterion_title}' for criterion '{criterion_name}'")
                 except Exception as e:
                     print(f"Error generating title for criterion '{criterion_name}': {e}")
-                    # Fallback: use truncated version
-                    words = criterion_name.split()[:8]
-                    criterion_title = ' '.join(words)
+                    # Fallback: extract first 2-3 meaningful words
+                    words = criterion_name.split()
+                    skip_words = {'and', 'or', 'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for'}
+                    meaningful_words = [w for w in words if w.lower() not in skip_words][:3]
+                    criterion_title = ' '.join(meaningful_words) if meaningful_words else ' '.join(words[:3])
             
             criterion_scores.append({
                 "criterion_name": criterion_name,
