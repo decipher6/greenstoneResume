@@ -18,7 +18,7 @@ DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 from models import Candidate, CandidateStatus, ContactInfo, ScoreBreakdown, CriterionScore
 from utils.cv_parser import parse_resume
 from utils.entity_extraction import extract_entities_with_llm, extract_contact_info, extract_name, extract_location
-from utils.ai_scoring import score_resume_with_llm, calculate_composite_score
+from utils.ai_scoring import score_resume_with_llm, calculate_composite_score, check_location_match
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
 
@@ -455,6 +455,24 @@ async def get_candidate(candidate_id: str):
             {"$set": {"status": CandidateStatus.reviewed.value}}
         )
         candidate["status"] = CandidateStatus.reviewed.value
+    
+    # Calculate location match if not present (for older candidates)
+    if not candidate.get("location_match") and candidate.get("job_id"):
+        try:
+            job = await db.jobs.find_one({"_id": ObjectId(candidate.get("job_id"))})
+            if job:
+                candidate_location = candidate.get("location")
+                job_regions = job.get("regions", [])
+                location_match = await check_location_match(candidate_location, job_regions)
+                # Update candidate with location match
+                await db.candidates.update_one(
+                    {"_id": ObjectId(candidate_id)},
+                    {"$set": {"location_match": location_match}}
+                )
+                candidate["location_match"] = location_match
+        except Exception as e:
+            print(f"Error calculating location match for candidate {candidate_id}: {e}")
+            # Continue without location match if calculation fails
     
     candidate["id"] = str(candidate["_id"])
     # Fix nested ObjectId if present in score_breakdown
@@ -1375,6 +1393,11 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
             # Optionally include personality in overall if desired
             # For now, overall = resume_score only
         
+        # Check location match
+        candidate_location = candidate.get("location")
+        job_regions = job.get("regions", [])
+        location_match = await check_location_match(candidate_location, job_regions)
+        
         # Update candidate - set status to 'new' after analysis completes
         await db.candidates.update_one(
             {"_id": ObjectId(candidate_id)},
@@ -1384,6 +1407,7 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
                     "score_breakdown": score_breakdown,
                     "criterion_scores": criterion_scores,
                     "ai_justification": scoring_result["justification"],
+                    "location_match": location_match,
                     "analyzed_at": datetime.now()
                 }
             }

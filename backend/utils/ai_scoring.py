@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 import asyncio
@@ -362,6 +364,73 @@ Remember: Replace "EXACT_CRITERION_NAME_1", "EXACT_CRITERION_NAME_2" with the ac
             "criterion_scores": [],
             "justification": justification
         }
+
+async def check_location_match(candidate_location: Optional[str], job_regions: List[str]) -> Dict[str, str]:
+    """
+    Check if candidate location matches job regions using LLM.
+    Returns: {"status": "match"|"mismatch"|"uncertain", "reason": "brief explanation"}
+    """
+    if not candidate_location or not job_regions:
+        return {"status": "uncertain", "reason": "Location information not available"}
+    
+    system_message = """Determine if candidate location matches job regions. Consider cities, countries, and regional groupings (GCC, APAC, EMEA, LATAM, NA).
+
+Return JSON:
+{
+    "status": "match" or "mismatch" or "uncertain",
+    "reason": "Brief explanation"
+}
+
+Examples:
+- Candidate: "Dubai, UAE", Job: ["GCC"] → "match"
+- Candidate: "New York, USA", Job: ["NA"] → "match"
+- Candidate: "London, UK", Job: ["GCC"] → "mismatch"
+- Candidate: "Singapore", Job: ["APAC"] → "match"
+- Candidate: "Unknown", Job: ["GCC"] → "uncertain"
+
+Be concise. Return JSON only."""
+
+    job_regions_str = ", ".join(job_regions)
+    user_prompt = f"""Candidate location: {candidate_location}
+Job regions: {job_regions_str}
+
+Determine match status."""
+
+    try:
+        full_prompt = f"{system_message}\n\n{user_prompt}"
+        response = await asyncio.to_thread(
+            gemini_client.models.generate_content,
+            model="gemini-3-flash-preview",
+            contents=full_prompt
+        )
+        
+        if not response or not response.text:
+            return {"status": "uncertain", "reason": "Unable to determine"}
+        
+        content = response.text.strip()
+        # Extract JSON
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
+        if json_match:
+            content = json_match.group(0)
+        
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        
+        result = json.loads(content)
+        status = result.get("status", "uncertain").lower()
+        if status not in ["match", "mismatch", "uncertain"]:
+            status = "uncertain"
+        
+        return {
+            "status": status,
+            "reason": result.get("reason", "Location comparison completed")
+        }
+    except Exception as e:
+        if DEBUG:
+            print(f"Error in location match: {e}")
+        return {"status": "uncertain", "reason": "Unable to determine location match"}
 
 async def calculate_composite_score(score_breakdown: Dict, weights: Dict) -> float:
     """Calculate composite score from multiple components"""

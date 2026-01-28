@@ -459,15 +459,72 @@ const CandidateProfile = () => {
               }`}>
                 {statusBadge}
               </span>
+              {percentile !== null && (
+                <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-500/30 text-gray-400 border border-gray-500/40">
+                  {percentile}{getOrdinalSuffix(percentile)} percentile
+                </span>
+              )}
               {rank && (
                 <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-400/40 text-purple-300 border border-purple-400/60">
                   Rank #{rank} of {allCandidates.length}
                 </span>
               )}
             </div>
-            <p className="text-lg text-gray-400">{jobTitle}</p>
+            <p className="text-lg text-gray-400 mb-3">{jobTitle}</p>
+            
+            {/* Rating Section */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => handleRating(star)}
+                    className="transition-all hover:scale-110"
+                    title={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+                  >
+                    <Star 
+                      size={24} 
+                      className={`${
+                        candidate?.rating >= star 
+                          ? 'text-yellow-400 fill-yellow-400' 
+                          : 'text-gray-500 fill-none'
+                      } transition-colors`}
+                    />
+                  </button>
+                ))}
+              </div>
+              {candidate?.rating && (
+                <span className="text-sm text-gray-400">
+                  ({candidate.rating} star{candidate.rating !== 1 ? 's' : ''})
+                </span>
+              )}
+            </div>
           </div>
           
+          {/* Action Buttons - Right Side */}
+          <div className="flex flex-col gap-2 ml-4">
+            <button
+              onClick={() => setShowInterviewModal(true)}
+              className="glass-button flex items-center justify-center gap-2 text-sm whitespace-nowrap"
+            >
+              <Calendar size={16} />
+              Invite to Interview
+            </button>
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className="glass-button-secondary flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 border-red-500/30 whitespace-nowrap"
+            >
+              <Send size={16} />
+              Reject
+            </button>
+            <button
+              onClick={handleDelete}
+              className="glass-button-secondary flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 border-red-500/30 whitespace-nowrap"
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
+          </div>
         </div>
 
         {/* Job Requirements Match Checklist */}
@@ -567,15 +624,15 @@ const CandidateProfile = () => {
                     )}
                   </div>
 
-                  {/* Percentile Ranking */}
-                  {percentile !== null && (
+                  {/* Rank Display */}
+                  {rank && (
                     <div className="mb-6 pt-6 border-t border-glass-200">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-300">Percentile Ranking</span>
-                        <span className="text-xl font-bold text-green-200">{percentile}{getOrdinalSuffix(percentile)}</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-300">Rank</span>
+                        <span className="text-3xl font-bold text-purple-300">#{rank} of {allCandidates.length}</span>
                       </div>
                       <p className="text-xs text-gray-300 mt-1">
-                        This candidate ranks in the {percentile}{getOrdinalSuffix(percentile)} percentile among all applicants for this position.
+                        This candidate is ranked #{rank} out of {allCandidates.length} applicants for this position.
                       </p>
                     </div>
                   )}
@@ -691,59 +748,53 @@ const CandidateProfile = () => {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Location Match */}
                 <div className="glass-card p-6">
-                  <h3 className="text-lg font-semibold mb-4">Actions</h3>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setShowInterviewModal(true)}
-                      className="glass-button w-full flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Calendar size={16} />
-                      Invite to Interview
-                    </button>
-                    <div className="glass-button-secondary w-full p-3">
-                      <div className="text-xs text-gray-400 mb-2 text-center">Rating</div>
-                      <div className="flex items-center justify-center gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            onClick={() => handleRating(star)}
-                            className="transition-all hover:scale-110"
-                            title={`Rate ${star} star${star !== 1 ? 's' : ''}`}
-                          >
-                            <Star 
-                              size={20} 
-                              className={`${
-                                candidate?.rating >= star 
-                                  ? 'text-yellow-400 fill-yellow-400' 
-                                  : 'text-gray-500 fill-none'
-                              } transition-colors`}
-                            />
-                          </button>
-                        ))}
-                      </div>
-                      {candidate?.rating && (
-                        <div className="text-xs text-gray-400 mt-1 text-center">
-                          {candidate.rating} star{candidate.rating !== 1 ? 's' : ''}
+                  <h3 className="text-lg font-semibold mb-4">Location Match</h3>
+                  {candidate.location_match ? (
+                    <div className="space-y-3">
+                      <div className={`text-center py-6 rounded-lg ${
+                        candidate.location_match.status === 'match'
+                          ? 'bg-green-500/20 border-2 border-green-400/60'
+                          : candidate.location_match.status === 'mismatch'
+                          ? 'bg-red-500/20 border-2 border-red-400/60'
+                          : 'bg-yellow-500/20 border-2 border-yellow-400/60'
+                      }`}>
+                        <div className={`text-4xl font-bold mb-2 ${
+                          candidate.location_match.status === 'match'
+                            ? 'text-green-300'
+                            : candidate.location_match.status === 'mismatch'
+                            ? 'text-red-400'
+                            : 'text-yellow-400'
+                        }`}>
+                          {candidate.location_match.status === 'match' 
+                            ? 'Location Match' 
+                            : candidate.location_match.status === 'mismatch'
+                            ? 'Location Mismatch'
+                            : 'Location Uncertain'}
                         </div>
+                        {candidate.location && (
+                          <p className="text-sm text-gray-300 mb-1">
+                            Candidate: {candidate.location}
+                          </p>
+                        )}
+                        {job?.regions && job.regions.length > 0 && (
+                          <p className="text-sm text-gray-300">
+                            Job Regions: {job.regions.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                      {candidate.location_match.reason && (
+                        <p className="text-sm text-gray-400 text-center">
+                          {candidate.location_match.reason}
+                        </p>
                       )}
                     </div>
-                    <button
-                      onClick={() => setShowEmailModal(true)}
-                      className="glass-button-secondary w-full flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 border-red-500/30"
-                    >
-                      <Send size={16} />
-                      Reject
-                    </button>
-                    <button
-                      onClick={handleDelete}
-                      className="glass-button-secondary w-full flex items-center justify-center gap-2 text-sm text-red-400 hover:bg-red-500/20 border-red-500/30"
-                    >
-                      <Trash2 size={16} />
-                      Delete
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="text-center py-6 text-gray-400">
+                      Location match information not available
+                    </div>
+                  )}
                 </div>
 
                 {/* Criterion Breakdown - Bottom Right */}
