@@ -16,7 +16,7 @@ const CreateJobModal = ({ onClose }) => {
     regions: [],
     otherRegions: '', // For custom "Other" locations
     evaluation_criteria: [
-      { name: 'Technical Skills', weight: 30 }
+      { name: 'Technical Skills', sliderValue: 50 } // sliderValue is 0-100, weight will be calculated
     ]
   })
   const [fieldErrors, setFieldErrors] = useState({})
@@ -38,10 +38,28 @@ const CreateJobModal = ({ onClose }) => {
     }
   }, [regionsDropdownOpen])
 
-  const totalWeight = formData.evaluation_criteria.reduce((sum, c) => {
-    const weight = c.weight === '' ? 0 : (parseFloat(c.weight) || 0)
-    return sum + weight
-  }, 0)
+  // Calculate percentages from slider values
+  const calculatePercentages = (criteria) => {
+    const totalSliderValue = criteria.reduce((sum, c) => {
+      const sliderVal = c.sliderValue === '' || c.sliderValue === undefined ? 0 : (parseFloat(c.sliderValue) || 0)
+      return sum + sliderVal
+    }, 0)
+    
+    if (totalSliderValue === 0) {
+      // If all sliders are 0, distribute equally
+      const equalWeight = 100 / criteria.length
+      return criteria.map(() => equalWeight)
+    }
+    
+    // Calculate percentages proportionally
+    return criteria.map(c => {
+      const sliderVal = c.sliderValue === '' || c.sliderValue === undefined ? 0 : (parseFloat(c.sliderValue) || 0)
+      return (sliderVal / totalSliderValue) * 100
+    })
+  }
+
+  const percentages = calculatePercentages(formData.evaluation_criteria)
+  const totalWeight = percentages.reduce((sum, p) => sum + p, 0)
 
   const regionOptions = ['GCC', 'APAC', 'EMEA', 'LATAM', 'NA', 'All', 'Other']
 
@@ -72,16 +90,7 @@ const CreateJobModal = ({ onClose }) => {
         errors[`name-${index}`] = 'Criterion name is required.'
         hasErrors = true
       }
-      if (criterion.weight === '' || criterion.weight === null || criterion.weight === undefined) {
-        errors[`weight-${index}`] = 'Weight is required.'
-        hasErrors = true
-      } else {
-        const weight = parseFloat(criterion.weight)
-        if (isNaN(weight) || weight < 0 || weight > 100) {
-          errors[`weight-${index}`] = 'Value must be between 0 and 100.'
-          hasErrors = true
-        }
-      }
+      // Slider values are always valid (0-100), so no need to validate weight
     })
 
     setFieldErrors(errors)
@@ -104,9 +113,15 @@ const CreateJobModal = ({ onClose }) => {
       const generatedCriteria = response.data.criteria || []
       
       if (generatedCriteria.length > 0) {
+        // Convert weight to sliderValue (distribute evenly for generated criteria)
+        const criteriaWithSliders = generatedCriteria.map(criterion => ({
+          name: criterion.name,
+          sliderValue: 50 // Default slider value, will be normalized
+        }))
+        
         setFormData({
           ...formData,
-          evaluation_criteria: generatedCriteria
+          evaluation_criteria: criteriaWithSliders
         })
         await showAlert('Success', 'Evaluation criteria generated successfully!', 'success')
       } else {
@@ -152,9 +167,17 @@ const CreateJobModal = ({ onClose }) => {
         finalRegions = formData.regions.filter(r => r !== 'Other')
       }
       
+      // Calculate final percentages and convert criteria to weight format
+      const finalPercentages = calculatePercentages(formData.evaluation_criteria)
+      const criteriaWithWeights = formData.evaluation_criteria.map((criterion, index) => ({
+        name: criterion.name,
+        weight: Math.round(finalPercentages[index] * 10) / 10 // Round to 1 decimal place
+      }))
+      
       const jobData = {
         ...formData,
-        regions: finalRegions
+        regions: finalRegions,
+        evaluation_criteria: criteriaWithWeights
       }
       
       const response = await createJob(jobData)
@@ -190,7 +213,7 @@ const CreateJobModal = ({ onClose }) => {
   const addCriterion = () => {
     setFormData({
       ...formData,
-      evaluation_criteria: [...formData.evaluation_criteria, { name: '', weight: '' }]
+      evaluation_criteria: [...formData.evaluation_criteria, { name: '', sliderValue: 50 }] // Default slider value
     })
   }
 
@@ -203,8 +226,8 @@ const CreateJobModal = ({ onClose }) => {
 
   const updateCriterion = (index, field, value) => {
     const updated = [...formData.evaluation_criteria]
-    if (field === 'weight') {
-      updated[index][field] = value === '' ? '' : parseFloat(value) || ''
+    if (field === 'sliderValue') {
+      updated[index][field] = parseFloat(value) || 0
     } else {
       updated[index][field] = value
     }
@@ -383,68 +406,66 @@ const CreateJobModal = ({ onClose }) => {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="block text-sm font-medium">Evaluation Criteria</label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleGenerateCriteria}
-                    disabled={generatingCriteria || !formData.description.trim()}
-                    className="glass-button-secondary flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Sparkles size={14} className={generatingCriteria ? 'animate-spin' : ''} />
-                    {generatingCriteria ? 'Generating...' : 'Generate with AI'}
-                  </button>
-                  <div className={`text-sm font-medium ${Math.abs(totalWeight - 100) <= 1 ? 'text-green-300' : 'text-red-400'}`}>
-                    Total: {totalWeight.toFixed(1)}% {Math.abs(totalWeight - 100) <= 1 ? '✓' : '(Must be 100%)'}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateCriteria}
+                  disabled={generatingCriteria || !formData.description.trim()}
+                  className="glass-button-secondary flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Sparkles size={14} className={generatingCriteria ? 'animate-spin' : ''} />
+                  {generatingCriteria ? 'Generating...' : 'Generate with AI'}
+                </button>
               </div>
-              <div className="space-y-3">
-                {formData.evaluation_criteria.map((criterion, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="flex-1 relative">
-                      <textarea
-                        placeholder="Criterion name"
-                        title={criterion.name || ''}
-                        className={`glass-input w-full resize-none ${fieldErrors[`name-${index}`] ? 'border-red-400' : ''}`}
-                        value={criterion.name}
-                        onChange={(e) => {
-                          updateCriterion(index, 'name', e.target.value)
-                          autoResizeTextarea(e.target)
-                        }}
-                        onInput={(e) => autoResizeTextarea(e.target)}
-                        rows={1}
-                        style={{ minHeight: '40px', maxHeight: '72px', overflowY: 'auto' }}
-                      />
-                      {fieldErrors[`name-${index}`] && (
-                        <p className="text-red-400 text-xs mt-1">{fieldErrors[`name-${index}`]}</p>
-                      )}
+              <div className="space-y-4">
+                {formData.evaluation_criteria.map((criterion, index) => {
+                  const calculatedPercentage = percentages[index]
+                  return (
+                    <div key={index} className="space-y-2">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 relative">
+                          <textarea
+                            placeholder="Criterion name"
+                            title={criterion.name || ''}
+                            className={`glass-input w-full resize-none ${fieldErrors[`name-${index}`] ? 'border-red-400' : ''}`}
+                            value={criterion.name}
+                            onChange={(e) => {
+                              updateCriterion(index, 'name', e.target.value)
+                              autoResizeTextarea(e.target)
+                            }}
+                            onInput={(e) => autoResizeTextarea(e.target)}
+                            rows={1}
+                            style={{ minHeight: '40px', maxHeight: '72px', overflowY: 'auto' }}
+                          />
+                          {fieldErrors[`name-${index}`] && (
+                            <p className="text-red-400 text-xs mt-1">{fieldErrors[`name-${index}`]}</p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeCriterion(index)}
+                          className="p-2 rounded-lg hover:bg-red-500/20 transition-colors mt-0.5"
+                          disabled={formData.evaluation_criteria.length === 1}
+                        >
+                          <X size={18} className="text-red-400" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          className="flex-1 h-2 bg-glass-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                          style={{
+                            background: `linear-gradient(to right, #a855f7 0%, #a855f7 ${criterion.sliderValue || 0}%, #1a1a2e ${criterion.sliderValue || 0}%, #1a1a2e 100%)`
+                          }}
+                          value={criterion.sliderValue || 0}
+                          onChange={(e) => updateCriterion(index, 'sliderValue', e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        placeholder="Weight"
-                        className={`glass-input w-24 ${fieldErrors[`weight-${index}`] ? 'border-red-400' : ''}`}
-                        value={criterion.weight === 0 ? '' : criterion.weight}
-                        onChange={(e) => updateCriterion(index, 'weight', e.target.value)}
-                      />
-                      {fieldErrors[`weight-${index}`] && (
-                        <p className="text-red-400 text-xs mt-1 absolute">{fieldErrors[`weight-${index}`]}</p>
-                      )}
-                    </div>
-                    <span className="text-gray-400 pt-2">%</span>
-                    <button
-                      type="button"
-                      onClick={() => removeCriterion(index)}
-                      className="p-2 rounded-lg hover:bg-red-500/20 transition-colors mt-0.5"
-                      disabled={formData.evaluation_criteria.length === 1}
-                    >
-                      <X size={18} className="text-red-400" />
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
                 <button
                   type="button"
                   onClick={addCriterion}
@@ -520,7 +541,7 @@ const CreateJobModal = ({ onClose }) => {
                     >
                       {criterion.name}
                     </div>
-                    <span className="text-primary-400 font-semibold flex-shrink-0">{criterion.weight}%</span>
+                    <span className="text-primary-400 font-semibold flex-shrink-0">{percentages[index].toFixed(1)}%</span>
                   </div>
                 ))}
                 <div className="flex items-center justify-between p-3 bg-glass-200 rounded-lg mt-2">

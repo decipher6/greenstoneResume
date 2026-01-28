@@ -12,7 +12,6 @@ from google import genai
 from database import get_db
 from models import Job, JobCreate, JobStatus
 from utils.ai_scoring import score_resume_with_llm
-from utils.criterion_title import generate_criterion_alias
 from routes.candidates import process_candidate_analysis
 from routes.activity_logs import log_activity
 from routes.auth import get_current_user_id
@@ -240,29 +239,6 @@ async def create_job(job: JobCreate, user_id: Optional[str] = Depends(get_curren
     job_dict["last_run"] = now  # Set last_run to creation time
     job_dict["status"] = "active"
     job_dict["candidate_count"] = 0
-    
-    # Generate aliases for criteria longer than 5 words
-    import re
-    for criterion in job_dict.get("evaluation_criteria", []):
-        criterion_name = criterion.get("name", "")
-        if criterion_name:
-            # Count words excluding parentheses
-            main_text = re.sub(r'\([^)]*\)', '', criterion_name).strip()
-            word_count = len(main_text.split()) if main_text else len(criterion_name.split())
-            
-            if word_count > 5:
-                try:
-                    alias = await generate_criterion_alias(criterion_name)
-                    criterion["alias"] = alias
-                    if DEBUG:
-                        print(f"DEBUG: Generated alias '{alias}' for criterion '{criterion_name}'")
-                except Exception as e:
-                    print(f"Error generating alias for criterion '{criterion_name}': {e}")
-                    # Fallback: use first 2-3 meaningful words
-                    words = criterion_name.split()
-                    skip_words = {'and', 'or', 'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for'}
-                    meaningful_words = [w for w in words if w.lower() not in skip_words][:3]
-                    criterion["alias"] = ' '.join(meaningful_words) if meaningful_words else ' '.join(words[:3])
     
     result = await db.jobs.insert_one(job_dict)
     job_dict["id"] = str(result.inserted_id)
