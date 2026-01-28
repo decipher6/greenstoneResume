@@ -751,7 +751,7 @@ const CandidateProfile = () => {
                 {/* Location Match */}
                 <div className="glass-card p-6">
                   <h3 className="text-lg font-semibold mb-4">Location Match</h3>
-                  {candidate.location_match ? (
+                  {candidate.location_match && candidate.location_match.status ? (
                     <div className="space-y-3">
                       <div className={`text-center py-6 rounded-lg ${
                         candidate.location_match.status === 'match'
@@ -792,7 +792,8 @@ const CandidateProfile = () => {
                     </div>
                   ) : (
                     <div className="text-center py-6 text-gray-400">
-                      Location match information not available
+                      <p className="mb-2">Calculating location match...</p>
+                      <p className="text-xs">If this persists, location match may not be available for this candidate.</p>
                     </div>
                   )}
                 </div>

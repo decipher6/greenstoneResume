@@ -475,23 +475,56 @@ async def get_candidate(candidate_id: str):
         )
         candidate["status"] = CandidateStatus.reviewed.value
     
-    # Calculate location match if not present (for older candidates)
-    if not candidate.get("location_match") and candidate.get("job_id"):
+    # Calculate location match if not present (for older candidates or if calculation failed)
+    # Check if location_match is missing, None, empty dict, or doesn't have required fields
+    location_match = candidate.get("location_match")
+    needs_location_match = (
+        not location_match or 
+        not isinstance(location_match, dict) or 
+        "status" not in location_match or
+        location_match.get("status") not in ["match", "mismatch", "uncertain"]
+    )
+    
+    if needs_location_match and candidate.get("job_id"):
         try:
             job = await db.jobs.find_one({"_id": ObjectId(candidate.get("job_id"))})
             if job:
                 candidate_location = candidate.get("location")
                 job_regions = job.get("regions", [])
+                if DEBUG:
+                    print(f"Calculating location match for candidate {candidate_id}: location={candidate_location}, regions={job_regions}")
                 location_match = await check_location_match(candidate_location, job_regions)
+                if DEBUG:
+                    print(f"Location match result: {location_match}")
+                # Validate location_match structure
+                if not location_match or not isinstance(location_match, dict):
+                    location_match = {"status": "uncertain", "reason": "Unable to determine location match"}
+                elif "status" not in location_match:
+                    location_match = {"status": "uncertain", "reason": location_match.get("reason", "Unable to determine location match")}
                 # Update candidate with location match
                 await db.candidates.update_one(
                     {"_id": ObjectId(candidate_id)},
                     {"$set": {"location_match": location_match}}
                 )
                 candidate["location_match"] = location_match
+            else:
+                # Job not found, set uncertain
+                candidate["location_match"] = {"status": "uncertain", "reason": "Job information not available"}
         except Exception as e:
             print(f"Error calculating location match for candidate {candidate_id}: {e}")
-            # Continue without location match if calculation fails
+            import traceback
+            traceback.print_exc()
+            # Set a default uncertain status if calculation fails
+            candidate["location_match"] = {"status": "uncertain", "reason": "Unable to determine location match"}
+    elif not candidate.get("job_id"):
+        # No job_id, set uncertain
+        candidate["location_match"] = {"status": "uncertain", "reason": "No job associated with candidate"}
+    elif location_match and isinstance(location_match, dict) and "status" in location_match:
+        # Location match exists and is valid, use it
+        pass
+    else:
+        # Invalid location_match structure, set default
+        candidate["location_match"] = {"status": "uncertain", "reason": "Location match data invalid"}
     
     candidate["id"] = str(candidate["_id"])
     # Fix nested ObjectId if present in score_breakdown
@@ -499,6 +532,13 @@ async def get_candidate(candidate_id: str):
         for key, value in candidate["score_breakdown"].items():
             if isinstance(value, dict) and "$numberDouble" in value:
                 candidate["score_breakdown"][key] = float(value["$numberDouble"])
+    
+    # Ensure location_match is always present with valid structure
+    if not candidate.get("location_match") or not isinstance(candidate.get("location_match"), dict):
+        candidate["location_match"] = {"status": "uncertain", "reason": "Location match not calculated"}
+    elif "status" not in candidate["location_match"]:
+        candidate["location_match"] = {"status": "uncertain", "reason": candidate["location_match"].get("reason", "Location match data invalid")}
+    
     return Candidate(**candidate)
 
 @router.get("/{candidate_id}/view-resume")
