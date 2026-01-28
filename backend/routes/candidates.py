@@ -1461,10 +1461,10 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
                 if DEBUG:
                     print(f"Matched '{criterion_name}' with score {score:.1f} using {match_method} matching")
             
-            # Generate short title for long criterion names (>8 words)
+            # Generate short title for long criterion names (>5 words)
             criterion_title = criterion_name
             word_count = len(criterion_name.split())
-            if word_count > 8:
+            if word_count > 5:
                 try:
                     criterion_title = await generate_criterion_title(criterion_name)
                 except Exception as e:
