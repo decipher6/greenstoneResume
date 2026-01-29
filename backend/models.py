@@ -22,6 +22,7 @@ class User(BaseModel):
 class EvaluationCriterion(BaseModel):
     name: str
     weight: float  # 0-100
+    short_name: Optional[str] = None  # 2-3 word display form for long criteria
 
 class JobStatus(str, Enum):
     active = "active"
@@ -67,6 +68,7 @@ class CriterionScore(BaseModel):
     criterion_name: str
     score: float
     weight: float
+    short_name: Optional[str] = None  # 2-3 word display form; full name on hover
 
 class PersonalityTraits(BaseModel):
     openness: float = 0.0

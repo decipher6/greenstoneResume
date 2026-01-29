@@ -30,6 +30,31 @@ gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 router = APIRouter()
 
+
+async def shorten_criterion_name(long_name: str) -> str:
+    """Use LLM to generate a 2-3 word shortened form of a criterion name."""
+    if not long_name or len(long_name.strip().split()) <= 6:
+        return long_name.strip()
+    prompt = f"""Shorten this evaluation criterion name to 2-3 words only. Keep the meaning clear for a recruiter.
+Criterion: "{long_name.strip()}"
+Return ONLY the shortened phrase, nothing else. No quotes, no explanation."""
+    try:
+        response = await asyncio.to_thread(
+            gemini_client.models.generate_content,
+            model="gemini-3-flash-preview",
+            contents=prompt
+        )
+        if not response or not response.text:
+            return long_name.strip()
+        short = response.text.strip().strip('"').strip()
+        if len(short.split()) <= 4 and len(short) >= 2:
+            return short
+        return long_name.strip()
+    except Exception as e:
+        if DEBUG:
+            print(f"Shorten criterion failed: {e}")
+        return long_name.strip()
+
 @router.get("/", response_model=List[Job])
 async def get_jobs():
     """Get all job posts"""
@@ -239,6 +264,16 @@ async def create_job(job: JobCreate, user_id: Optional[str] = Depends(get_curren
     job_dict["last_run"] = now  # Set last_run to creation time
     job_dict["status"] = "active"
     job_dict["candidate_count"] = 0
+    
+    # For criteria longer than 6 words, generate short_name via LLM
+    criteria = job_dict.get("evaluation_criteria", [])
+    for c in criteria:
+        name = c.get("name", "")
+        if len(name.split()) > 6:
+            c["short_name"] = await shorten_criterion_name(name)
+        else:
+            c["short_name"] = None
+    job_dict["evaluation_criteria"] = criteria
     
     result = await db.jobs.insert_one(job_dict)
     job_dict["id"] = str(result.inserted_id)

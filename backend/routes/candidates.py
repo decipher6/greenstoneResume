@@ -1463,7 +1463,8 @@ async def process_candidate_analysis(job_id: str, candidate_id: str, retry_count
             criterion_scores.append({
                 "criterion_name": criterion_name,
                 "score": float(score),
-                "weight": criterion["weight"]
+                "weight": criterion["weight"],
+                "short_name": criterion.get("short_name")
             })
         
         if DEBUG:

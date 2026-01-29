@@ -821,10 +821,16 @@ const CandidateProfile = () => {
                     <div className="space-y-4">
                       {candidate.criterion_scores.map((criterion, index) => {
                         const score = parseFloat(criterion.score || 0)
+                        const displayName = criterion.short_name || criterion.criterion_name
                         return (
                           <div key={index}>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium">{criterion.criterion_name}</span>
+                              <span
+                                className="text-sm font-medium"
+                                title={criterion.criterion_name}
+                              >
+                                {displayName}
+                              </span>
                               <span className="text-sm font-semibold text-emerald-400">{score.toFixed(1)}/10</span>
                             </div>
                             <div className="h-2 bg-glass-200 rounded-full overflow-hidden">
