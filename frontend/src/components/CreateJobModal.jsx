@@ -113,10 +113,12 @@ const CreateJobModal = ({ onClose }) => {
       const generatedCriteria = response.data.criteria || []
       
       if (generatedCriteria.length > 0) {
-        // Convert weight to sliderValue (distribute evenly for generated criteria)
+        // Convert weight percentages to sliderValue positions
+        // Use the weight values directly as slider positions since they sum to 100
+        // This ensures the normalized percentages match the AI-generated weights
         const criteriaWithSliders = generatedCriteria.map(criterion => ({
           name: criterion.name,
-          sliderValue: 50 // Default slider value, will be normalized
+          sliderValue: criterion.weight || 50 // Use AI-generated weight as slider position
         }))
         
         setFormData({
