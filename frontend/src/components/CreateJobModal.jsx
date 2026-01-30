@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, AlertTriangle, Sparkles, ChevronRight, ChevronLeft } from 'lucide-react'
+import { X, AlertTriangle, Sparkles, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react'
 import { createJob, generateEvaluationCriteria } from '../services/api'
 import { useModal } from '../context/ModalContext'
 
@@ -9,6 +9,7 @@ const CreateJobModal = ({ onClose }) => {
   const navigate = useNavigate()
   const [step, setStep] = useState(1) // 1: Form, 2: Review
   const [generatingCriteria, setGeneratingCriteria] = useState(false)
+  const [creatingJob, setCreatingJob] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     department: '',
@@ -16,7 +17,7 @@ const CreateJobModal = ({ onClose }) => {
     regions: [],
     otherRegions: '', // For custom "Other" locations
     evaluation_criteria: [
-      { name: 'Technical Skills', sliderValue: 50 } // sliderValue is 0-100, weight will be calculated
+      { name: 'Technical Skills', sliderValue: 5 } // sliderValue 0-10, normalized to weights
     ]
   })
   const [fieldErrors, setFieldErrors] = useState({})
@@ -38,7 +39,7 @@ const CreateJobModal = ({ onClose }) => {
     }
   }, [regionsDropdownOpen])
 
-  // Calculate percentages from slider values
+  // Sliders are 0-10; normalize to percentages for backend
   const calculatePercentages = (criteria) => {
     const totalSliderValue = criteria.reduce((sum, c) => {
       const sliderVal = c.sliderValue === '' || c.sliderValue === undefined ? 0 : (parseFloat(c.sliderValue) || 0)
@@ -46,12 +47,10 @@ const CreateJobModal = ({ onClose }) => {
     }, 0)
     
     if (totalSliderValue === 0) {
-      // If all sliders are 0, distribute equally
       const equalWeight = 100 / criteria.length
       return criteria.map(() => equalWeight)
     }
     
-    // Calculate percentages proportionally
     return criteria.map(c => {
       const sliderVal = c.sliderValue === '' || c.sliderValue === undefined ? 0 : (parseFloat(c.sliderValue) || 0)
       return (sliderVal / totalSliderValue) * 100
@@ -90,7 +89,7 @@ const CreateJobModal = ({ onClose }) => {
         errors[`name-${index}`] = 'Criterion name is required.'
         hasErrors = true
       }
-      // Slider values are always valid (0-100), so no need to validate weight
+      // Slider values are 0-10, no need to validate weight
     })
 
     setFieldErrors(errors)
@@ -113,12 +112,10 @@ const CreateJobModal = ({ onClose }) => {
       const generatedCriteria = response.data.criteria || []
       
       if (generatedCriteria.length > 0) {
-        // Convert weight percentages to sliderValue positions
-        // Use the weight values directly as slider positions since they sum to 100
-        // This ensures the normalized percentages match the AI-generated weights
+        // Convert weight percentages to 0-10 scale: weight/10
         const criteriaWithSliders = generatedCriteria.map(criterion => ({
           name: criterion.name,
-          sliderValue: criterion.weight || 50 // Use AI-generated weight as slider position
+          sliderValue: (criterion.weight || 10) / 10 // 0-10 scale
         }))
         
         setFormData({
@@ -156,6 +153,7 @@ const CreateJobModal = ({ onClose }) => {
   }
 
   const handleSubmit = async () => {
+    setCreatingJob(true)
     try {
       // Process regions: if "Other" is selected, add the custom locations
       let finalRegions = [...formData.regions]
@@ -190,6 +188,8 @@ const CreateJobModal = ({ onClose }) => {
       console.error('Error creating job:', error)
       const errorMessage = error.response?.data?.detail || 'Error creating job. Please try again.'
       await showAlert('Error', errorMessage, 'error')
+    } finally {
+      setCreatingJob(false)
     }
   }
 
@@ -215,7 +215,7 @@ const CreateJobModal = ({ onClose }) => {
   const addCriterion = () => {
     setFormData({
       ...formData,
-      evaluation_criteria: [...formData.evaluation_criteria, { name: '', sliderValue: 50 }] // Default slider value
+      evaluation_criteria: [...formData.evaluation_criteria, { name: '', sliderValue: 5 }] // Default 5/10
     })
   }
 
@@ -420,7 +420,8 @@ const CreateJobModal = ({ onClose }) => {
               </div>
               <div className="space-y-4">
                 {formData.evaluation_criteria.map((criterion, index) => {
-                  const calculatedPercentage = percentages[index]
+                  const score = parseFloat(criterion.sliderValue) ?? 0
+                  const displayScore = Number.isInteger(score) ? score : score.toFixed(1)
                   return (
                     <div key={index} className="space-y-2">
                       <div className="flex items-start gap-3">
@@ -455,15 +456,18 @@ const CreateJobModal = ({ onClose }) => {
                         <input
                           type="range"
                           min="0"
-                          max="100"
-                          step="1"
+                          max="10"
+                          step="0.5"
                           className="flex-1 h-2 bg-glass-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
                           style={{
-                            background: `linear-gradient(to right, #a855f7 0%, #a855f7 ${criterion.sliderValue || 0}%, #1a1a2e ${criterion.sliderValue || 0}%, #1a1a2e 100%)`
+                            background: `linear-gradient(to right, #a855f7 0%, #a855f7 ${(score / 10) * 100}%, #1a1a2e ${(score / 10) * 100}%, #1a1a2e 100%)`
                           }}
-                          value={criterion.sliderValue || 0}
+                          value={criterion.sliderValue ?? 0}
                           onChange={(e) => updateCriterion(index, 'sliderValue', e.target.value)}
                         />
+                        <span className="text-sm font-semibold text-primary-400 w-10 text-right">
+                          {displayScore}/10
+                        </span>
                       </div>
                     </div>
                   )
@@ -528,28 +532,28 @@ const CreateJobModal = ({ onClose }) => {
             <div>
               <h3 className="text-lg font-semibold mb-2">Evaluation Criteria</h3>
               <div className="space-y-2">
-                {formData.evaluation_criteria.map((criterion, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-glass-100 rounded-lg">
-                    <div 
-                      className="text-gray-300 flex-1"
-                      title={criterion.name}
-                      style={{ 
-                        maxHeight: '72px', // 3 lines * 24px line height
-                        overflowY: 'auto',
-                        overflowX: 'hidden',
-                        wordWrap: 'break-word',
-                        lineHeight: '24px'
-                      }}
-                    >
-                      {criterion.name}
+                {formData.evaluation_criteria.map((criterion, index) => {
+                  const score = parseFloat(criterion.sliderValue) ?? 0
+                  const displayScore = Number.isInteger(score) ? score : score.toFixed(1)
+                  return (
+                    <div key={index} className="flex items-start gap-3 p-3 bg-glass-100 rounded-lg">
+                      <div 
+                        className="text-gray-300 flex-1"
+                        title={criterion.name}
+                        style={{ 
+                          maxHeight: '72px',
+                          overflowY: 'auto',
+                          overflowX: 'hidden',
+                          wordWrap: 'break-word',
+                          lineHeight: '24px'
+                        }}
+                      >
+                        {criterion.name}
+                      </div>
+                      <span className="text-primary-400 font-semibold flex-shrink-0">{displayScore}/10</span>
                     </div>
-                    <span className="text-primary-400 font-semibold flex-shrink-0">{percentages[index].toFixed(1)}%</span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between p-3 bg-glass-200 rounded-lg mt-2">
-                  <span className="font-semibold text-white">Total</span>
-                  <span className="font-semibold text-green-300">{totalWeight.toFixed(1)}%</span>
-                </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -565,9 +569,17 @@ const CreateJobModal = ({ onClose }) => {
               <button 
                 type="button" 
                 onClick={handleSubmit} 
-                className="glass-button"
+                disabled={creatingJob}
+                className="glass-button flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Job
+                {creatingJob ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Creating Job...
+                  </>
+                ) : (
+                  'Create Job'
+                )}
               </button>
             </div>
           </div>

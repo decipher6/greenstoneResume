@@ -31,14 +31,17 @@
     bottom: 0;
   }
   
+  /* App at 80% visual scale at 100% browser zoom */
   #root {
-    width: 111.11vw; /* Compensate for 0.9 scale: 100% / 0.9 = 111.11% */
-    height: 111.11vh;
-    min-height: 111.11vh;
-    transform: scale(0.9);
+    width: 125%;
+    height: 125vh;
+    min-height: 125vh;
+    transform: scale(0.8);
     transform-origin: top left;
     overflow: auto;
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
     background: transparent;
   }
 }
