@@ -9,7 +9,10 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
+import hashlib
+import re
 import mammoth
+from pymongo import UpdateOne
 
 from database import get_db
 
@@ -27,6 +30,29 @@ router = APIRouter()
 
 # Use /tmp on serverless (Vercel) as it's writable, otherwise use uploads
 UPLOAD_DIR = "/tmp" if os.getenv("VERCEL") else "uploads"
+
+# ---------
+# Deduping helpers
+# ---------
+_EMAIL_RE = re.compile(r"\s+")
+_PHONE_NON_DIGIT_RE = re.compile(r"[^\d]+")
+
+def normalize_email(email: Optional[str]) -> Optional[str]:
+    if not email:
+        return None
+    normalized = _EMAIL_RE.sub("", str(email)).strip().lower()
+    return normalized or None
+
+def normalize_phone(phone: Optional[str]) -> Optional[str]:
+    if not phone:
+        return None
+    digits = _PHONE_NON_DIGIT_RE.sub("", str(phone))
+    # Keep last 15 digits to avoid wildly long garbage strings
+    digits = digits[-15:]
+    return digits or None
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 # Only create directory if not on Vercel (where /tmp already exists)
 # Create it lazily when needed, not at import time
@@ -120,6 +146,7 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
         db = get_db()
         resume_file_id = None
         resume_file_path = None
+        resume_hash = sha256_bytes(file_content)
         
         try:
             # Create GridFS bucket
@@ -155,6 +182,9 @@ async def process_single_file(file_content: bytes, filename: str, job_id: str, f
             "resume_text": resume_text,
             "resume_file_path": resume_file_path,  # Keep for backward compatibility
             "resume_file_id": resume_file_id,  # New: MongoDB GridFS file ID
+            "resume_hash": resume_hash,  # Used for dedupe when contact info is missing
+            "normalized_email": normalize_email(contact_info_dict.get("email")),
+            "normalized_phone": normalize_phone(contact_info_dict.get("phone")),
             "status": CandidateStatus.analyzing.value,  # Set to analyzing immediately so candidates are visible
             "created_at": datetime.now()
         }
@@ -192,6 +222,39 @@ async def upload_candidates_bulk(
         
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+
+        # Best-effort backfill of dedupe fields for existing candidates on this job.
+        # This prevents creating new duplicates in deployments that predate normalized_* fields.
+        try:
+            backfill_ops = []
+            async for existing in db.candidates.find(
+                {
+                    "job_id": job_id,
+                    "$or": [
+                        {"normalized_email": {"$exists": False}},
+                        {"normalized_phone": {"$exists": False}},
+                    ],
+                },
+                {"_id": 1, "contact_info": 1},
+            ):
+                contact = existing.get("contact_info") or {}
+                set_fields = {}
+                if "normalized_email" not in existing:
+                    ne = normalize_email(contact.get("email"))
+                    if ne:
+                        set_fields["normalized_email"] = ne
+                if "normalized_phone" not in existing:
+                    np = normalize_phone(contact.get("phone"))
+                    if np:
+                        set_fields["normalized_phone"] = np
+                if set_fields:
+                    backfill_ops.append(UpdateOne({"_id": existing["_id"]}, {"$set": set_fields}))
+            if backfill_ops:
+                await db.candidates.bulk_write(backfill_ops, ordered=False)
+        except Exception as backfill_error:
+            # Backfill failure should never break uploads
+            if DEBUG:
+                print(f"Warning: could not backfill dedupe fields: {backfill_error}")
         
         # Removed hard limit - process any number of files (chunked on frontend if needed)
         # Large batches are handled efficiently with parallel processing
@@ -310,13 +373,59 @@ async def upload_candidates_bulk(
             # Bulk insert candidates for this batch
             if batch_candidates:
                 try:
-                    insert_results = await db.candidates.insert_many(batch_candidates)
-                    # Add IDs to candidate dicts and collect for parallel analysis
-                    for idx, candidate_dict in enumerate(batch_candidates):
-                        candidate_id = str(insert_results.inserted_ids[idx])
-                        candidate_dict["id"] = candidate_id
-                        uploaded_candidates.append(Candidate(**candidate_dict))
-                        all_candidate_ids_to_analyze.append(candidate_id)
+                    # Deduplicate within the same job by:
+                    # - normalized_email (best)
+                    # - normalized_phone
+                    # - resume_hash (fallback when contact info missing)
+                    # For matches, we skip creating a new document (conservative behavior).
+                    bulk_ops = []
+                    passthrough_inserts = []
+                    op_context = []  # mirrors bulk_ops indices -> candidate_dict
+                    
+                    for candidate_dict in batch_candidates:
+                        normalized_email = candidate_dict.get("normalized_email")
+                        normalized_phone = candidate_dict.get("normalized_phone")
+                        resume_hash = candidate_dict.get("resume_hash")
+                        
+                        dedupe_filter = None
+                        if normalized_email:
+                            dedupe_filter = {"job_id": job_id, "normalized_email": normalized_email}
+                        elif normalized_phone:
+                            dedupe_filter = {"job_id": job_id, "normalized_phone": normalized_phone}
+                        elif resume_hash:
+                            dedupe_filter = {"job_id": job_id, "resume_hash": resume_hash}
+                        
+                        if dedupe_filter:
+                            # Only insert if not already present. Do not overwrite existing candidate data.
+                            bulk_ops.append(
+                                UpdateOne(
+                                    dedupe_filter,
+                                    {"$setOnInsert": candidate_dict},
+                                    upsert=True,
+                                )
+                            )
+                            op_context.append(candidate_dict)
+                        else:
+                            passthrough_inserts.append(candidate_dict)
+                    
+                    inserted_ids = []
+                    
+                    if bulk_ops:
+                        bulk_result = await db.candidates.bulk_write(bulk_ops, ordered=False)
+                        # Upserted IDs correspond to new inserts for upserts
+                        if getattr(bulk_result, "upserted_ids", None):
+                            inserted_ids.extend([str(v) for v in bulk_result.upserted_ids.values()])
+                    
+                    if passthrough_inserts:
+                        insert_results = await db.candidates.insert_many(passthrough_inserts, ordered=False)
+                        inserted_ids.extend([str(_id) for _id in insert_results.inserted_ids])
+                    
+                    # Fetch inserted candidates to return consistent models
+                    if inserted_ids:
+                        async for cand in db.candidates.find({"_id": {"$in": [ObjectId(i) for i in inserted_ids]}}):
+                            cand["id"] = str(cand["_id"])
+                            uploaded_candidates.append(Candidate(**cand))
+                            all_candidate_ids_to_analyze.append(cand["id"])
                 except Exception as e:
                     error_msg = str(e)
                     print(f"Error bulk inserting candidates: {error_msg}")
@@ -325,6 +434,24 @@ async def upload_candidates_bulk(
                     # Fallback to individual inserts if bulk insert fails
                     for candidate_dict in batch_candidates:
                         try:
+                            # Best-effort dedupe fallback (sequential): if match exists, skip insert.
+                            normalized_email = candidate_dict.get("normalized_email")
+                            normalized_phone = candidate_dict.get("normalized_phone")
+                            resume_hash = candidate_dict.get("resume_hash")
+                            
+                            dedupe_filter = None
+                            if normalized_email:
+                                dedupe_filter = {"job_id": job_id, "normalized_email": normalized_email}
+                            elif normalized_phone:
+                                dedupe_filter = {"job_id": job_id, "normalized_phone": normalized_phone}
+                            elif resume_hash:
+                                dedupe_filter = {"job_id": job_id, "resume_hash": resume_hash}
+                            
+                            if dedupe_filter:
+                                existing = await db.candidates.find_one(dedupe_filter, {"_id": 1})
+                                if existing:
+                                    continue
+                            
                             result = await db.candidates.insert_one(candidate_dict)
                             candidate_id = str(result.inserted_id)
                             candidate_dict["id"] = candidate_id

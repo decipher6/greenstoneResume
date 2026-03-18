@@ -71,7 +71,15 @@ async def init_db():
             await db.users.create_index("email", unique=True)
             await db.jobs.create_index("title")
             await db.candidates.create_index("job_id")
-            await db.candidates.create_index([("name", 1), ("phone", 1)])
+            # Candidate dedupe + lookup indexes
+            # Keep these non-unique to avoid breaking existing deployments that may already contain duplicates.
+            # The upload flow performs upserts to avoid creating new duplicates.
+            await db.candidates.create_index([("job_id", 1), ("normalized_email", 1)])
+            await db.candidates.create_index([("job_id", 1), ("normalized_phone", 1)])
+            await db.candidates.create_index([("job_id", 1), ("resume_hash", 1)])
+            # Useful for searches / UI sorting
+            await db.candidates.create_index([("job_id", 1), ("created_at", -1)])
+            await db.candidates.create_index([("job_id", 1), ("name", 1)])
             await db.activity_logs.create_index("created_at")
             # Note: assessments collections will be created when needed
             print("✅ Database indexes created")
