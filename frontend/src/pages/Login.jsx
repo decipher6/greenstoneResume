@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Mail, Lock } from 'lucide-react'
 
 const Login = () => {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login, user, loading: authLoading } = useAuth()
+  const { login, requestOtp, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -17,12 +19,31 @@ const Login = () => {
     }
   }, [user, authLoading, navigate])
 
-  const handleSubmit = async (e) => {
+  const handleRequestOtp = async (e) => {
     e.preventDefault()
     setError('')
+    setSuccess('')
     setLoading(true)
 
-    const result = await login(email, password)
+    const result = await requestOtp(email)
+    setLoading(false)
+
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+
+    setOtpSent(true)
+    setSuccess('OTP sent to your email. It is valid for 10 minutes.')
+  }
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    setLoading(true)
+
+    const result = await login(email, otp)
     setLoading(false)
 
     if (!result.success) {
@@ -42,7 +63,9 @@ const Login = () => {
             />
           </div>
           <h1 className="text-3xl font-bold mb-2">AI Resume Checker</h1>
-          <p className="text-gray-400">Sign in to your account</p>
+          <p className="text-gray-400">
+            {otpSent ? 'Enter your one-time password' : 'Sign in with your organizational email'}
+          </p>
         </div>
 
         {error && (
@@ -51,61 +74,91 @@ const Login = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Email</label>
-            <div className="relative">
-              <Mail size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="email"
-                required
-                className="glass-input w-full pl-10"
-                placeholder="your.email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+        {success && (
+          <div className="mb-4 p-3 rounded-lg bg-green-500/20 border border-green-500/30 text-green-400 text-sm">
+            {success}
           </div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Password</label>
-            <div className="relative">
-              <Lock size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="password"
-                required
-                className="glass-input w-full pl-10"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+        {!otpSent ? (
+          <form onSubmit={handleRequestOtp} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Email</label>
+              <div className="relative">
+                <Mail size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  required
+                  className="glass-input w-full pl-10"
+                  placeholder="your.email@gsequity.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="glass-button w-full flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Signing in...
-              </>
-            ) : (
-              'Sign In'
-            )}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="glass-button w-full flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Sending OTP...
+                </>
+              ) : (
+                'Continue'
+              )}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">OTP</label>
+              <div className="relative">
+                <Lock size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  required
+                  className="glass-input w-full pl-10"
+                  placeholder="Enter 6-digit OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                />
+              </div>
+            </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-gray-400 text-sm">
-            Don't have an account?{' '}
-            <Link to="/signup" className="text-primary-400 hover:text-primary-300">
-              Sign up
-            </Link>
-          </p>
-        </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="glass-button w-full flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Signing in...
+                </>
+              ) : (
+                'Verify OTP & Sign In'
+              )}
+            </button>
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => {
+                setOtpSent(false)
+                setOtp('')
+                setSuccess('')
+              }}
+              className="glass-button w-full"
+            >
+              Change Email
+            </button>
+          </form>
+        )}
+
       </div>
     </div>
   )

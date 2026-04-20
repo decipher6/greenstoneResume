@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login as loginApi, signup as signupApi, getMe, getToken, setToken, removeToken } from '../services/auth'
+import { login as loginApi, getMe, getToken, setToken, removeToken, requestOtp as requestOtpApi } from '../services/auth'
 
 const AuthContext = createContext(null)
 
@@ -38,9 +38,21 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  const login = async (email, password) => {
+  const requestOtp = async (email) => {
     try {
-      const response = await loginApi(email, password)
+      await requestOtpApi(email)
+      return { success: true }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Failed to send OTP'
+      }
+    }
+  }
+
+  const login = async (email, otp) => {
+    try {
+      const response = await loginApi(email, otp)
       const { token, user } = response.data
       setToken(token)
       setUser(user)
@@ -54,22 +66,6 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const signup = async (email, password, name) => {
-    try {
-      const response = await signupApi(email, password, name)
-      const { token, user } = response.data
-      setToken(token)
-      setUser(user)
-      navigate('/')
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Signup failed'
-      }
-    }
-  }
-
   const logout = () => {
     removeToken()
     setUser(null)
@@ -77,7 +73,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, requestOtp, logout, loading }}>
       {children}
     </AuthContext.Provider>
   )

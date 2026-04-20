@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { ModalProvider } from './context/ModalContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
-import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import JobDetail from './pages/JobDetail'
 import CandidateProfile from './pages/CandidateProfile'
@@ -46,7 +45,6 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
-      <Route path="/signup" element={<AuthRoute><Signup /></AuthRoute>} />
       <Route
         path="/"
         element={

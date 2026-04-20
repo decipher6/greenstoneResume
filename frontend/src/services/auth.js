@@ -10,13 +10,12 @@ const authApi = axios.create({
   },
 })
 
-// Auth functions
-export const signup = (email, password, name) => {
-  return authApi.post('/auth/signup', { email, password, name })
+export const login = (email, otp) => {
+  return authApi.post('/auth/login', { email, otp })
 }
 
-export const login = (email, password) => {
-  return authApi.post('/auth/login', { email, password })
+export const requestOtp = (email) => {
+  return authApi.post('/auth/request-otp', { email })
 }
 
 export const getMe = (token) => {
