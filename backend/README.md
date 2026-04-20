@@ -65,7 +65,8 @@ The login flow is OTP-based:
 - Request OTP via `/api/auth/request-otp`
 - OTP is valid for 10 minutes
 - Successful login session token is valid for 7 days
-- OTP emails are only sent to `@gsequity.com` addresses
+- OTP emails are sent to any valid email address
+- If an email is new, the user is created automatically on OTP request
 
 Configure Resend in `.env`:
 ```env
@@ -85,6 +86,6 @@ Set `EMAIL_ENABLED=false` to disable email sending.
 - **Email errors**: 
   - Verify `RESEND_API_KEY` and sender email/domain are configured correctly
   - Check that `EMAIL_ENABLED=true` in `.env`
-  - OTP login only allows `@gsequity.com` email addresses
+  - Ensure the recipient email can receive external mail from your Resend sender
   - Check server logs for detailed error messages
 

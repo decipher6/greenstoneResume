@@ -21,7 +21,6 @@ JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
 JWT_ALGORITHM = "HS256"
 OTP_EXPIRY_MINUTES = 10
 LOGIN_TOKEN_EXPIRY_DAYS = 7
-ALLOWED_LOGIN_DOMAIN = "gsequity.com"
 
 def create_token(user_id: str, email: str) -> str:
     """Create JWT token"""
@@ -31,10 +30,6 @@ def create_token(user_id: str, email: str) -> str:
         "exp": datetime.utcnow() + timedelta(days=LOGIN_TOKEN_EXPIRY_DAYS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def is_allowed_email(email: str) -> bool:
-    """Allow login OTP delivery only to gsequity.com accounts."""
-    return email.lower().endswith(f"@{ALLOWED_LOGIN_DOMAIN}")
 
 def generate_otp() -> str:
     """Generate a 6-digit OTP."""
@@ -63,8 +58,6 @@ async def login(user_data: OTPVerify):
     db = get_db()
 
     email = user_data.email.lower()
-    if not is_allowed_email(email):
-        raise HTTPException(status_code=403, detail="Only @gsequity.com email logins are allowed")
 
     user = await find_user_by_email(db, email)
     if not user:
@@ -114,12 +107,16 @@ async def request_otp(request_data: OTPRequest):
     db = get_db()
 
     email = request_data.email.lower()
-    if not is_allowed_email(email):
-        raise HTTPException(status_code=403, detail="Only @gsequity.com email logins are allowed")
 
     user = await find_user_by_email(db, email)
     if not user:
-        raise HTTPException(status_code=404, detail="No user found with this email")
+        default_name = email.split("@")[0]
+        result = await db.users.insert_one({
+            "email": email,
+            "name": default_name,
+            "created_at": datetime.utcnow()
+        })
+        user = await db.users.find_one({"_id": result.inserted_id})
 
     otp = generate_otp()
     otp_expires_at = datetime.utcnow() + timedelta(minutes=OTP_EXPIRY_MINUTES)
