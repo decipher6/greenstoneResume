@@ -64,7 +64,7 @@ const Login = () => {
           </div>
           <h1 className="text-3xl font-bold mb-2">AI Resume Checker</h1>
           <p className="text-gray-400">
-            {otpSent ? 'Enter your one-time password' : 'Sign in with your organizational email'}
+            {otpSent ? 'Enter your one-time password' : 'Sign in with your email'}
           </p>
         </div>
 
@@ -90,7 +90,7 @@ const Login = () => {
                   type="email"
                   required
                   className="glass-input w-full pl-10"
-                  placeholder="your.email@gsequity.com"
+                  placeholder="your.email@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
