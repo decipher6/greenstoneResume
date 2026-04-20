@@ -29,14 +29,10 @@
    CORS_ORIGINS=http://localhost:5173,http://localhost:3000
    DEBUG=false
    
-   # Email Configuration (SMTP)
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_USER=your_email@gmail.com
-   SMTP_PASSWORD=your_app_password
-   SMTP_FROM_EMAIL=your_email@gmail.com
-   SMTP_FROM_NAME=Greenstone Talent Team
-   SMTP_USE_TLS=true
+   # Email Configuration (Resend)
+   RESEND_API_KEY=your_resend_api_key
+   RESEND_FROM_EMAIL=onboarding@resend.dev
+   RESEND_FROM_NAME=Greenstone Talent Team
    EMAIL_ENABLED=true
    ```
 
@@ -63,59 +59,23 @@ Visit:
 - `http://localhost:8000/api/health` - Health check
 - `http://localhost:8000/docs` - Interactive API documentation (Swagger UI)
 
-## Email Configuration
+## Email + OTP Login Configuration
 
-The email functionality uses SMTP to send emails. Here's how to configure it:
+The login flow is OTP-based:
+- Request OTP via `/api/auth/request-otp`
+- OTP is valid for 10 minutes
+- Successful login session token is valid for 7 days
+- OTP emails are only sent to `@gsequity.com` addresses
 
-### Gmail Setup (Recommended for Development)
-
-1. **Enable 2-Step Verification** on your Google account
-2. **Generate an App Password**:
-   - Go to Google Account settings → Security
-   - Under "2-Step Verification", click "App passwords"
-   - Generate a new app password for "Mail"
-   - Copy the 16-character password
-
-3. **Set in `.env`**:
-   ```env
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_USER=your_email@gmail.com
-   SMTP_PASSWORD=your_16_char_app_password
-   SMTP_FROM_EMAIL=your_email@gmail.com
-   SMTP_FROM_NAME=Greenstone Talent Team
-   SMTP_USE_TLS=true
-   SMTP_USE_SSL=false
-   SMTP_TIMEOUT=30
-   EMAIL_ENABLED=true
-   ```
-   
-   **Note**: If you encounter connection timeout errors:
-   - Try port 465 with SSL: Set `SMTP_PORT=465` and `SMTP_USE_SSL=true`
-   - Increase timeout: Set `SMTP_TIMEOUT=60` (seconds)
-   - The system will automatically try alternative Gmail ports if the primary fails
-
-### Other Email Providers
-
-**Outlook/Office 365**:
+Configure Resend in `.env`:
 ```env
-SMTP_HOST=smtp.office365.com
-SMTP_PORT=587
-SMTP_USER=your_email@outlook.com
-SMTP_PASSWORD=your_password
-SMTP_USE_TLS=true
+RESEND_API_KEY=your_resend_api_key
+RESEND_FROM_EMAIL=onboarding@resend.dev
+RESEND_FROM_NAME=Greenstone Talent Team
+EMAIL_ENABLED=true
 ```
 
-**Custom SMTP Server**:
-```env
-SMTP_HOST=your_smtp_server.com
-SMTP_PORT=587
-SMTP_USER=your_username
-SMTP_PASSWORD=your_password
-SMTP_USE_TLS=true
-```
-
-**Note**: Set `EMAIL_ENABLED=false` to disable email sending (emails will be logged but not sent).
+Set `EMAIL_ENABLED=false` to disable email sending.
 
 ## Troubleshooting
 
@@ -123,14 +83,8 @@ SMTP_USE_TLS=true
 - **MongoDB connection errors**: Check your `MONGODB_URI` in `.env`
 - **GEMINI_API_KEY errors**: Make sure your Gemini API key is set in `.env`
 - **Email errors**: 
-  - Verify SMTP credentials are correct
-  - For Gmail, make sure you're using an App Password, not your regular password
+  - Verify `RESEND_API_KEY` and sender email/domain are configured correctly
   - Check that `EMAIL_ENABLED=true` in `.env`
-  - **Connection timeout errors**:
-    - Try using port 465 with SSL: `SMTP_PORT=465` and `SMTP_USE_SSL=true`
-    - Increase timeout: `SMTP_TIMEOUT=60`
-    - Check if your network/firewall blocks SMTP ports (587, 465)
-    - If running on a cloud platform (Render, Heroku, etc.), ensure outbound SMTP is allowed
-    - The system will automatically try alternative Gmail ports if primary fails
+  - OTP login only allows `@gsequity.com` email addresses
   - Check server logs for detailed error messages
 

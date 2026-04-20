@@ -3,14 +3,12 @@ from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
 
-class UserSignup(BaseModel):
+class OTPRequest(BaseModel):
     email: EmailStr
-    password: str
-    name: str
 
-class UserLogin(BaseModel):
+class OTPVerify(BaseModel):
     email: EmailStr
-    password: str
+    otp: str
 
 class User(BaseModel):
     id: Optional[str] = None
